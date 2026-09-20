@@ -1,8 +1,8 @@
-# D.A.R. Dental Clinic — App
+# DentalVibe — Dental Clinic App
 
 Full-stack dental clinic management app for our SF capstone: appointments, patients, income, staff, with a **Patient**, **Doctor**, and **Doctor Owner** portal in one PWA.
 
-🔗 **Live (Vercel):** https://dental-clinic-nine-iota.vercel.app
+🔗 **Live (Vercel):** https://dentalvibe.vercel.app
 
 > Every push to `main` auto-deploys. Give Vercel ~1–2 min after merging.
 
@@ -18,7 +18,7 @@ You need **Node.js 18+** (check with `node -v`).
 
 ```bash
 # 1. clone
-git clone https://github.com/AttilaHuns288452/Dental-Clinic.git
+git clone https://github.com/AttilaHuns288452/dentalvibe.git
 cd Dental-Clinic
 
 # 2. frontend
@@ -40,11 +40,11 @@ Open **http://localhost:5173**. That's it — the backend is only needed for API
 `frontend/.env.local` is **gitignored** — never commit it. It needs two values:
 
 ```
-VITE_SUPABASE_URL=https://qjtzednadniskhtpjzyw.supabase.co
-VITE_SUPABASE_ANON_KEY=sb_publishable_fA2-vEEktnLWTLv0o-Kukw_K3dXTzzI
+VITE_SUPABASE_URL=https://wfmtkmfevdqbhtpqamic.supabase.co
+VITE_SUPABASE_ANON_KEY=sb_publishable_FXP8LIDjDFZ5yN53jy2F7w_xVcIokw_
 ```
 
-Both are **publishable browser values** — safe to expose (the site ships them to every visitor), data is protected by Row Level Security. If these ever stop working, grab fresh ones: [supabase.com](https://supabase.com) → project **AttilaHuns288452's Project** → ⚙️ Project Settings → **API**.
+Both are **publishable browser values** — safe to expose (the site ships them to every visitor), data is protected by Row Level Security. If these ever stop working, grab fresh ones: [supabase.com](https://supabase.com) → project **DentalVibe** → ⚙️ Project Settings → **API**.
 
 ## Trying the app
 
