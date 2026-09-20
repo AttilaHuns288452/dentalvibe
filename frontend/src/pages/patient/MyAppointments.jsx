@@ -47,7 +47,7 @@ export default function MyAppointments() {
             <div className="text-xs text-gray-500 mt-1">
               {a.requested_date || (a.scheduled_at ? new Date(a.scheduled_at).toLocaleDateString() : 'Date to be assigned')}
               {a.dentists?.full_name ? ` · ${a.dentists.full_name}` : ''}
-              {a.services?.price ? ` · ${peso(a.price ?? a.services.price)}` : ''}
+              {` · ${peso(a.price ?? a.services?.price)}`}
             </div>
             {a.notes && <div className="text-xs text-gray-400 mt-1 italic">"{a.notes}"</div>}
             {a.status === 'pending' && (

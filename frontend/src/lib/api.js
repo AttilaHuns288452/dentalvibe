@@ -1,7 +1,7 @@
+import { supabase } from '../supabaseClient'
+
 // Supabase data access — every query the app makes, in one place.
 // ponytail: no React Query/SWR; components fetch on mount, refresh on action.
-
-import { supabase } from '../supabaseClient'
 
 export const peso = (v) => '₱' + Number(v ?? 0).toLocaleString('en-US')
 
@@ -84,10 +84,10 @@ export async function deleteService(id) {
 export async function listPriceExceptions(serviceId) {
   const { data, error } = await supabase
     .from('service_prices')
-    .select('patient_id, price, patients(full_name, id:patient_id)')
+    .select('patient_id, price')
     .eq('service_id', serviceId)
   if (error) throw error
-  return (data ?? []).map((r) => ({ patient_id: r.patient_id, price: r.price, name: r.patients?.full_name }))
+  return data ?? []
 }
 
 export async function upsertPriceException(serviceId, patientId, price) {
@@ -106,6 +106,17 @@ export async function deletePriceException(serviceId, patientId) {
   if (error) throw error
 }
 
+// effective price for one patient+service: exception wins over base
+export async function getEffectivePrice(patientId, serviceId, basePrice) {
+  const { data } = await supabase
+    .from('service_prices')
+    .select('price')
+    .eq('service_id', serviceId)
+    .eq('patient_id', patientId)
+    .maybeSingle()
+  return data?.price ?? basePrice
+}
+
 // ---- patients (staff) ----
 export async function listPatients() {
   const { data, error } = await supabase
@@ -117,10 +128,10 @@ export async function listPatients() {
 }
 
 // ---- appointments ----
-export async function bookAppointment({ patientId, serviceId, requestedDate, notes }) {
+export async function bookAppointment({ patientId, serviceId, requestedDate, notes, price }) {
   const { data, error } = await supabase
     .from('appointments')
-    .insert({ patient_id: patientId, service_id: serviceId, requested_date: requestedDate, notes, status: 'pending' })
+    .insert({ patient_id: patientId, service_id: serviceId, requested_date: requestedDate, notes, price, status: 'pending' })
     .select()
     .single()
   if (error) throw error
@@ -166,12 +177,9 @@ export async function listChat(patientId) {
 }
 
 export async function sendChat(patientId, sender, body) {
-  const { error } = await supabase.from('chat_messages').insert({ patient_id: patient_idFix(patientId), sender, body })
+  const { error } = await supabase.from('chat_messages').insert({ patient_id: patientId, sender, body })
   if (error) throw error
 }
-
-// ponytail: guard against undefined slipping through callers
-const patient_idFix = (id) => id
 
 export function subscribeChat(patientId, onInsert) {
   const channel = supabase

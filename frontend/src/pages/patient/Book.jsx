@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react'
 import { useAuth } from '../../context/RoleContext'
-import { listServices, bookAppointment, peso } from '../../lib/api'
+import { listServices, bookAppointment, peso, getEffectivePrice } from '../../lib/api'
 
-// Patient booking: pick service → pick date → notes → submit. Figma frame 04.
+// Patient booking: pick service → date → notes → submit.
+// The price shown is the patient's EFFECTIVE price (custom exception if set).
 
 export default function Book() {
   const { patientRecord } = useAuth()
   const [services, setServices] = useState([])
+  const [prices, setPrices] = useState({}) // serviceId → effective price
   const [serviceId, setServiceId] = useState('')
   const [date, setDate] = useState('')
   const [notes, setNotes] = useState('')
@@ -15,8 +17,18 @@ export default function Book() {
   const [busy, setBusy] = useState(false)
 
   useEffect(() => {
-    listServices().then(setServices).catch((e) => setErr(e.message))
-  }, [])
+    listServices()
+      .then(async (svcs) => {
+        setServices(svcs)
+        if (!patientRecord?.id) return
+        // resolve custom-price exceptions per patient
+        const entries = await Promise.all(
+          svcs.map(async (s) => [s.id, await getEffectivePrice(patientRecord.id, s.id, s.price)]),
+        )
+        setPrices(Object.fromEntries(entries))
+      })
+      .catch((e) => setErr(e.message))
+  }, [patientRecord?.id])
 
   const submit = async (e) => {
     e.preventDefault()
@@ -25,7 +37,13 @@ export default function Book() {
     if (!serviceId || !date) return setErr('Pick a service and a date.')
     setBusy(true)
     try {
-      await bookAppointment({ patientId: patientRecord.id, serviceId, requestedDate: date, notes })
+      await bookAppointment({
+        patientId: patientRecord.id,
+        serviceId,
+        requestedDate: date,
+        notes,
+        price: prices[serviceId] ?? services.find((s) => s.id === serviceId)?.price,
+      })
       setDone(true)
     } catch (ex) {
       setErr(ex.message)
@@ -58,18 +76,25 @@ export default function Book() {
         <section>
           <h2 className="text-[11px] font-bold uppercase tracking-wide text-gray-500 mb-1.5">Select dental service</h2>
           <div className="space-y-2">
-            {services.map((s) => (
-              <button type="button" key={s.id} onClick={() => setServiceId(s.id)}
-                      className={'w-full text-left bg-white border rounded-lg px-3.5 py-2.5 flex items-center gap-3 ' + (serviceId === s.id ? 'border-primary-600 bg-primary-50' : 'border-gray-200')}>
-                <span className={'w-4 h-4 rounded-full border-2 flex-none ' + (serviceId === s.id ? 'border-primary-600 bg-primary-600' : 'border-gray-300')} />
-                <span className="flex-1 min-w-0">
-                  <span className="block text-sm font-semibold text-gray-900">{s.name}</span>
-                  <span className="block text-xs text-gray-500">{s.duration_minutes} min</span>
-                </span>
-                <span className="text-sm font-bold text-gray-900">{peso(s.price)}</span>
-              </button>
-            ))}
-            {!services.length && <div className="bg-white border border-gray-200 rounded-lg px-3.5 py-3 text-sm text-gray-400">Loading services…</div>}
+            {services.map((s) => {
+              const shown = prices[s.id] ?? s.price
+              const custom = shown !== s.price
+              return (
+                <button type="button" key={s.id} onClick={() => setServiceId(s.id)}
+                        className={'w-full text-left bg-white border rounded-lg px-3.5 py-2.5 flex items-center gap-3 ' + (serviceId === s.id ? 'border-primary-600 bg-primary-50' : 'border-gray-200')}>
+                  <span className={'w-4 h-4 rounded-full border-2 flex-none ' + (serviceId === s.id ? 'border-primary-600 bg-primary-600' : 'border-gray-300')} />
+                  <span className="flex-1 min-w-0">
+                    <span className="block text-sm font-semibold text-gray-900">{s.name}</span>
+                    <span className="block text-xs text-gray-500">
+                      {s.duration_minutes} min
+                      {custom && <span className="ml-1 text-primary-700 font-semibold">· your price</span>}
+                    </span>
+                  </span>
+                  <span className="text-sm font-bold text-gray-900">{peso(shown)}</span>
+                </button>
+              )
+            })}
+            {!services.length && !err && <div className="bg-white border border-gray-200 rounded-lg px-3.5 py-3 text-sm text-gray-400">Loading services…</div>}
           </div>
         </section>
 

@@ -1,24 +1,27 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/RoleContext'
-import { listServices, listPatients, listPriceExceptions, upsertPriceException, deletePriceException, updateClinicSettings, getClinicSettings, peso } from '../../lib/api'
+import { listServices, listPatients, listPriceExceptions, upsertPriceException, deletePriceException, updateClinicSettings, getClinicSettings, createService, deleteService, peso } from '../../lib/api'
 
 // Owner Manage — Figma frames 71–74: clinic profile, hours, services & pricing
-// with per-patient exceptions ("like adding members to a group chat").
+// with per-patient exceptions. Add/delete services included.
 
 const ALL_DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 
 export default function OwnerManage() {
+  const navigate = useNavigate()
   const [settings, setSettings] = useState(null)
   const [services, setServices] = useState([])
+  const [adding, setAdding] = useState(false)
   const [saved, setSaved] = useState(false)
   const [err, setErr] = useState('')
-  const navigate = useNavigate()
 
   useEffect(() => {
     getClinicSettings().then(setSettings).catch((e) => setErr(e.message))
     listServices().then(setServices).catch(() => {})
   }, [])
+
+  const reloadServices = () => listServices().then(setServices).catch(() => {})
 
   const save = async () => {
     try {
@@ -87,10 +90,18 @@ export default function OwnerManage() {
       </section>
 
       <section>
-        <h2 className="text-[11px] font-bold uppercase tracking-wide text-gray-500 mb-1.5">Services &amp; pricing</h2>
+        <div className="flex items-center justify-between mb-1.5">
+          <h2 className="text-[11px] font-bold uppercase tracking-wide text-gray-500">Services &amp; pricing</h2>
+          <button onClick={() => setAdding((v) => !v)} className="text-xs font-semibold text-primary-700">
+            {adding ? 'Close' : '+ Add Service'}
+          </button>
+        </div>
+
+        {adding && <AddServiceForm onDone={() => { setAdding(false); reloadServices() }} />}
+
         <div className="space-y-2">
-          {services.map((s) => <ServiceCard key={s.id} service={s} navigate={navigate} />)}
-          {!services.length && <div className="bg-white border border-gray-200 rounded-lg px-3.5 py-3 text-sm text-gray-400">No services yet.</div>}
+          {services.map((s) => <ServiceCard key={s.id} service={s} navigate={navigate} onDeleted={reloadServices} />)}
+          {!services.length && <div className="bg-white border border-gray-200 rounded-lg px-3.5 py-3 text-sm text-gray-400">No services yet — add one above.</div>}
         </div>
       </section>
 
@@ -103,26 +114,80 @@ export default function OwnerManage() {
   )
 }
 
-function ServiceCard({ service, navigate }) {
+function AddServiceForm({ onDone }) {
+  const [name, setName] = useState('')
+  const [price, setPrice] = useState('')
+  const [mins, setMins] = useState('30')
+  const [err, setErr] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  const submit = async (e) => {
+    e.preventDefault()
+    if (!name.trim() || !Number(price)) return setErr('Name and price are required.')
+    setBusy(true)
+    try {
+      await createService(name.trim(), Number(price), Number(mins) || 30)
+      onDone()
+    } catch (ex) {
+      setErr(ex.message)
+      setBusy(false)
+    }
+  }
+
+  return (
+    <form onSubmit={submit} className="bg-primary-50 border border-primary-100 rounded-lg p-3.5 space-y-2.5 mb-2">
+      <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Service name"
+             className="w-full h-10 border border-gray-200 rounded-lg px-3 text-sm bg-white" />
+      <div className="flex gap-2">
+        <input type="number" min="0" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="Price ₱"
+               className="flex-1 h-10 border border-gray-200 rounded-lg px-3 text-sm bg-white" />
+        <input type="number" min="5" step="5" value={mins} onChange={(e) => setMins(e.target.value)} placeholder="Minutes"
+               className="w-24 h-10 border border-gray-200 rounded-lg px-3 text-sm bg-white" />
+      </div>
+      {err && <p className="text-xs text-red-500">{err}</p>}
+      <button disabled={busy} className="w-full h-9 rounded-lg bg-primary-600 text-white text-xs font-semibold">Add Service</button>
+    </form>
+  )
+}
+
+function ServiceCard({ service, navigate, onDeleted }) {
   const [excCount, setExcCount] = useState(null)
+  const [confirmDel, setConfirmDel] = useState(false)
 
   useEffect(() => {
     listPriceExceptions(service.id).then((x) => setExcCount(x.length)).catch(() => setExcCount(0))
   }, [service.id])
 
+  const remove = async () => {
+    await deleteService(service.id)
+    onDeleted()
+  }
+
   return (
-    <button onClick={() => navigate(`/owner/manage/prices?service=${service.id}&name=${encodeURIComponent(service.name)}&base=${service.price}`)}
-            className="w-full text-left bg-white border border-gray-200 rounded-lg px-3.5 py-2.5 flex items-center gap-3">
-      <span className="flex-1 min-w-0">
-        <span className="block text-sm font-semibold text-gray-900 truncate">{service.name}</span>
-        <span className="block mt-1">
-          {excCount > 0
-            ? <span className="text-[11px] font-bold bg-amber-100 text-amber-700 rounded px-1.5 py-0.5">{excCount} exception{excCount !== 1 ? 's' : ''}</span>
-            : <span className="text-xs text-gray-400">+ Custom price</span>}
+    <div className="bg-white border border-gray-200 rounded-lg px-3.5 py-2.5 flex items-center gap-3">
+      <button onClick={() => navigate(`/owner/manage/prices?service=${service.id}&name=${encodeURIComponent(service.name)}&base=${service.price}`)}
+              className="flex-1 min-w-0 flex items-center gap-3 text-left">
+        <span className="flex-1 min-w-0">
+          <span className="block text-sm font-semibold text-gray-900 truncate">{service.name}</span>
+          <span className="block mt-1">
+            {excCount > 0
+              ? <span className="text-[11px] font-bold bg-amber-100 text-amber-700 rounded px-1.5 py-0.5">{excCount} exception{excCount !== 1 ? 's' : ''}</span>
+              : <span className="text-xs text-gray-400">+ Custom price</span>}
+          </span>
         </span>
-      </span>
-      <span className="text-sm font-bold text-gray-900">{peso(service.price)}</span>
-      <svg viewBox="0 0 24 24" className="w-4 h-4 text-gray-400 flex-none" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 6 6 6-6 6" /></svg>
-    </button>
+        <span className="text-sm font-bold text-gray-900">{peso(service.price)}</span>
+        <svg viewBox="0 0 24 24" className="w-4 h-4 text-gray-400 flex-none" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 6 6 6-6 6" /></svg>
+      </button>
+      {confirmDel ? (
+        <span className="flex gap-1 flex-none">
+          <button onClick={remove} className="text-[11px] font-bold text-red-500 border border-red-200 rounded px-1.5 py-1">Yes</button>
+          <button onClick={() => setConfirmDel(false)} className="text-[11px] text-gray-400 border border-gray-200 rounded px-1.5 py-1">No</button>
+        </span>
+      ) : (
+        <button onClick={() => setConfirmDel(true)} aria-label="Delete service" className="text-gray-300 hover:text-red-400 flex-none">
+          <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" /></svg>
+        </button>
+      )}
+    </div>
   )
 }

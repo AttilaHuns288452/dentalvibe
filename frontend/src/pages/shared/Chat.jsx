@@ -34,7 +34,16 @@ export default function Chat({ patient }) {
   }
 
   if (!thread?.id) {
-    return <p className="px-4 py-16 text-center text-sm text-gray-400">Select a patient conversation first.</p>
+    return (
+      <div className="px-4 py-16 text-center">
+        <div className="w-16 h-16 mx-auto rounded-full bg-primary-50 text-primary-600 flex items-center justify-center">
+          <svg viewBox="0 0 24 24" className="w-8 h-8" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z" /></svg>
+        </div>
+        <h1 className="text-lg font-bold text-gray-900 mt-3">Messages</h1>
+        <p className="text-xs text-gray-500 mt-1">Open a conversation from the Patients tab — tap any patient to chat.</p>
+        <button onClick={() => window.history.back()} className="mt-4 h-10 px-4 rounded-lg bg-primary-600 text-white text-sm font-semibold">Go to Patients</button>
+      </div>
+    )
   }
 
   return (

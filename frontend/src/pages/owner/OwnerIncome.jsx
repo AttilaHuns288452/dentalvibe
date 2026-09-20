@@ -17,7 +17,8 @@ export default function OwnerIncome() {
   }, [])
 
   const completed = (appts ?? []).filter((a) => a.status === 'completed')
-  const income = completed.reduce((sum, a) => sum + Number(a.services?.price ?? 0), 0)
+  // price was locked in per-appointment at booking time (custom exceptions included)
+  const income = completed.reduce((sum, a) => sum + Number(a.price ?? a.services?.price ?? 0), 0)
   const expenses = MOCK_EXPENSES.reduce((s, e) => s + e.amount, 0)
 
   return (
@@ -46,9 +47,9 @@ export default function OwnerIncome() {
             <div key={a.id} className="flex justify-between items-center px-3.5 py-2.5">
               <div className="min-w-0">
                 <div className="text-sm font-semibold text-gray-900 truncate">{a.patients?.full_name}</div>
-                <div className="text-xs text-gray-500">{a.services?.name}</div>
+                <div className="text-xs text-gray-500">{a.services?.name}{Number(a.price ?? a.services?.price) !== Number(a.services?.price) ? ' (custom price)' : ''}</div>
               </div>
-              <div className="text-sm font-bold text-gray-900">{peso(a.services?.price)}</div>
+              <div className="text-sm font-bold text-gray-900">{peso(a.price ?? a.services?.price)}</div>
             </div>
           ))}
         </div>
