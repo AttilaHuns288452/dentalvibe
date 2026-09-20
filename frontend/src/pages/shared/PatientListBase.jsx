@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { listPatients } from '../../lib/api'
+import { useAuth } from '../../context/RoleContext'
 
 // Patient list for staff — tap a row to open the chat thread.
 
@@ -9,6 +10,8 @@ export default function PatientListBase({ title, subtitle }) {
   const [q, setQ] = useState('')
   const [err, setErr] = useState('')
   const navigate = useNavigate()
+  const { profile } = useAuth()
+  const roleBase = profile?.role === 'patient' ? '' : '/' + profile?.role
 
   useEffect(() => {
     listPatients().then(setPatients).catch((e) => setErr(e.message))
@@ -16,7 +19,7 @@ export default function PatientListBase({ title, subtitle }) {
 
   const filtered = (patients ?? []).filter((p) => p.full_name?.toLowerCase().includes(q.toLowerCase()))
 
-  const openChat = (p) => navigate('/messages', { state: { patient: p } })
+  const openChat = (p) => navigate(roleBase + '/messages', { state: { patient: p } })
 
   return (
     <div className="px-4 py-4 space-y-3">

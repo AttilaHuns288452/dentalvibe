@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useAuth } from '../context/RoleContext'
 import { listAppointments, getClinicSettings } from '../lib/api'
 
@@ -7,11 +8,11 @@ import { listAppointments, getClinicSettings } from '../lib/api'
 
 function QuickAction({ icon, label, sub, href }) {
   return (
-    <a href={'#' + href} className="bg-white border border-gray-200 rounded-lg p-3.5 flex flex-col gap-2">
+    <Link to={href} className="bg-white border border-gray-200 rounded-lg p-3.5 flex flex-col gap-2">
       <span className="w-9 h-9 rounded-lg bg-primary-50 text-primary-700 flex items-center justify-center">{icon}</span>
       <span className="text-sm font-semibold text-gray-900">{label}</span>
       <span className="text-[11px] text-gray-500 -mt-1.5">{sub}</span>
-    </a>
+    </Link>
   )
 }
 
@@ -67,7 +68,7 @@ export default function Home() {
           </div>
 
           {pending.length > 0 && (
-            <a href={profile.role === 'owner' ? '#/owner/requests' : '#/doctor/requests'} className="block bg-white border border-gray-200 rounded-lg p-3.5">
+            <Link to={profile.role === 'owner' ? '/owner/requests' : '/doctor/requests'} className="block bg-white border border-gray-200 rounded-lg p-3.5">
               <div className="flex items-center gap-3">
                 <span className="w-10 h-10 rounded-lg bg-amber-100 text-amber-600 flex items-center justify-center flex-none">
                   <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 8-3 8h18s-3-1-3-8M10.3 21a1.9 1.9 0 0 0 3.4 0" /></svg>
@@ -78,7 +79,7 @@ export default function Home() {
                 </span>
                 <span className="h-8 px-3 rounded-lg bg-primary-600 text-white text-xs font-semibold flex items-center flex-none">Review</span>
               </div>
-            </a>
+            </Link>
           )}
 
           <section>

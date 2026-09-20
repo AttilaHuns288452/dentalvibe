@@ -1,6 +1,6 @@
 import { NAV_BY_ROLE, ICONS } from './navConfig'
 import { useAuth } from '../context/RoleContext'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate, Link } from 'react-router-dom'
 
 function TabIcon({ name, active }) {
   return (
@@ -26,11 +26,11 @@ export default function Navbar() {
     <>
       <header className="bg-white border-b border-gray-200">
         <div className="max-w-md mx-auto px-4 h-14 flex items-center gap-3">
-          <a href={roleBase || '/'} className="w-9 h-9 rounded-lg bg-primary-600 text-white flex items-center justify-center flex-none">
+          <Link to={roleBase || '/'} className="w-9 h-9 rounded-lg bg-primary-600 text-white flex items-center justify-center flex-none">
             <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M12 2.5C9.4 2.5 7.5 4.6 7.5 7.2c0 1.7.5 3.1 1.1 4.6.5 1.2 1 2.5 1.3 3.9.2 1 .4 1.9.4 2.4 0 1.4.8 2.4 1.7 2.4s1.7-1 1.7-2.4c0-.5.2-1.4.4-2.4.3-1.4.8-2.7 1.3-3.9.6-1.5 1.1-2.9 1.1-4.6C16.5 4.6 14.6 2.5 12 2.5z" />
             </svg>
-          </a>
+          </Link>
           <div className="flex-1 min-w-0">
             <div className="text-sm font-bold text-gray-900 leading-tight">DentalVibe</div>
             <div className="text-[11px] text-gray-500 leading-tight capitalize">

@@ -28,6 +28,7 @@ export async function signUp(email, password, fullName, role) {
 }
 
 export async function signOut() {
+  await supabase.removeAllChannels() // drop realtime subs first — avoids 400s on revoked token
   await supabase.auth.signOut()
 }
 
