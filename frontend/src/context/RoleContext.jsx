@@ -1,8 +1,8 @@
 import { createContext, useContext, useEffect, useState } from 'react'
+import { getSession, getProfile, getMyPatientRecord } from '../lib/api'
 
-// ponytail: dev-only mock session. Real Supabase auth later: make this provider
-// read supabase.auth.getSession() + role from the profiles table; keep the same
-// { role, user, setRole } shape and no consumer changes needed.
+// Real Supabase session. The dev RoleSwitcher still exists for teammate testing:
+// it signs in as seeded demo accounts (owner@/doctor@) or a mock patient view.
 
 export const ROLES = {
   PATIENT: 'patient',
@@ -10,35 +10,56 @@ export const ROLES = {
   OWNER: 'owner',
 }
 
-const MOCK_USERS = {
-  [ROLES.PATIENT]: { name: 'Maria Santos', id: 'DAR-0012' },
-  [ROLES.DOCTOR]: { name: 'Dr. Miguel Ramos', id: 'DR-0007' },
-  [ROLES.OWNER]: { name: 'Dr. Dulce Amor R. Joson', id: 'OWNER' },
-}
-
-const STORAGE_KEY = 'dc_role'
-
-const RoleContext = createContext(null)
+const AuthContext = createContext(null)
 
 export function RoleProvider({ children }) {
-  const [role, setRole] = useState(() => {
-    const saved = localStorage.getItem(STORAGE_KEY)
-    return Object.values(ROLES).includes(saved) ? saved : ROLES.PATIENT
-  })
+  const [session, setSession] = useState(null)
+  const [profile, setProfile] = useState(null)
+  const [patientRecord, setPatientRecord] = useState(null)
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, role)
-  }, [role])
+    getSession()
+      .then(async (s) => {
+        setSession(s)
+        if (s?.user) {
+          const p = await getProfile(s.user.id)
+          setProfile(p)
+          if (p?.role === 'patient') setPatientRecord(await getMyPatientRecord(s.user.id))
+        }
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false))
+  }, [])
+
+  const refresh = async () => {
+    const s = await getSession()
+    setSession(s)
+    if (s?.user) {
+      const p = await getProfile(s.user.id)
+      setProfile(p)
+      if (p?.role === 'patient') setPatientRecord(await getMyPatientRecord(s.user.id))
+    } else {
+      setProfile(null)
+      setPatientRecord(null)
+    }
+  }
 
   return (
-    <RoleContext.Provider value={{ role, setRole, user: MOCK_USERS[role] }}>
+    <AuthContext.Provider value={{ session, profile, patientRecord, loading, refresh }}>
       {children}
-    </RoleContext.Provider>
+    </AuthContext.Provider>
   )
 }
 
-export function useRole() {
-  const ctx = useContext(RoleContext)
-  if (!ctx) throw new Error('useRole must be used inside <RoleProvider>')
+export function useAuth() {
+  const ctx = useContext(AuthContext)
+  if (!ctx) throw new Error('useAuth must be used inside <RoleProvider>')
   return ctx
+}
+
+// ponytail: legacy alias so older components keep compiling
+export const useRole = () => {
+  const { profile } = useAuth()
+  return { role: profile?.role, user: { name: profile?.full_name } }
 }

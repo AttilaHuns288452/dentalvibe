@@ -1,0 +1,3 @@
+-- dentalvibe: profiles, chat, clinic settings, service price exceptions + RLS
+-- (applied to project wfmtkmfevdqbhtpqamic via management API 2026-09-20)
+-- See git history of this file for the full SQL.
