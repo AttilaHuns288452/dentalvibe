@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/RoleContext'
 import { listServices, listPatients, listPriceExceptions, upsertPriceException, deletePriceException, updateClinicSettings, getClinicSettings, createService, deleteService, peso } from '../../lib/api'
+import { fmtTime12 } from '../../lib/format'
 
 // Owner Manage — Figma frames 71–74: clinic profile, hours, services & pricing
 // with per-patient exceptions. Add/delete services included.

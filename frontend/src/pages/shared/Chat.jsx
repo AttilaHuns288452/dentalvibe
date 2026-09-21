@@ -44,12 +44,12 @@ export default function Chat({ patient }) {
   const bottomRef = useRef(null)
 
   useEffect(() => {
-    if (!thread?.id) return
+    if (!active?.id) return
     let unsub
-    listChat(thread.id).then(setMessages).catch(() => setMessages([]))
-    unsub = subscribeChat(thread.id, (m) => setMessages((prev) => [...(prev ?? []), m]))
+    listChat(active.id).then(setMessages).catch(() => setMessages([]))
+    unsub = subscribeChat(active.id, (m) => setMessages((prev) => [...(prev ?? []), m]))
     return unsub
-  }, [thread?.id])
+  }, [active?.id])
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
