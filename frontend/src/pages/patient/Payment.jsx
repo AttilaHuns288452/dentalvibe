@@ -38,6 +38,7 @@ export default function Payment() {
 
   const submit = async () => {
     if (!file) return setErr('Attach your payment proof first.')
+    if (file.size > 2 * 1024 * 1024) return setErr('Image too large — max 2MB.')
     setBusy(true)
     setErr('')
     try {
@@ -47,7 +48,8 @@ export default function Payment() {
         reader.onerror = rej
         reader.readAsDataURL(file)
       })
-      const { error } = await supabase.from('payment_proofs').insert({ appointment_id: appt.id, image: dataUrl })
+      // ponytail: base64 data-URL in a table (no storage bucket needed); 2MB cap enforced by fn_submit_payment_proof
+      const { error } = await supabase.rpc('fn_submit_payment_proof', { p_appointment: appt.id, p_image: dataUrl })
       if (error) throw error
       setDone(true)
     } catch (ex) {
