@@ -1,8 +1,10 @@
 import { createContext, useContext, useEffect, useState } from 'react'
-import { getSession, getProfile, getMyPatientRecord } from '../lib/api'
+import { getSession, getProfile, getMyPatientRecord, listAppointments, signOut } from '../lib/api'
 
-// Real Supabase session. The dev RoleSwitcher still exists for teammate testing:
-// it signs in as seeded demo accounts (owner@/doctor@) or a mock patient view.
+// Real Supabase session. Role comes from profiles table (set at signup).
+// Staff accounts are provisioned by the clinic owner, not public signup.
+
+const AuthContext = createContext(null)
 
 export const ROLES = {
   PATIENT: 'patient',
@@ -10,56 +12,72 @@ export const ROLES = {
   OWNER: 'owner',
 }
 
-const AuthContext = createContext(null)
-
 export function RoleProvider({ children }) {
   const [session, setSession] = useState(null)
   const [profile, setProfile] = useState(null)
   const [patientRecord, setPatientRecord] = useState(null)
+  const [pendingCount, setPendingCount] = useState(0)
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    getSession()
-      .then(async (s) => {
-        setSession(s)
-        if (s?.user) {
-          const p = await getProfile(s.user.id)
-          setProfile(p)
-          if (p?.role === 'patient') setPatientRecord(await getMyPatientRecord(s.user.id))
-        }
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false))
-  }, [])
-
-  const refresh = async () => {
+  const hydrate = async () => {
     const s = await getSession()
     setSession(s)
-    if (s?.user) {
-      const p = await getProfile(s.user.id)
-      setProfile(p)
-      if (p?.role === 'patient') setPatientRecord(await getMyPatientRecord(s.user.id))
-    } else {
+    if (!s?.user) {
       setProfile(null)
       setPatientRecord(null)
+      setPendingCount(0)
+      return
+    }
+    // profile first — never null it because a secondary fetch hiccuped
+    let p = null
+    try {
+      p = await getProfile(s.user.id)
+      setProfile(p)
+    } catch {
+      setProfile(null)
+      return
+    }
+    try {
+      if (p?.role === 'patient') {
+        const rec = await getMyPatientRecord(s.user.id)
+        setPatientRecord(rec)
+        if (rec?.id) {
+          const mine = await listMyAppointments(rec.id)
+          setPendingCount(mine.filter((a) => a.status === 'pending').length)
+        }
+      } else {
+        setPatientRecord(null)
+        const all = await listAppointments()
+        setPendingCount(all.filter((a) => a.status === 'pending').length)
+      }
+    } catch {
+      setPendingCount(0) // secondary data failed — app still usable
     }
   }
 
+  useEffect(() => {
+    hydrate().finally(() => setLoading(false))
+  }, [])
+
+  const logout = async () => {
+    await signOut()
+    setSession(null)
+    setProfile(null)
+    setPatientRecord(null)
+    setPendingCount(0)
+  }
+
   return (
-    <AuthContext.Provider value={{ session, profile, patientRecord, loading, refresh }}>
+    <AuthContext.Provider value={{ session, profile, patientRecord, pendingCount, loading, refresh: hydrate, logout }}>
       {children}
     </AuthContext.Provider>
   )
 }
 
+export function useRole() { const { profile } = useAuth(); return { role: profile?.role, user: { name: profile?.full_name } } }
+
 export function useAuth() {
   const ctx = useContext(AuthContext)
   if (!ctx) throw new Error('useAuth must be used inside <RoleProvider>')
   return ctx
-}
-
-// ponytail: legacy alias so older components keep compiling
-export const useRole = () => {
-  const { profile } = useAuth()
-  return { role: profile?.role, user: { name: profile?.full_name } }
 }

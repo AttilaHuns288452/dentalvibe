@@ -3,6 +3,7 @@ import { supabase } from '../supabaseClient'
 // Supabase data access — every query the app makes, in one place.
 // ponytail: no React Query/SWR; components fetch on mount, refresh on action.
 
+export { supabase }
 export const peso = (v) => '₱' + Number(v ?? 0).toLocaleString('en-US')
 
 // ---- auth ----

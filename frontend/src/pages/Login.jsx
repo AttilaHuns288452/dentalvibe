@@ -1,17 +1,19 @@
 import { useState } from 'react'
 import { signIn, signUp } from '../lib/api'
+import { useAuth } from '../context/RoleContext'
 
-// Login / signup. Role comes from signup metadata; seeded staff accounts
-// (owner@dentalvibe.ph / doctor@dentalvibe.ph) exist for testing.
+// Login / register. Staff accounts are provisioned by the clinic (no public
+// staff signup); patients self-register. No demo buttons in production.
 
 export default function Login() {
+  const { refresh } = useAuth()
   const [mode, setMode] = useState('signin')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [fullName, setFullName] = useState('')
-  const [role, setRole] = useState('patient')
   const [err, setErr] = useState('')
   const [busy, setBusy] = useState(false)
+  const [ok, setOk] = useState('')
 
   const submit = async (e) => {
     e.preventDefault()
@@ -20,23 +22,14 @@ export default function Login() {
     try {
       if (mode === 'signin') {
         await signIn(email.trim(), password)
+        window.location.href = '/' // full reload — hydrate runs from persisted session
       } else {
-        await signUp(email.trim(), password, fullName.trim(), role)
+        await signUp(email.trim(), password, fullName.trim(), 'patient')
+        setOk('Account created! You can now sign in.')
+        setMode('signin')
+        setBusy(false)
+        return
       }
-      window.location.reload() // simplest way to re-run the session gate
-    } catch (ex) {
-      setErr(ex.message)
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  const quick = async (em) => {
-    setErr('')
-    setBusy(true)
-    try {
-      await signIn(em, 'password123')
-      window.location.reload()
     } catch (ex) {
       setErr(ex.message)
       setBusy(false)
@@ -44,7 +37,7 @@ export default function Login() {
   }
 
   return (
-    <div className="max-w-md mx-auto min-h-screen">
+    <div className="max-w-md mx-auto min-h-screen bg-gray-50">
       <div className="bg-primary-600 text-white px-4 pt-10 pb-8 text-center">
         <div className="w-16 h-16 mx-auto rounded-full bg-white text-primary-600 flex items-center justify-center">
           <svg viewBox="0 0 24 24" className="w-8 h-8" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -79,35 +72,18 @@ export default function Login() {
             <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={6}
                    className="mt-1 w-full h-11 border border-gray-200 rounded-lg px-3 text-sm" placeholder="••••••••" />
           </label>
-          {mode === 'signup' && (
-            <div>
-              <span className="text-xs font-medium text-gray-500">I am a</span>
-              <div className="mt-1 grid grid-cols-2 gap-2 text-sm font-medium">
-                {['patient', 'doctor'].map((r) => (
-                  <button type="button" key={r} onClick={() => setRole(r)}
-                          className={'py-2 rounded-lg border ' + (role === r ? 'border-primary-600 bg-primary-50 text-primary-700' : 'border-gray-200 text-gray-500')}>
-                    {r === 'patient' ? 'Patient' : 'Dentist'}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
 
           {err && <p className="text-xs text-red-500">{err}</p>}
+          {ok && <p className="text-xs text-green-600">{ok}</p>}
           <button disabled={busy} className="w-full h-11 rounded-lg bg-primary-600 text-white text-sm font-semibold disabled:opacity-60">
-            {busy ? 'Please wait…' : mode === 'signin' ? 'Sign In' : 'Create Account'}
+            {busy ? 'Please wait…' : mode === 'signin' ? 'Sign In' : 'Create Patient Account'}
           </button>
         </div>
       </form>
 
-      <div className="px-4 mt-4">
-        <p className="text-[11px] text-center text-gray-400 uppercase tracking-wide font-semibold mb-2">Demo accounts</p>
-        <div className="grid grid-cols-2 gap-2 text-xs">
-          <button onClick={() => quick('owner@dentalvibe.ph')} disabled={busy} className="h-9 rounded-lg border border-gray-200 bg-white text-gray-600">Owner demo</button>
-          <button onClick={() => quick('doctor@dentalvibe.ph')} disabled={busy} className="h-9 rounded-lg border border-gray-200 bg-white text-gray-600">Doctor demo</button>
-        </div>
-        <p className="text-[10px] text-gray-400 text-center mt-1.5">password123 · create a Patient account to test booking</p>
-      </div>
+      <p className="px-4 mt-4 text-[11px] text-gray-400 text-center">
+        Patient self-registration only. Staff accounts are provisioned by the clinic owner.
+      </p>
     </div>
   )
 }

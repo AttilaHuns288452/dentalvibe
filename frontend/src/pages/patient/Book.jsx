@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/RoleContext'
 import { listServices, bookAppointment, peso, getEffectivePrice } from '../../lib/api'
 
@@ -7,13 +8,13 @@ import { listServices, bookAppointment, peso, getEffectivePrice } from '../../li
 
 export default function Book() {
   const { patientRecord } = useAuth()
+  const navigate = useNavigate()
   const [services, setServices] = useState([])
   const [prices, setPrices] = useState({}) // serviceId → effective price
   const [serviceId, setServiceId] = useState('')
   const [date, setDate] = useState('')
   const [notes, setNotes] = useState('')
   const [err, setErr] = useState('')
-  const [done, setDone] = useState(false)
   const [busy, setBusy] = useState(false)
 
   useEffect(() => {
@@ -33,36 +34,24 @@ export default function Book() {
   const submit = async (e) => {
     e.preventDefault()
     setErr('')
-    if (!patientRecord?.id) return setErr('No patient record linked to this account.')
+    if (!patientRecord?.id) { console.error('[book] no patientRecord', patientRecord); return setErr('No patient record linked to this account.') }
     if (!serviceId || !date) return setErr('Pick a service and a date.')
     setBusy(true)
     try {
-      await bookAppointment({
+      const appt = await bookAppointment({
         patientId: patientRecord.id,
         serviceId,
         requestedDate: date,
         notes,
         price: prices[serviceId] ?? services.find((s) => s.id === serviceId)?.price,
       })
-      setDone(true)
+      navigate('/pay', { state: { appointment: { ...appt, services: { name: services.find((s) => s.id === serviceId)?.name } } } })
     } catch (ex) {
+      console.error('[book-err]', ex)
       setErr(ex.message)
     } finally {
       setBusy(false)
     }
-  }
-
-  if (done) {
-    return (
-      <div className="px-4 py-16 text-center">
-        <div className="w-16 h-16 mx-auto rounded-full bg-primary-50 text-primary-600 flex items-center justify-center">
-          <svg viewBox="0 0 24 24" className="w-8 h-8" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m5 12 5 5L20 7" /></svg>
-        </div>
-        <h1 className="text-lg font-bold text-gray-900 mt-3">Booking Request Submitted</h1>
-        <p className="text-xs text-gray-500 mt-1">The dentist will assign your exact time — you'll see it in My Appointments.</p>
-        <button onClick={() => window.location.assign('#/appointments')} className="mt-4 h-10 px-4 rounded-lg bg-primary-600 text-white text-sm font-semibold">My Appointments</button>
-      </div>
-    )
   }
 
   return (

@@ -1,7 +1,6 @@
-import { BrowserRouter, Navigate, useLocation } from 'react-router-dom'
+import { useEffect, useState } from 'react'
 import { RoleProvider, useAuth, ROLES } from './context/RoleContext'
 import Navbar from './navigation/Navbar'
-import RoleSwitcher from './navigation/RoleSwitcher'
 import Home from './pages/Home'
 import Login from './pages/Login'
 import Book from './pages/patient/Book'
@@ -17,7 +16,9 @@ import OwnerServicePrices from './pages/owner/OwnerServicePrices'
 import OwnerPatients from './pages/owner/OwnerPatients'
 import OwnerIncome from './pages/owner/OwnerIncome'
 import OwnerStaff from './pages/owner/OwnerStaff'
+import Payment from './pages/patient/Payment'
 import Placeholder from './pages/Placeholder'
+import { BrowserRouter, Navigate, useLocation } from 'react-router-dom'
 
 const HOME = { [ROLES.PATIENT]: '/', [ROLES.DOCTOR]: '/doctor', [ROLES.OWNER]: '/owner' }
 
@@ -27,7 +28,6 @@ function Routes() {
   const role = profile.role
   const roleBase = role === ROLES.PATIENT ? '' : '/' + role
 
-  // routes outside this role's section → snap to the role's home
   const inScope = role === ROLES.PATIENT
     ? !path.startsWith('/doctor') && !path.startsWith('/owner')
     : path === '/' || path.startsWith(roleBase)
@@ -54,27 +54,24 @@ function Routes() {
     case '/owner/manage/prices': return <OwnerServicePrices />
     case '/owner/income': return <OwnerIncome />
     case '/owner/staff': return <OwnerStaff />
+    case '/pay': return <Payment />
     default: return <Placeholder path={path} />
   }
 }
 
 function Shell() {
-  const { session, profile, loading } = useAuth()
+  const { session, profile, loading, pendingCount } = useAuth()
+  if (import.meta.env.DEV) window.__auth = { session: !!session, profile, loading }
 
   if (loading) {
     return <div className="min-h-screen flex items-center justify-center text-sm text-gray-400">Loading…</div>
   }
-  if (!session || !profile) {
-    return (
-      <div className="max-w-md mx-auto min-h-screen shadow-sm"><Login /></div>
-    )
-  }
+  if (!session || !profile) return <Login />
 
   return (
     <>
-      <RoleSwitcher />
       <div className="max-w-md mx-auto bg-gray-50 min-h-screen shadow-sm">
-        <Navbar />
+        <Navbar pendingCount={pendingCount} />
         <main className="pb-20">
           <Routes />
         </main>
