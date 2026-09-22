@@ -15,8 +15,16 @@ import OwnerManage from './pages/owner/OwnerManage'
 import OwnerServicePrices from './pages/owner/OwnerServicePrices'
 import OwnerPatients from './pages/owner/OwnerPatients'
 import OwnerIncome from './pages/owner/OwnerIncome'
+import IncomeHub from './pages/owner/IncomeHub'
 import OwnerStaff from './pages/owner/OwnerStaff'
 import Payment from './pages/patient/Payment'
+import QrPayment from './pages/patient/QrPayment'
+import ConfirmBooking, { BookSuccess } from './pages/patient/ConfirmBooking'
+import Receipt from './pages/patient/Receipt'
+import EditProfile from './pages/patient/EditProfile'
+import Notifications from './pages/shared/Notifications'
+import AccountSecurity from './pages/shared/AccountSecurity'
+import ResetPassword, { ResetConfirm } from './pages/shared/ResetPassword'
 import Placeholder from './pages/Placeholder'
 import { BrowserRouter, Navigate, useLocation } from 'react-router-dom'
 
@@ -29,32 +37,46 @@ function Routes() {
   const roleBase = role === ROLES.PATIENT ? '' : '/' + role
 
   const inScope = role === ROLES.PATIENT
-    ? !path.startsWith('/doctor') && !path.startsWith('/owner')
-    : path === '/' || path.startsWith(roleBase)
+    ? !path.startsWith('/doctor') && !path.startsWith('/owner') || path.startsWith('/reset')
+    : path === '/' || path.startsWith(roleBase) || path.startsWith('/reset')
 
   if (!inScope) return <Navigate to={HOME[role]} replace />
 
   switch (path) {
     case '/': return <Home />
     case '/book': return <Book />
+    case '/book/confirm': return <ConfirmBooking />
+    case '/book/success': return <BookSuccess />
     case '/appointments': return <MyAppointments />
     case '/messages': return <Chat />
     case '/profile': return <Profile />
+    case '/profile/edit': return <EditProfile />
+    case '/security': return <AccountSecurity />
+    case '/notifications': return <Notifications roleBase="" />
     case '/doctor': return <Home />
     case '/doctor/calendar': return <DoctorCalendar />
     case '/doctor/requests': return <Requests />
     case '/doctor/patients': return <DoctorPatients />
     case '/doctor/messages': return <StaffMessages />
+    case '/doctor/notifications': return <Notifications roleBase="/doctor" />
+    case '/doctor/security': return <AccountSecurity />
     case '/owner': return <Home />
     case '/owner/calendar': return <DoctorCalendar />
     case '/owner/requests': return <Requests />
     case '/owner/patients': return <OwnerPatients />
     case '/owner/messages': return <StaffMessages />
+    case '/owner/notifications': return <Notifications roleBase="/owner" />
+    case '/owner/security': return <AccountSecurity />
     case '/owner/manage': return <OwnerManage />
     case '/owner/manage/prices': return <OwnerServicePrices />
-    case '/owner/income': return <OwnerIncome />
+    case '/owner/income': return <IncomeHub />
+    case '/owner/income/legacy': return <OwnerIncome />
     case '/owner/staff': return <OwnerStaff />
     case '/pay': return <Payment />
+    case '/pay/qr': return <QrPayment />
+    case '/receipt': return <Receipt />
+    case '/reset': return <ResetPassword />
+    case '/reset-confirm': return <ResetConfirm />
     default: return <Placeholder path={path} />
   }
 }

@@ -1,9 +1,11 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/RoleContext'
 import { signOut } from '../../lib/api'
 
 export default function Profile() {
   const { session, profile, patientRecord, logout } = useAuth()
+  const navigate = useNavigate()
   const [phone, setPhone] = useState(patientRecord?.phone || '')
   const [address, setAddress] = useState(patientRecord?.address || '')
   const [saved, setSaved] = useState(false)
@@ -92,6 +94,11 @@ export default function Profile() {
         </div>
       </section>
 
+      <button
+        onClick={() => navigate('/security')}
+        className="w-full h-11 rounded-lg border border-gray-200 text-gray-700 text-sm font-semibold bg-white">
+        Account Security
+      </button>
       <button
         onClick={logout}
         className="w-full h-11 rounded-lg border border-red-200 text-red-500 text-sm font-semibold bg-white">

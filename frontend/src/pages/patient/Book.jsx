@@ -45,7 +45,7 @@ export default function Book() {
         notes,
         price: prices[serviceId] ?? services.find((s) => s.id === serviceId)?.price,
       })
-      navigate('/pay', { state: { appointment: { ...appt, services: { name: services.find((s) => s.id === serviceId)?.name } } } })
+      navigate('/book/confirm', { state: { appointment: { ...appt, services: { name: services.find((s) => s.id === serviceId)?.name } } } })
     } catch (ex) {
       console.error('[book-err]', ex)
       setErr(ex.message)

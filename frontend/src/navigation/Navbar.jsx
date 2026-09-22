@@ -37,20 +37,16 @@ export default function Navbar({ pendingCount = 0 }) {
               {' · '}{profile?.full_name}
             </div>
           </div>
-          {/* bell + gear, per the Figma headers */}
-          {role !== 'patient' && (
-            <>
-              <button onClick={() => navigate(roleBase + '/requests')} aria-label="Notifications"
-                      className="relative w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center flex-none">
-                <svg viewBox="0 0 24 24" className="w-4.5 h-4.5 w-5 h-5 text-gray-600" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d={ICONS.bell} /></svg>
-                {pendingCount > 0 && <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 rounded-full bg-primary-600 text-white text-[9px] font-bold flex items-center justify-center px-1">{pendingCount}</span>}
-              </button>
-              <button onClick={() => navigate(role === 'owner' ? '/owner/manage' : roleBase + '/profile')} aria-label="Settings"
-                      className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center flex-none">
-                <svg viewBox="0 0 24 24" className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d={ICONS.gear} /></svg>
-              </button>
-            </>
-          )}
+          {/* bell (notifications) + gear (security), per the Figma headers — every role */}
+          <button onClick={() => navigate(roleBase + '/notifications')} aria-label="Notifications"
+                  className="relative w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center flex-none">
+            <svg viewBox="0 0 24 24" className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d={ICONS.bell} /></svg>
+            {pendingCount > 0 && role !== 'patient' && <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 rounded-full bg-primary-600 text-white text-[9px] font-bold flex items-center justify-center px-1">{pendingCount}</span>}
+          </button>
+          <button onClick={() => navigate(role === 'owner' ? '/owner/manage' : role === 'doctor' ? '/doctor/profile' : '/profile')} aria-label="Settings"
+                  className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center flex-none">
+            <svg viewBox="0 0 24 24" className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d={ICONS.gear} /></svg>
+          </button>
           <span className="text-[11px] font-semibold text-white bg-primary-600 rounded-full px-2 py-0.5 capitalize">{role}</span>
         </div>
       </header>

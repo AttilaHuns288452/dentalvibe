@@ -79,6 +79,12 @@ export default function MyAppointments() {
             {a.status === 'approved' && a.payment_status === 'verified' && (
               <span className="inline-block mt-2 text-[11px] font-bold px-2 py-0.5 rounded bg-green-50 text-green-700">Payment verified ✓</span>
             )}
+            {a.status === 'completed' && (
+              <button onClick={() => navigate('/receipt', { state: { appointment: a } })}
+                      className="mt-2 h-8 px-3 rounded-lg border border-primary-200 text-primary-700 text-xs font-semibold bg-white">
+                Attach receipt
+              </button>
+            )}
             {a.notes && <div className="text-xs text-gray-400 mt-1 italic">"{a.notes}"</div>}
           </div>
         ))}
