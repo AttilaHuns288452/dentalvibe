@@ -161,7 +161,7 @@ export default function PatientEHR() {
         </div>
       </section>
 
-      <button onClick={exportEHR} className="w-full h-11 rounded-lg bg-primary-600 text-white text-sm font-semibold mb-4">
+      <button onClick={exportEHR} className="w-full h-11 rounded-lg bg-primary-600 text-white text-sm font-semibold mb-20 mr-16">
         Export EHR (PDF)
       </button>
 
