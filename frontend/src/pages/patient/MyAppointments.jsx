@@ -22,6 +22,8 @@ export default function MyAppointments() {
   const { patientRecord, refresh } = useAuth()
   const [appts, setAppts] = useState(null)
   const [err, setErr] = useState('')
+  const [tab, setTab] = useState('All')
+  const [q, setQ] = useState('')
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -39,20 +41,46 @@ export default function MyAppointments() {
     }
   }
 
+  const todayStr = new Date().toISOString().slice(0, 10)
+  const filtered = (appts ?? []).filter((a) => {
+    if (tab === 'Upcoming' && !['pending', 'approved'].includes(a.status)) return false
+    if (tab === 'Past' && !['completed', 'cancelled'].includes(a.status)) return false
+    if (q && !(a.services?.name ?? '').toLowerCase().includes(q.toLowerCase())) return false
+    return true
+  })
+
   return (
     <div className="px-4 py-4 space-y-3">
       <div>
         <h1 className="text-xl font-bold text-gray-900">My Appointments</h1>
-        <p className="text-xs text-gray-500">Track your bookings &amp; visit history</p>
+        <p className="text-xs text-gray-500">Reservation &amp; Scheduling</p>
       </div>
+
+      {/* All / Upcoming / Past segmented control (Figma p35) */}
+      <div className="flex bg-gray-100 rounded-lg p-1 text-sm font-medium">
+        {['All', 'Upcoming', 'Past'].map((t) => (
+          <button key={t} onClick={() => setTab(t)}
+                  className={'flex-1 py-1.5 rounded-md ' + (tab === t ? 'bg-primary-50 text-primary-700 font-semibold' : 'text-gray-500')}>{t}</button>
+        ))}
+      </div>
+
+      {/* search */}
+      <div className="relative">
+        <svg viewBox="0 0 24 24" className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search appointments…"
+               className="w-full h-10 border border-gray-200 rounded-lg pl-9 pr-3 text-sm bg-white" />
+      </div>
+
+      <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-400">{(filtered ?? []).length} appointments</p>
       {err && <p className="text-xs text-red-500">{err}</p>}
       {appts?.length === 0 && <p className="text-sm text-gray-400 py-8 text-center">No appointments yet — book one from the Book tab.</p>}
       <div className="space-y-2">
-        {(appts ?? []).map((a) => (
+        {(filtered ?? []).map((a) => (
           <div key={a.id} className="bg-white border border-gray-200 rounded-lg px-3.5 py-3">
             <div className="flex items-center gap-2">
               <div className="flex-1 min-w-0 text-sm font-semibold text-gray-900">{a.services?.name || 'Appointment'}</div>
               <StatusPill status={a.status} payment={a.payment_status} />
+              <svg viewBox="0 0 24 24" className="w-4 h-4 text-gray-400 flex-none" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 6 6 6-6 6" /></svg>
             </div>
             <div className="text-xs text-gray-500 mt-1">
               {a.requested_date || (a.scheduled_at ? new Date(a.scheduled_at).toLocaleDateString() : 'Date to be assigned')}
@@ -88,6 +116,17 @@ export default function MyAppointments() {
             {a.notes && <div className="text-xs text-gray-400 mt-1 italic">"{a.notes}"</div>}
           </div>
         ))}
+
+        {/* CLINIC INFORMATION card (Figma p35) */}
+        <div className="bg-white border border-gray-200 rounded-lg p-4 mt-4">
+          <div className="text-[11px] font-bold uppercase tracking-wide text-gray-400 mb-2">Clinic information</div>
+          <div className="flex justify-between text-sm py-1.5 border-t border-gray-100">
+            <span className="text-gray-500">Hours</span><span className="font-semibold text-gray-900">Mon - Sat · 8 AM – 5 PM</span>
+          </div>
+          <div className="flex justify-between text-sm py-1.5 border-t border-gray-100">
+            <span className="text-gray-500">Contact</span><span className="font-semibold text-primary-700">dr.joson@dardenal.ph</span>
+          </div>
+        </div>
       </div>
     </div>
   )

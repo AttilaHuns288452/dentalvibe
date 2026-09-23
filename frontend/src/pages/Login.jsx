@@ -45,7 +45,7 @@ export default function Login() {
             <path d="M12 2.5C9.4 2.5 7.5 4.6 7.5 7.2c0 1.7.5 3.1 1.1 4.6.5 1.2 1 2.5 1.3 3.9.2 1 .4 1.9.4 2.4 0 1.4.8 2.4 1.7 2.4s1.7-1 1.7-2.4c0-.5.2-1.4.4-2.4.3-1.4.8-2.7 1.3-3.9.6-1.5 1.1-2.9 1.1-4.6C16.5 4.6 14.6 2.5 12 2.5z" />
           </svg>
         </div>
-        <h1 className="text-xl font-bold mt-3">DentalVibe</h1>
+        <h1 className="text-xl font-bold mt-3">D.A.R. Dental Clinic</h1>
         <p className="text-xs opacity-80 mt-1">Appointment &amp; Record System</p>
       </div>
 

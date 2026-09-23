@@ -31,7 +31,7 @@ export default function Navbar({ pendingCount = 0 }) {
             </svg>
           </a>
           <div className="flex-1 min-w-0">
-            <div className="text-sm font-bold text-gray-900 leading-tight">DentalVibe</div>
+            <div className="text-sm font-bold text-gray-900 leading-tight">D.A.R. Dental Clinic</div>
             <div className="text-[11px] text-gray-500 leading-tight capitalize">
               {role === 'patient' ? 'Patient Portal' : role === 'doctor' ? 'Dentist Portal' : 'Clinic Owner'}
               {' · '}{profile?.full_name}
@@ -43,7 +43,7 @@ export default function Navbar({ pendingCount = 0 }) {
             <svg viewBox="0 0 24 24" className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d={ICONS.bell} /></svg>
             {pendingCount > 0 && role !== 'patient' && <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 rounded-full bg-primary-600 text-white text-[9px] font-bold flex items-center justify-center px-1">{pendingCount}</span>}
           </button>
-          <button onClick={() => navigate(role === 'owner' ? '/owner/manage' : role === 'doctor' ? '/doctor/profile' : '/profile')} aria-label="Settings"
+          <button onClick={() => navigate(roleBase + '/settings')} aria-label="Settings"
                   className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center flex-none">
             <svg viewBox="0 0 24 24" className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d={ICONS.gear} /></svg>
           </button>

@@ -65,15 +65,19 @@ await tab('Patients')
 check('owner: patients seeded', (await pg.locator('main').textContent()).includes('Maria Santos'))
 await pg.locator('main button:has-text("Maria Santos")').first().click()
 await pg.waitForTimeout(1200)
-check('owner: chat opens', (await pg.locator('main').textContent()).includes('Good morning doc!'))
+check('owner: EHR opens from patient row', (await pg.locator('main').textContent()).includes('Patient Record'))
+await pg.goto(BASE + '/owner/messages', { waitUntil: 'networkidle' }); await pg.waitForTimeout(1200)
+await pg.locator('main button:has-text("Maria Santos")').first().click(); await pg.waitForTimeout(1200)
+check('owner: chat opens', (await pg.locator('body').textContent()).includes('Good morning doc!'))
 await pg.fill('main form input', 'QA msg ' + Date.now())
 await pg.locator('button[aria-label="Send"]').click()
 await pg.waitForTimeout(1500)
 check('owner: chat send works', true)
 
 // FAB deep link → picker
+await pg.goto(BASE + '/owner', { waitUntil: 'networkidle' }); await pg.waitForTimeout(1000)
 await pg.locator('button[aria-label="Messages"]').click()
-await pg.waitForTimeout(1000)
+await pg.waitForTimeout(1200)
 check('owner: FAB picker', (await pg.locator('main').textContent()).includes('Pick a conversation'))
 await pg.locator('main button:has-text("Juan Dela Cruz")').first().click()
 await pg.waitForTimeout(1000)
@@ -143,6 +147,21 @@ await pg.waitForTimeout(1000)
 await pg.locator('button:has-text("Log Out")').click()
 await pg.waitForTimeout(1500)
 check('logout works', (await pg.locator('input[type="email"]').count()) === 1)
+
+// self-cleanup: remove the QA patient row + its notifications
+try {
+  const env = Object.fromEntries(fs.readFileSync('/home/attila/Documents/Projects/dentalvibe/frontend/.env.local', 'utf8').trim().split('\n').map((l) => l.split('=')))
+  const { createClient } = await import('file:///home/attila/Documents/Projects/dentalvibe/frontend/node_modules/@supabase/supabase-js/dist/index.cjs')
+  const sbs = createClient(env.VITE_SUPABASE_URL, env.VITE_SUPABASE_ANON_KEY)
+  await sbs.auth.signInWithPassword({ email: 'owner@dentalvibe.ph', password: 'password123' })
+  const { data: jp } = await sbs.from('patients').select('id, user_id, full_name').eq('full_name', 'QA Final')
+  for (const j of (jp ?? [])) {
+    if (j.user_id) await sbs.from('notifications').delete().eq('user_id', j.user_id)
+    await sbs.from('appointments').delete().eq('patient_id', j.id)
+    await sbs.from('chat_messages').delete().eq('patient_id', j.id)
+    await sbs.from('patients').delete().eq('id', j.id)
+  }
+} catch {}
 
 console.log(`\n=== QA RESULT: ${pass} passed, ${fail} failed ===`)
 console.log('page errors:', pageErrors.length ? pageErrors.slice(0, 5) : 'NONE')

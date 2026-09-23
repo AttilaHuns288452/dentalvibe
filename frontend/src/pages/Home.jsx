@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../context/RoleContext'
-import { listAppointments, getClinicSettings, peso, setAppointmentStatus } from '../lib/api'
+import { listAppointments, listMyAppointments, getClinicSettings, peso, setAppointmentStatus } from '../lib/api'
 import { fmtTime12 } from '../lib/format'
 
 // Owner/Doctor home — Figma frame 48: date + hours header, KPI cards
@@ -16,7 +16,7 @@ const STATUS_PILL = {
 }
 
 export default function Home() {
-  const { profile } = useAuth()
+  const { profile, patientRecord } = useAuth()
   const isStaff = profile?.role !== 'patient'
   const [appts, setAppts] = useState(null)
   const [settings, setSettings] = useState(null)
@@ -25,6 +25,7 @@ export default function Home() {
   useEffect(() => {
     getClinicSettings().then(setSettings).catch(() => {})
     if (isStaff) listAppointments().then(setAppts).catch((e) => setErr(e.message))
+    else if (patientRecord?.id) listMyAppointments(patientRecord.id).then(setAppts).catch(() => {})
   }, [isStaff])
 
   const today = new Date().toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' })
@@ -136,12 +137,66 @@ export default function Home() {
 
       {!isStaff && (
         <>
-          <div className="bg-green-50 border border-green-100 rounded-lg p-3.5 flex items-center gap-3">
-            <span className="text-green-600 flex-none">
-              <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m5 12 5 5L20 7" /></svg>
-            </span>
-            <span className="text-xs text-gray-600">Welcome to the patient portal — book appointments, chat with the clinic, and track visits.</span>
-          </div>
+          {/* Upcoming appointment banner + card (Figma p34) */}
+          {(() => {
+            const upcoming = (appts ?? []).filter((a) => ['approved', 'pending'].includes(a.status))
+              .sort((a, b) => (a.scheduled_at || a.requested_date).localeCompare(b.scheduled_at || b.requested_date))[0]
+            if (!upcoming) {
+              return (
+                <div className="bg-green-50 border border-green-100 rounded-lg p-3.5 flex items-center gap-3">
+                  <span className="text-green-600 flex-none">
+                    <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m5 12 5 5L20 7" /></svg>
+                  </span>
+                  <span className="text-xs text-gray-600">Welcome to the patient portal — book appointments, chat with the clinic, and track visits.</span>
+                </div>
+              )
+            }
+            const d = new Date(upcoming.scheduled_at || upcoming.requested_date + 'T00:00:00')
+            const isApproved = upcoming.status === 'approved'
+            return (
+              <>
+                <div className="bg-green-50 border border-green-100 rounded-lg p-3.5 flex items-center gap-3">
+                  <span className="text-green-600 flex-none">
+                    <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m5 12 5 5L20 7" /></svg>
+                  </span>
+                  <span className="text-xs text-green-700">
+                    <b>Upcoming Appointment</b> — Your {upcoming.services?.name} on{' '}
+                    {d.toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}
+                    {upcoming.scheduled_at ? ` · ${fmtTime12(upcoming.scheduled_at.slice(11, 16))}` : ''} is {isApproved ? 'confirmed' : 'pending confirmation'}.
+                  </span>
+                </div>
+                <section>
+                  <h2 className="text-[11px] font-bold uppercase tracking-wide text-gray-500 mb-1.5">Upcoming appointment</h2>
+                  <Link to="/appointments" className="bg-white border border-gray-200 rounded-lg p-3.5 flex items-center gap-3">
+                    <span className="w-12 rounded-lg bg-primary-50 text-primary-700 flex flex-col items-center py-1.5 flex-none">
+                      <span className="text-[9px] font-bold uppercase">{d.toLocaleDateString('en-PH', { month: 'short' })}</span>
+                      <span className="text-lg font-bold leading-none">{d.getDate()}</span>
+                    </span>
+                    <span className="flex-1 min-w-0">
+                      <span className="block text-sm font-semibold text-gray-900 truncate">{upcoming.services?.name ?? 'Appointment'}</span>
+                      <span className="block text-xs text-gray-500">
+                        {d.toLocaleDateString('en-PH', { weekday: 'long' })}
+                        {upcoming.scheduled_at ? ` · ${fmtTime12(upcoming.scheduled_at.slice(11, 16))}` : ''}
+                      </span>
+                    </span>
+                  </Link>
+                </section>
+                <section>
+                  <h2 className="text-[11px] font-bold uppercase tracking-wide text-gray-500 mb-1.5">Recent activity</h2>
+                  <div className="bg-white border border-gray-200 rounded-lg px-3.5 py-3">
+                    <div className="text-sm font-semibold text-gray-900">
+                      {(appts ?? [])[0]?.status === 'completed' ? 'Visit completed' : 'Book an Appointment'}
+                    </div>
+                    <div className="text-xs text-gray-500 mt-0.5">
+                      {(appts ?? [])[0]
+                        ? `${(appts ?? [])[0].services?.name ?? 'Service'} · ${(appts ?? [])[0].requested_date ?? ''}`
+                        : 'Your booking history will appear here.'}
+                    </div>
+                  </div>
+                </section>
+              </>
+            )
+          })()}
           <div className="grid grid-cols-2 gap-2">
             {[
               ['Book Appointment', 'Pick a service & date', '/book'],

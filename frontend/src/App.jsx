@@ -21,9 +21,11 @@ import Payment from './pages/patient/Payment'
 import QrPayment from './pages/patient/QrPayment'
 import ConfirmBooking, { BookSuccess } from './pages/patient/ConfirmBooking'
 import Receipt from './pages/patient/Receipt'
+import PatientEHR from './pages/shared/PatientEHR'
 import EditProfile from './pages/patient/EditProfile'
 import Notifications from './pages/shared/Notifications'
 import AccountSecurity from './pages/shared/AccountSecurity'
+import Settings from './pages/shared/Settings'
 import ResetPassword, { ResetConfirm } from './pages/shared/ResetPassword'
 import Placeholder from './pages/Placeholder'
 import { BrowserRouter, Navigate, useLocation } from 'react-router-dom'
@@ -52,21 +54,26 @@ function Routes() {
     case '/profile': return <Profile />
     case '/profile/edit': return <EditProfile />
     case '/security': return <AccountSecurity />
+    case '/settings': return <Settings />
     case '/notifications': return <Notifications roleBase="" />
     case '/doctor': return <Home />
     case '/doctor/calendar': return <DoctorCalendar />
     case '/doctor/requests': return <Requests />
     case '/doctor/patients': return <DoctorPatients />
+    case '/doctor/patients/ehr': return <PatientEHR />
     case '/doctor/messages': return <StaffMessages />
     case '/doctor/notifications': return <Notifications roleBase="/doctor" />
     case '/doctor/security': return <AccountSecurity />
+    case '/doctor/settings': return <Settings />
     case '/owner': return <Home />
     case '/owner/calendar': return <DoctorCalendar />
     case '/owner/requests': return <Requests />
     case '/owner/patients': return <OwnerPatients />
+    case '/owner/patients/ehr': return <PatientEHR />
     case '/owner/messages': return <StaffMessages />
     case '/owner/notifications': return <Notifications roleBase="/owner" />
     case '/owner/security': return <AccountSecurity />
+    case '/owner/settings': return <Settings />
     case '/owner/manage': return <OwnerManage />
     case '/owner/manage/prices': return <OwnerServicePrices />
     case '/owner/income': return <IncomeHub />

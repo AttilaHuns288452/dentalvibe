@@ -38,6 +38,7 @@ function ProofModal({ apptId, onClose }) {
 
 export default function Requests() {
   const [appts, setAppts] = useState(null)
+  const [confirming, setConfirming] = useState(null)
   const [err, setErr] = useState('')
   const [assigning, setAssigning] = useState(null)
   const [when, setWhen] = useState('')
@@ -61,6 +62,32 @@ export default function Requests() {
 
   return (
     <div className="px-4 py-4 space-y-4">
+
+      {confirming && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={() => setConfirming(null)}>
+          <div className="bg-white rounded-2xl w-full max-w-sm p-5 text-center" onClick={(e) => e.stopPropagation()}>
+            <span className="w-10 h-10 mx-auto rounded-full border-2 border-primary-600 text-primary-700 flex items-center justify-center font-bold">i</span>
+            <h3 className="text-sm font-bold text-gray-900 mt-2">Confirm Patient Appointment</h3>
+            <p className="text-xs text-gray-600 mt-2 leading-relaxed">
+              Accept appointment request for <b>{confirming.patients?.full_name}</b> on{' '}
+              <b className="text-primary-700">{confirming.when ? new Date(confirming.when).toLocaleString('en-PH', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : confirming.requested_date}</b> for <b>{confirming.services?.name}</b>? A
+              confirmation notification will be sent to the patient.
+            </p>
+            <div className="bg-green-50 text-green-700 text-xs font-semibold rounded-full px-3 py-1.5 mt-3 flex items-center justify-center gap-1.5">
+              <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M5 13l4 4L19 7" /></svg>
+              No schedule conflicts
+            </div>
+            <div className="flex gap-2.5 mt-4">
+              <button onClick={() => setConfirming(null)} className="flex-1 h-10 rounded-lg border border-gray-200 bg-white text-gray-600 text-sm font-semibold">Cancel</button>
+              <button onClick={() => { const c = confirming; setConfirming(null); act(c.id, 'approved', { scheduled_at: c.when, ...(c.payment_status === 'submitted' ? { payment_verified: true } : {}) }) }}
+                      className="flex-1 h-10 rounded-lg bg-primary-600 text-white text-sm font-semibold flex items-center justify-center gap-1.5">
+                <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M5 13l4 4L19 7" /></svg>
+                Approve
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       <div>
         <h1 className="text-xl font-bold text-gray-900">Requests</h1>
         <p className="text-xs text-gray-500">Booking review · payment verification</p>
@@ -93,7 +120,7 @@ export default function Requests() {
                 <div className="flex gap-2 items-center pt-1">
                   <input type="datetime-local" value={when} onChange={(e) => setWhen(e.target.value)}
                          className="flex-1 h-9 border border-gray-200 rounded-lg px-2 text-xs" />
-                  <button onClick={() => act(a.id, 'approved', { scheduled_at: when })} disabled={!when}
+                  <button onClick={() => setConfirming({ ...a, when })} disabled={!when}
                           className="h-9 px-3 rounded-lg bg-primary-600 text-white text-xs font-semibold disabled:opacity-50">Confirm</button>
                   <button onClick={() => setAssigning(null)} className="h-9 px-3 rounded-lg border border-gray-200 text-xs text-gray-500">Cancel</button>
                 </div>

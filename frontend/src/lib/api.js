@@ -160,9 +160,12 @@ export async function listMyAppointments(patientId) {
 }
 
 export async function setAppointmentStatus(id, status, extra = {}) {
+  const { payment_verified, ...rest } = extra
+  const payload = { status, ...rest }
+  if (payment_verified) payload.payment_status = 'verified'
   const { error } = await supabase
     .from('appointments')
-    .update({ status, ...extra })
+    .update(payload)
     .eq('id', id)
   if (error) throw error
 }

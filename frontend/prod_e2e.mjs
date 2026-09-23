@@ -96,14 +96,17 @@ await pg.locator('main button:has-text("Verify & Approve")').first().click()
 await pg.waitForTimeout(400)
 await pg.locator('input[type="datetime-local"]').fill('2026-10-12T10:00')
 await pg.locator('button:has-text("Confirm")').click()
-await pg.waitForTimeout(1200)
+await pg.waitForTimeout(600)
+// p4 confirm dialog → Approve
+await pg.locator('div.fixed button:has-text("Approve")').click()
+await pg.waitForTimeout(1500)
 check('12. approved after payment', !(await pg.locator('main').textContent()).includes('Prod Patient') || true)
 
 // verify DB: payment_status verified? (owner clicked verify+approve — we set status approved; payment verification = separate UI: mark verified via requests? Simplify: approved implies verified in our flow)
 const sbs = createClient(env.VITE_SUPABASE_URL, env.VITE_SUPABASE_ANON_KEY)
 await sbs.auth.signInWithPassword({ email: 'owner@dentalvibe.ph', password: 'password123' })
 const { data: lastAppt } = await sbs.from('appointments').select('status, payment_status, price').order('created_at', { ascending: false }).limit(1)
-check('13. DB: approved + submitted payment', lastAppt[0]?.status === 'approved' && lastAppt[0]?.payment_status === 'submitted')
+check('13. DB: approved + payment verified', lastAppt[0]?.status === 'approved' && lastAppt[0]?.payment_status === 'verified')
 
 // complete
 await pg.goto('http://localhost:4176/owner/requests', { waitUntil: 'networkidle' })

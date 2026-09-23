@@ -39,13 +39,21 @@ export default function DoctorCalendar() {
 
   const heading = new Date(day + 'T12:00:00').toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' })
   const slots = hoursFor(settings?.open_time, settings?.close_time)
-  const booked = new Set(dayAppts.map((a) => (a.scheduled_at || '').slice(11, 13)))
+  // local-hour keys — scheduled_at is UTC; slice(11,13) matched UTC hours (bug)
+  const booked = new Set(dayAppts.map((a) => a.scheduled_at ? String(new Date(a.scheduled_at).getHours()).padStart(2, '0') : null))
 
   return (
     <div className="px-4 py-4 space-y-4">
       <div>
         <h1 className="text-xl font-bold text-gray-900">Calendar</h1>
         <p className="text-xs text-gray-500">Color-coded by appointment status</p>
+      </div>
+
+      {/* legend chips (Figma p42) */}
+      <div className="flex gap-2">
+        <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full bg-blue-50 text-blue-600">Consultation</span>
+        <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full bg-green-50 text-green-600">Treatment</span>
+        <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full bg-orange-50 text-orange-600">Walk-in</span>
       </div>
 
       {/* Day / Week / Month segmented control (Figma) */}
@@ -70,7 +78,7 @@ export default function DoctorCalendar() {
       {view === 'Day' && (
         <div className="space-y-1.5">
           {slots.map((h) => {
-            const block = dayAppts.find((a) => (a.scheduled_at || '').slice(11, 13) === h.slice(0, 2))
+            const block = dayAppts.find((a) => a.scheduled_at && String(new Date(a.scheduled_at).getHours()).padStart(2, '0') === h.slice(0, 2))
             return (
               <div key={h} className="flex gap-2 items-stretch">
                 <div className="w-16 text-xs font-bold text-gray-900 flex items-center flex-none">{fmtTime12(h).replace(':00', '')}</div>
@@ -115,6 +123,18 @@ export default function DoctorCalendar() {
           <div className="text-sm text-gray-500">{dayAppts.length} appointments on {heading}. Use Week view to browse the month.</div>
         </div>
       )}
+
+      {/* summary card (Figma p42) */}
+      <div className="bg-gray-50 border border-gray-200 rounded-lg p-3.5 divide-y divide-gray-200 text-sm">
+        <div className="flex justify-between py-1">
+          <span className="text-gray-600">Today</span>
+          <span className="font-semibold text-gray-900">{appts?.filter((a) => (a.scheduled_at || a.requested_date || '').slice(0, 10) === new Date().toISOString().slice(0, 10) && a.status !== 'cancelled').length ?? 0} booked</span>
+        </div>
+        <div className="flex justify-between py-1">
+          <span className="text-gray-600">This week</span>
+          <span className="font-semibold text-gray-900">{appts?.filter((a) => { const d = new Date(a.scheduled_at || a.requested_date); const n = new Date(); return a.status !== 'cancelled' && d >= new Date(n.getFullYear(), n.getMonth(), n.getDate()) && d < new Date(n.getFullYear(), n.getMonth(), n.getDate() + 7) }).length ?? 0} booked</span>
+        </div>
+      </div>
       <div className="h-4" />
     </div>
   )
