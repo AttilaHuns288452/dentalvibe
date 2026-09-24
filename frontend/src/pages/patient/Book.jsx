@@ -13,7 +13,7 @@ function DateGrid({ date, setDate }) {
   const today = new Date(); today.setHours(0, 0, 0, 0)
   const [month, setMonth] = useState(() => new Date(today.getFullYear(), today.getMonth(), 1))
   const monthName = month.toLocaleDateString('en-PH', { month: 'long', year: 'numeric' })
-  const firstDay = month.getDay()
+  const firstDay = (month.getDay() + 6) % 7 // Monday-first (p87)
   const days = new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate()
   const cells = [...Array(firstDay).fill(null), ...Array.from({ length: days }, (_, i) => i + 1)]
   const iso = (d) => `${month.getFullYear()}-${String(month.getMonth() + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`
@@ -35,7 +35,7 @@ function DateGrid({ date, setDate }) {
       </div>
       <div className="bg-white border border-gray-200 rounded-lg p-2">
         <div className="grid grid-cols-7 gap-1 text-center text-[10px] font-bold text-gray-400 mb-1">
-          {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => <span key={i}>{d}</span>)}
+          {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((d, i) => <span key={i}>{d}</span>)}
         </div>
         <div className="grid grid-cols-7 gap-1">
           {cells.map((d, i) => {
@@ -132,7 +132,7 @@ export default function Book() {
     <div className="px-4 py-4 space-y-4">
       <div>
         <h1 className="text-xl font-bold text-gray-900">Book Appointment</h1>
-        <p className="text-xs text-gray-500">Pick a service, a date, and a time</p>
+        <p className="text-xs text-gray-500">Reservation &amp; Scheduling</p>
       </div>
 
       <form onSubmit={submit} className="space-y-4">
