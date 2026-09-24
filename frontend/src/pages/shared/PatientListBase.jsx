@@ -54,7 +54,7 @@ export default function PatientListBase({ title, subtitle }) {
 
       {err && <p className="text-xs text-red-500">{err}</p>}
       {!patients && <Skel lines={3} h="h-14" />}
-      {patients && filtered.length === 0 && <p className="text-sm text-gray-500 py-6 text-center">No patients found.</p>}
+      {patients && filtered.length === 0 && <div className="bg-white border border-gray-200 rounded-lg px-3.5 py-6 text-sm text-gray-500 text-center">No patients found.</div>}
 
       {patients?.length > 0 && (
         <section>
