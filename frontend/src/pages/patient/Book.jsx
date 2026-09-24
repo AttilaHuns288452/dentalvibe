@@ -224,7 +224,7 @@ export default function Book() {
         )}
 
         {/* sticky action bar — fee context + CTA always in reach */}
-        <div className="sticky -mx-4 px-4 pt-2 pb-2 bottom-[calc(4.25rem+env(safe-area-inset-bottom))] bg-gradient-to-t from-gray-50 via-gray-50 to-transparent">
+        <div className="sticky -mx-4 px-4 pt-2 pb-2 bottom-[calc(4.25rem+env(safe-area-inset-bottom))] md:bottom-0 bg-gradient-to-t from-gray-50 via-gray-50 to-transparent">
         {step === 1 && (
           <p className="text-[11px] text-gray-500 bg-primary-50 border border-primary-100 rounded-lg px-3 py-2 mb-2">
             The appointment fee reserves your slot — it is <b>not</b> your full treatment bill. Any treatment is charged at the clinic.
@@ -237,11 +237,11 @@ export default function Book() {
           )}
           {step === 1 ? (
             <button type="button" disabled={!picked.length} onClick={() => { setErr(''); navigate('/book?step=2') }}
-                    className="flex-1 h-12 rounded-lg bg-primary-600 text-white font-semibold disabled:opacity-50">
+                    className="flex-1 h-12 rounded-lg bg-primary-600 text-white font-semibold disabled:bg-gray-200 disabled:text-gray-500">
               Next{total ? ` · ${peso(total)}` : ''}
             </button>
           ) : (
-            <button disabled={busy || !date || !time} className="flex-1 h-12 rounded-lg bg-primary-600 text-white font-semibold disabled:opacity-50">
+            <button disabled={busy || !date || !time} className="flex-1 h-12 rounded-lg bg-primary-600 text-white font-semibold disabled:bg-gray-200 disabled:text-gray-500">
               {busy ? 'Submitting…' : `Continue to Payment${total ? ' · ' + peso(total) : ''}`}
             </button>
           )}

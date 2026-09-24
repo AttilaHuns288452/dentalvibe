@@ -57,16 +57,16 @@ export default function DoctorCalendar() {
 
       {/* legend chips (Figma p42) */}
       <div className="flex gap-2">
-        <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full bg-blue-50 text-blue-600">Consultation</span>
-        <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full bg-green-50 text-green-600">Treatment</span>
-        <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full bg-orange-50 text-orange-600">Walk-in</span>
+        <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full bg-green-50 text-green-700">Completed</span>
+        <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full bg-amber-50 text-amber-700">Pending</span>
+        <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full bg-red-50 text-red-600">Cancelled</span>
       </div>
 
       {/* Day / Week / Month segmented control (Figma) */}
       <div className="flex bg-white border border-gray-200 rounded-lg p-1 text-sm font-semibold">
         {['Day', 'Week', 'Month'].map((v) => (
           <button key={v} onClick={() => setView(v)}
-                  className={'flex-1 py-1.5 rounded-md ' + (view === v ? 'bg-primary-50 text-primary-700' : 'text-gray-500')}>
+                  className={'flex-1 min-h-[44px] rounded-md ' + (view === v ? 'bg-primary-50 text-primary-700' : 'text-gray-500')}>
             {v}
           </button>
         ))}
@@ -74,11 +74,11 @@ export default function DoctorCalendar() {
 
       <div className="flex items-center gap-2">
         <button type="button" aria-label="Previous day" onClick={() => { const d = new Date(day + 'T12:00:00'); d.setDate(d.getDate() - 1); setDay(d.toISOString().slice(0, 10)) }}
-                className="w-9 h-9 rounded-lg border border-gray-200 bg-white text-gray-600">‹</button>
+                className="w-9 h-9 rounded-lg border border-gray-200 bg-white text-gray-600"aria-label="Previous day">‹</button>
         <input type="date" value={day} onChange={(e) => setDay(e.target.value)}
              className="h-9 px-2.5 rounded-lg border border-gray-200 bg-white text-xs font-semibold text-gray-600" />
         <button type="button" aria-label="Next day" onClick={() => { const d = new Date(day + 'T12:00:00'); d.setDate(d.getDate() + 1); setDay(d.toISOString().slice(0, 10)) }}
-                className="w-9 h-9 rounded-lg border border-gray-200 bg-white text-gray-600">›</button>
+                className="w-9 h-9 rounded-lg border border-gray-200 bg-white text-gray-600"aria-label="Next day">›</button>
       </div>
 
       {err && <p className="text-xs text-red-500">{err}</p>}
@@ -109,7 +109,7 @@ export default function DoctorCalendar() {
                             await setAppointmentStatus(block.id, 'completed')
                             setAppts((list) => list.map((x) => (x.id === block.id ? { ...x, status: 'completed' } : x)))
                           } catch (e) { alert(e.message) }
-                        }} className="h-8 px-3 rounded-md bg-blue-600 text-white text-[11px] font-semibold">Mark completed</button>
+                        }} className="h-11 px-3 rounded-md bg-blue-600 text-white text-[11px] font-semibold">Mark completed</button>
                       )}
                     </div>
                   </div>

@@ -94,7 +94,7 @@ export default function IncomeHub() {
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-bold text-gray-900">Income Analytics</h1>
         <div className="flex gap-2">
-          <button onClick={() => exportReport(period)} aria-label="Export report"
+          <button aria-label="Export report" onClick={() => exportReport(period)} aria-label="Export report"
                   className="w-9 h-9 rounded-lg border border-gray-200 bg-white text-gray-600 flex items-center justify-center">
             <svg viewBox="0 0 24 24" className="w-4.5 h-4.5 w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3v12m0 0 4-4m-4 4-4-4M4 21h16" /></svg>
           </button>
@@ -108,7 +108,7 @@ export default function IncomeHub() {
       <div className="flex bg-gray-100 rounded-lg p-1">
         {['Analytics', 'Transactions', 'Reports'].map((s) => (
           <button key={s} onClick={() => setSeg(s)}
-                  className={'flex-1 h-8 rounded-md text-xs font-semibold ' + (seg === s ? 'bg-white text-primary-700 shadow-sm' : 'text-gray-500')}>{s}</button>
+                  className={'flex-1 h-11 rounded-md text-xs font-semibold ' + (seg === s ? 'bg-white text-primary-700 shadow-sm' : 'text-gray-500')}>{s}</button>
         ))}
       </div>
 
@@ -121,7 +121,7 @@ export default function IncomeHub() {
         <div className="flex gap-2">
           {PERIODS.map((p) => (
             <button key={p} onClick={() => setPeriod(p)}
-                    className={'h-8 px-3.5 rounded-full text-xs font-semibold ' + (period === p ? 'bg-primary-50 text-primary-700 border border-primary-200' : 'bg-white text-gray-500 border border-gray-200')}>{p}</button>
+                    className={'h-11 px-3.5 rounded-full text-xs font-semibold ' + (period === p ? 'bg-primary-50 text-primary-700 border border-primary-200' : 'bg-white text-gray-500 border border-gray-200')}>{p}</button>
           ))}
         </div>
         {period === 'Custom' && (
@@ -135,7 +135,7 @@ export default function IncomeHub() {
 
         <div className="bg-white border border-gray-200 rounded-lg p-4">
           <div className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide">Net income</div>
-          <div className="text-3xl font-bold text-gray-900 mt-1">{peso(net)}</div>
+          <div className={"text-3xl font-bold mt-1 " + (net < 0 ? "text-red-600" : "text-gray-900")}>{net < 0 ? "−" + peso(Math.abs(net)) : peso(net)}</div>
           <div className="flex justify-between text-xs mt-3 pt-3 border-t border-gray-100">
             <span className="text-green-600 font-semibold">+{peso(pIncome)} income</span>
             <span className="text-red-500 font-semibold">−{peso(pExpenses)} expenses</span>
@@ -149,7 +149,7 @@ export default function IncomeHub() {
           </div>
           <div className="bg-white border border-gray-200 rounded-lg p-3.5">
             <div className="text-lg font-bold text-gray-900">{peso(avg)}</div>
-            <div className="text-[11px] text-gray-500">avg per visit</div>
+            <div className="text-[11px] text-gray-500">avg per completed visit</div>
           </div>
         </div>
 
@@ -284,7 +284,7 @@ function AddTransaction({ onDone }) {
       <div className="flex bg-gray-100 rounded-lg p-1">
         {['income', 'expense'].map((t) => (
           <button key={t} type="button" onClick={() => { setType(t); setCategory('') }}
-                  className={'flex-1 h-8 rounded-md text-xs font-semibold capitalize ' + (type === t ? 'bg-white text-primary-700 shadow-sm' : 'text-gray-500')}>{t}</button>
+                  className={'flex-1 h-11 rounded-md text-xs font-semibold capitalize ' + (type === t ? 'bg-white text-primary-700 shadow-sm' : 'text-gray-500')}>{t}</button>
         ))}
       </div>
       <div>
@@ -292,7 +292,7 @@ function AddTransaction({ onDone }) {
         <div className="flex flex-wrap gap-2">
           {cats.map((c) => (
             <button key={c} type="button" onClick={() => setCategory(c)}
-                    className={'h-8 px-3 rounded-full text-xs font-semibold border ' + (category === c ? 'bg-primary-50 text-primary-700 border-primary-300' : 'bg-white text-gray-600 border-gray-200')}>{c}</button>
+                    className={'h-11 px-3 rounded-full text-xs font-semibold border ' + (category === c ? 'bg-primary-50 text-primary-700 border-primary-300' : 'bg-white text-gray-600 border-gray-200')}>{c}</button>
           ))}
         </div>
       </div>

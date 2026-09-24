@@ -35,8 +35,7 @@ function InstallPill() {
   if (!evt) return null
   return (
     <button onClick={async () => { evt.prompt(); await evt.userChoice; setEvt(null) }}
-            className="fixed right-3 z-[60] flex items-center gap-1.5 bg-primary-600 text-white text-xs font-bold px-3 h-9 rounded-full shadow-lg"
-            style={{ bottom: 'calc(4.5rem + env(safe-area-inset-bottom))' }}>
+            className="fixed right-3 z-[60] flex items-center gap-1.5 bg-primary-600 text-white text-xs font-bold px-3 h-9 rounded-full shadow-lg bottom-[calc(4.5rem+env(safe-area-inset-bottom))] md:bottom-4">
       Install app
     </button>
   )
@@ -113,11 +112,11 @@ function Shell() {
 
   return (
     <>
-      <div className="max-w-md mx-auto bg-gray-50 min-h-screen shadow-sm">
+      <div className="max-w-md mx-auto bg-gray-50 min-h-screen shadow-sm md:max-w-none md:pl-[72px] lg:pl-60">
         <Navbar pendingCount={pendingCount} />
         <DevPanel />
         <InstallPill />
-        <main className="pb-28">
+        <main className="pb-28 md:pb-10 md:max-w-3xl xl:max-w-5xl md:mx-auto md:w-full md:px-6">
           <Suspense fallback={<div className="px-4 py-10"><Skel lines={3} h="h-14" /></div>}>
             <Routes />
           </Suspense>

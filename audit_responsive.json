@@ -1,0 +1,38 @@
+[
+  {
+    "route": "/owner/manage",
+    "vp": "360x800",
+    "issue": "small tap targets: + Add Service 82x16 | Delete service 16x16 | Delete service 16x16",
+    "sev": "MED"
+  },
+  {
+    "route": "/owner/manage",
+    "vp": "390x844",
+    "issue": "small tap targets: + Add Service 82x16 | Delete service 16x16 | Delete service 16x16",
+    "sev": "MED"
+  },
+  {
+    "route": "/owner/manage",
+    "vp": "412x915",
+    "issue": "small tap targets: + Add Service 82x16 | Delete service 16x16 | Delete service 16x16",
+    "sev": "MED"
+  },
+  {
+    "route": "/owner/manage",
+    "vp": "768x1024",
+    "issue": "small tap targets: + Add Service 82x16 | Delete service 16x16 | Delete service 16x16",
+    "sev": "MED"
+  },
+  {
+    "route": "/owner/manage",
+    "vp": "1024x768",
+    "issue": "small tap targets: + Add Service 82x16 | Delete service 16x16 | Delete service 16x16",
+    "sev": "MED"
+  },
+  {
+    "route": "/owner/manage",
+    "vp": "1440x900",
+    "issue": "small tap targets: + Add Service 82x16 | Delete service 16x16 | Delete service 16x16",
+    "sev": "MED"
+  }
+]

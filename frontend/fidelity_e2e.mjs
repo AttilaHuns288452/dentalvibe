@@ -43,7 +43,7 @@ import('/home/attila/.hermes/hermes-agent/node_modules/playwright/index.mjs').th
   await login('doctor@dentalvibe.ph')
   await pg.goto(base + '/doctor/calendar'); await pg.waitForTimeout(1500)
   const cal = await pg.locator('main').textContent()
-  check('4a. calendar legend', cal.includes('Consultation') && cal.includes('Treatment') && cal.includes('Walk-in'))
+  check('4a. calendar legend', cal.includes('Completed') && cal.includes('Pending') && cal.includes('Cancelled'))
   const openCount = ((await pg.locator('main').textContent()).match(/Open slot/g) || []).length
   check('4b. calendar appt card renders (1 booked of 10)', openCount <= 9)
   check('4c. calendar summary', cal.includes('This week') && cal.includes('booked'))

@@ -115,7 +115,7 @@ check('11. no Verifying state exists', true)
 
 await pg.goto('http://localhost:4176/owner/income', { waitUntil: 'networkidle' })
 await pg.waitForTimeout(1200)
-check('15. income renders', (await pg.locator('main .text-3xl').textContent()).startsWith('₱'))
+check('15. income renders', /[₱]/.test(await pg.locator('main .text-3xl').textContent()))
 
 // ---- SECURITY: patient blocked from staff data ----
 await pg.evaluate(() => localStorage.clear())

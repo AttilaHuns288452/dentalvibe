@@ -127,7 +127,7 @@ function AddPatient({ onClose, onSaved }) {
             <h2 className="text-lg font-bold text-gray-900">Add Patient</h2>
             <p className="text-xs text-gray-500">New patient record · EHR</p>
           </div>
-          <button type="button" onClick={onClose} aria-label="Close" className="w-8 h-8 rounded-lg bg-white border border-gray-200 text-gray-500">×</button>
+          <button type="button" onClick={onClose} aria-label="Close" className="w-8 h-11 rounded-lg bg-white border border-gray-200 text-gray-500">×</button>
         </div>
         <div className="bg-white border border-gray-200 rounded-lg p-4 space-y-3">
           <div className="grid grid-cols-2 gap-3">

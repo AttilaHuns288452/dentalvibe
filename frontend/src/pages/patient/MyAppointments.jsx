@@ -8,8 +8,8 @@ import { fmtTime12 } from '../../lib/format'
 
 const STATUS_PILL = {
   pending: 'bg-amber-100 text-amber-700',
-  approved: 'bg-green-100 text-green-700',
-  completed: 'bg-blue-100 text-blue-700',
+  approved: 'bg-blue-100 text-blue-700',
+  completed: 'bg-green-100 text-green-700',
   cancelled: 'bg-red-100 text-red-600',
 }
 
@@ -52,7 +52,7 @@ export default function MyAppointments() {
   }
   const filtered = (appts ?? []).filter((a) => {
     if (tab === 'Upcoming' && (isPast(a) || !['pending', 'approved'].includes(a.status))) return false
-    if (tab === 'Past' && !isPast(a)) return false
+    if (tab === 'Past' && (!isPast(a) || a.status === 'pending')) return false // lapsed unbooked != history (fidelity 3e)
     if (q && !(a.services?.name ?? '').toLowerCase().includes(q.toLowerCase())) return false
     return true
   })
@@ -69,7 +69,7 @@ export default function MyAppointments() {
       <div className="flex bg-gray-100 rounded-lg p-1 text-sm font-medium">
         {['All', 'Upcoming', 'Past'].map((t) => (
           <button key={t} onClick={() => setTab(t)}
-                  className={'flex-1 py-1.5 rounded-md ' + (tab === t ? 'bg-primary-50 text-primary-700 font-semibold' : 'text-gray-500')}>{t}</button>
+                  className={'flex-1 min-h-[44px] rounded-md ' + (tab === t ? 'bg-primary-50 text-primary-700 font-semibold' : 'text-gray-500')}>{t}</button>
         ))}
       </div>
 
@@ -86,7 +86,7 @@ export default function MyAppointments() {
       <div className="space-y-2">
         {(filtered ?? []).map((a) => (
           <div key={a.id} className="bg-white border border-gray-200 rounded-lg px-3.5 py-3">
-            <button type="button" onClick={() => setOpenId(openId === a.id ? null : a.id)} className="w-full flex items-center gap-2 text-left">
+            <button type="button" onClick={() => setOpenId(openId === a.id ? null : a.id)} className="min-h-[44px] w-full flex items-center gap-2 text-left">
               <div className="flex-1 min-w-0 text-sm font-semibold text-gray-900">{a.services?.name || 'Appointment'}</div>
               <StatusPill status={a.status} />
               <svg viewBox="0 0 24 24" className={'w-4 h-4 text-gray-500 flex-none transition-transform ' + (openId === a.id ? 'rotate-90' : '')} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 6 6 6-6 6" /></svg>
@@ -113,11 +113,11 @@ export default function MyAppointments() {
                 </span>
                 {a.payment_status === 'unpaid' && (
                   <button onClick={() => navigate('/pay', { state: { appointment: a } })}
-                          className="h-8 px-3 rounded-lg bg-primary-600 text-white text-xs font-semibold">
+                          className="h-11 px-3 rounded-lg bg-primary-600 text-white text-xs font-semibold">
                     Pay now
                   </button>
                 )}
-                <button onClick={() => cancel(a.id)} className="ml-auto text-xs font-semibold text-red-500">Cancel booking</button>
+                <button onClick={() => cancel(a.id)} className="ml-auto min-h-[44px] px-2 text-xs font-semibold text-red-500">Cancel booking</button>
               </div>
             )}
             {a.status === 'approved' && a.payment_status === 'verified' && (
@@ -125,7 +125,7 @@ export default function MyAppointments() {
             )}
             {(a.status === 'completed' || (a.payment_status === 'verified' && isPast(a))) && (
               <button onClick={() => navigate('/receipt', { state: { appointment: a } })}
-                      className="mt-2 h-8 px-3 rounded-lg border border-primary-200 text-primary-700 text-xs font-semibold bg-white">
+                      className="mt-2 min-h-[44px] px-4 rounded-lg border border-primary-200 text-primary-700 text-xs font-semibold bg-white">
                 Attach receipt
               </button>
             )}

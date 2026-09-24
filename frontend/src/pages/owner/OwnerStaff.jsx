@@ -86,8 +86,8 @@ export default function OwnerStaff() {
           <div className="text-xs text-gray-700">Default password: <b>{created.tempPw}</b></div>
           <p className="text-[11px] text-gray-500 mt-2">This is a temporary password — the dentist will be asked to set their own password upon logging in.</p>
           <div className="flex gap-2 mt-3">
-            <button onClick={() => navigator.clipboard?.writeText(created.tempPw)} className="flex-1 h-9 rounded-lg border border-primary-300 text-primary-700 text-xs font-semibold bg-white">Copy Password</button>
-            <button onClick={() => setCreated(null)} className="flex-1 h-9 rounded-lg bg-primary-600 text-white text-xs font-semibold">Done</button>
+            <button onClick={() => navigator.clipboard?.writeText(created.tempPw)} className="flex-1 h-11 rounded-lg border border-primary-300 text-primary-700 text-xs font-semibold bg-white">Copy Password</button>
+            <button onClick={() => setCreated(null)} className="flex-1 h-11 rounded-lg bg-primary-600 text-white text-xs font-semibold">Done</button>
           </div>
         </div>
       )}

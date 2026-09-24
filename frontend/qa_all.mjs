@@ -108,7 +108,7 @@ check('owner: custom prices shows exception', /exceptions? set/.test(await pg.lo
 check('owner: exception price 1000', await pg.evaluate(() => [...document.querySelectorAll('main input[type=number]')].some(i => i.value === '1000')))
 
 await tab('Income')
-check('owner: income net', (await pg.locator('main .text-3xl').textContent()).startsWith('₱'))
+check('owner: income net', /[₱]/.test(await pg.locator('main .text-3xl').textContent()))
 await tab('Staff')
 check('owner: staff roster', (await pg.locator('main').textContent()).includes('Dr. Miguel Ramos'))
 

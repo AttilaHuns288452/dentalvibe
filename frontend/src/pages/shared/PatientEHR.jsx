@@ -138,7 +138,7 @@ export default function PatientEHR() {
           <span className="w-1.5 h-1.5 rounded-full bg-green-500" /> Confirmed
         </span>
         <button onClick={() => setEditInfo({ ...p })} aria-label="Edit patient info"
-                className="w-8 h-8 rounded-lg border border-gray-200 bg-white text-gray-500 flex items-center justify-center flex-none">
+                className="w-8 h-11 rounded-lg border border-gray-200 bg-white text-gray-500 flex items-center justify-center flex-none">
           <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5z" /></svg>
         </button>
       </div>
@@ -194,7 +194,7 @@ export default function PatientEHR() {
           {atts.length === 0 && <div className="px-3.5 py-3 text-sm text-gray-500">No attachments yet.</div>}
           {atts.map((x) => (
             <div key={x.id} className="flex items-center gap-3 px-3.5 py-2.5">
-              <span className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center flex-none">
+              <span className="w-8 h-11 rounded-lg bg-gray-100 flex items-center justify-center flex-none">
                 <svg viewBox="0 0 24 24" className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><path d="M14 2v6h6" /></svg>
               </span>
               <span className="flex-1 min-w-0">
@@ -202,8 +202,8 @@ export default function PatientEHR() {
                 <span className="block text-xs text-gray-500">{x.category} · {fmt(x.created_at)} · {x.file_size ?? '—'}</span>
               </span>
               <span className="flex gap-2 flex-none">
-                <button onClick={() => viewAtt(x)} className="h-8 px-2.5 rounded-md border border-gray-200 bg-white text-[11px] font-semibold text-primary-700">View</button>
-                <button disabled={delBusy} onClick={() => delAtt(x)} className="h-8 px-2.5 rounded-md border border-red-100 bg-white text-[11px] font-semibold text-red-500">Delete</button>
+                <button onClick={() => viewAtt(x)} className="h-11 px-2.5 rounded-md border border-gray-200 bg-white text-[11px] font-semibold text-primary-700">View</button>
+                <button disabled={delBusy} onClick={() => delAtt(x)} className="h-11 px-2.5 rounded-md border border-red-100 bg-white text-[11px] font-semibold text-red-500">Delete</button>
               </span>
             </div>
           ))}
@@ -224,7 +224,7 @@ export default function PatientEHR() {
                 <h2 className="text-lg font-bold text-gray-900">Edit Patient Info</h2>
                 <p className="text-xs text-gray-500">{p.full_name} · {p.patient_code ?? '—'}</p>
               </div>
-              <button type="button" onClick={() => setEditInfo(null)} aria-label="Close" className="w-8 h-8 rounded-lg bg-white border border-gray-200 text-gray-500">×</button>
+              <button type="button" onClick={() => setEditInfo(null)} aria-label="Close" className="w-8 h-11 rounded-lg bg-white border border-gray-200 text-gray-500">×</button>
             </div>
             <div className="bg-white border border-gray-200 rounded-lg p-4 space-y-3">
               <label className="block"><span className="text-xs font-medium text-gray-500">Full name</span>
@@ -336,7 +336,7 @@ function AddAttachment({ patient, onClose, onSaved }) {
             <h2 className="text-lg font-bold text-gray-900">Add Attachment</h2>
             <p className="text-xs text-gray-500">{patient.full_name} · EHR</p>
           </div>
-          <button type="button" onClick={onClose} aria-label="Close" className="w-8 h-8 rounded-lg bg-white border border-gray-200 text-gray-500">×</button>
+          <button type="button" onClick={onClose} aria-label="Close" className="w-8 h-11 rounded-lg bg-white border border-gray-200 text-gray-500">×</button>
         </div>
 
         <div>
@@ -344,7 +344,7 @@ function AddAttachment({ patient, onClose, onSaved }) {
           <div className="flex flex-wrap gap-2">
             {CATS.map((c) => (
               <button key={c} type="button" onClick={() => setCat(c)}
-                      className={'h-8 px-3 rounded-full text-xs font-semibold border ' + (cat === c ? 'bg-primary-50 text-primary-700 border-primary-300' : 'bg-white text-gray-600 border-gray-200')}>{c}</button>
+                      className={'h-11 px-3 rounded-full text-xs font-semibold border ' + (cat === c ? 'bg-primary-50 text-primary-700 border-primary-300' : 'bg-white text-gray-600 border-gray-200')}>{c}</button>
             ))}
           </div>
         </div>

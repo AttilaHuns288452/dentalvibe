@@ -11,8 +11,8 @@ import { fmtTime12 } from '../lib/format'
 // WEEK AHEAD, View full calendar button.
 
 const STATUS_PILL = {
-  approved: 'bg-green-100 text-green-700',
-  completed: 'bg-blue-100 text-blue-700',
+  approved: 'bg-blue-100 text-blue-700',
+  completed: 'bg-green-100 text-green-700',
   pending: 'bg-amber-100 text-amber-700',
   cancelled: 'bg-red-100 text-red-600',
 }
@@ -80,7 +80,12 @@ export default function Home() {
             </div>
             <div className="bg-white border border-gray-200 rounded-lg px-3 py-2.5">
               <div className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">This week</div>
-              <div className="text-xl font-bold text-gray-900">{weekAhead.length}</div>
+              <div className="text-xl font-bold text-gray-900">{(appts ?? []).filter((a) => {
+                const d = new Date(a.scheduled_at || a.requested_date + 'T00:00:00')
+                const now = new Date(); const mon = new Date(now); mon.setDate(now.getDate() - ((now.getDay() + 6) % 7)); mon.setHours(0, 0, 0, 0)
+                const sun = new Date(mon); sun.setDate(mon.getDate() + 7)
+                return d >= mon && d < sun
+              }).length}</div>
             </div>
             <div className="bg-white border border-gray-200 rounded-lg px-3 py-2.5">
               <div className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">Income Today</div>

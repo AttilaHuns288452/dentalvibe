@@ -17,7 +17,7 @@ export default function DevPanel() {
   }
 
   return (
-    <div className="fixed left-3 z-[60]" style={{ bottom: 'calc(4.5rem + env(safe-area-inset-bottom))' }}>
+    <div className="fixed left-3 z-[60] bottom-[calc(8.5rem+env(safe-area-inset-bottom))] md:bottom-4 md:left-[76px] lg:left-[244px] opacity-80">
       {open && (
         <div className="mb-2 bg-gray-900 text-white rounded-xl p-2 w-56 shadow-xl text-xs space-y-1">
           <div className="px-1 pb-1 text-[10px] font-bold uppercase tracking-wide text-gray-500">Dev login</div>

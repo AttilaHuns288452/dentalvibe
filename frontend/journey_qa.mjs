@@ -139,7 +139,7 @@ await pg.locator('form section:has-text("Available time") button:not([disabled])
   // calendar: legend + appointment card + summary
   await pg.goto(BASE + '/doctor/calendar', { waitUntil: 'networkidle' }); await pg.waitForTimeout(1500)
   const cal = await pg.locator('main').textContent()
-  check('D2. calendar legend', cal.includes('Consultation') && cal.includes('Treatment') && cal.includes('Walk-in'))
+  check('D2. calendar legend', cal.includes('Completed') && cal.includes('Pending') && cal.includes('Cancelled'))
   check('D3. calendar has booked slot (not all open)', ((cal.match(/Open slot/g) || []).length) < 10)
   check('D4. calendar summary rows', cal.includes('Today') && cal.includes('This week'))
   await shot('09-calendar')

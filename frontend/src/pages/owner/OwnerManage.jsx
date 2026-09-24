@@ -80,7 +80,7 @@ export default function OwnerManage() {
               const on = settings.open_days.includes(d)
               return (
                 <button key={d} onClick={() => setSettings({ ...settings, open_days: on ? settings.open_days.filter((x) => x !== d) : [...settings.open_days, d] })}
-                        className={'flex-1 rounded-lg border py-2 text-[10px] font-bold ' + (on ? 'border-primary-600 bg-primary-50 text-primary-700' : 'border-gray-200 text-gray-500')}>
+                        className={'flex-1 min-h-[44px] rounded-lg border py-2 text-[10px] font-bold ' + (on ? 'border-primary-600 bg-primary-50 text-primary-700' : 'border-gray-200 text-gray-500')}>
                   {d.toUpperCase()}
                 </button>
               )
@@ -88,7 +88,7 @@ export default function OwnerManage() {
           </div>
           <div className="flex gap-2 items-center">
             <input type="time" value={settings.open_time} onChange={(e) => setSettings({ ...settings, open_time: e.target.value })}
-                   className="flex-1 h-10 border border-primary-600 bg-primary-50 text-primary-700 rounded-lg px-2 text-sm font-semibold text-center" />
+                   className="min-h-[44px] inline-flex items-center flex-1 h-10 border border-primary-600 bg-primary-50 text-primary-700 rounded-lg px-2 text-sm font-semibold text-center" />
             <span className="text-gray-500 font-bold">–</span>
             <input type="time" value={settings.close_time} onChange={(e) => setSettings({ ...settings, close_time: e.target.value })}
                    className="flex-1 h-10 border border-primary-600 bg-primary-50 text-primary-700 rounded-lg px-2 text-sm font-semibold text-center" />
@@ -187,8 +187,8 @@ function ServiceCard({ service, navigate, onDeleted }) {
       </button>
       {confirmDel ? (
         <span className="flex gap-1 flex-none">
-          <button onClick={remove} className="text-[11px] font-bold text-red-500 border border-red-200 rounded px-1.5 py-1">Yes</button>
-          <button onClick={() => setConfirmDel(false)} className="text-[11px] text-gray-500 border border-gray-200 rounded px-1.5 py-1">No</button>
+          <button onClick={remove} className="text-[11px] font-bold text-red-500 border border-red-200 rounded px-3 min-h-[44px]">Yes</button>
+          <button onClick={() => setConfirmDel(false)} className="text-[11px] text-gray-500 border border-gray-200 rounded px-3 min-h-[44px]">No</button>
         </span>
       ) : (
         <button onClick={() => setConfirmDel(true)} aria-label="Delete service" className="text-gray-300 hover:text-red-400 flex-none">
