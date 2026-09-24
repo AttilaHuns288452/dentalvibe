@@ -1,3 +1,4 @@
+import { useSubmit } from '../../lib/hooks'
 import { useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { supabase, peso } from '../../lib/api'
@@ -25,6 +26,12 @@ export default function DentistRecord() {
       .then(({ data, error }) => (error ? setErr(error.message) : setAppts(data ?? [])))
   }, [dentist?.id])
 
+  const toggleActiveImpl = async () => {
+    const { error } = await supabase.from('dentists').update({ active: !dentist.active }).eq('id', dentist.id)
+    if (!error) navigate('/owner/staff')
+  }
+  const [toggleActive, togBusy] = useSubmit(toggleActiveImpl)
+
   if (!dentist) return (
     <div className="px-4 py-10 text-center">
       <p className="text-sm text-gray-500">No dentist selected.</p>
@@ -36,11 +43,7 @@ export default function DentistRecord() {
   const rows = appts.filter((a) => new Date(a.scheduled_at ?? a.requested_date).getTime() >= cutoff)
   const initials = (dentist.full_name || '?').split(' ').map((w) => w[0]).slice(0, 2).join('')
 
-  const toggleActive = async () => {
-    const { error } = await supabase.from('dentists').update({ active: !dentist.active }).eq('id', dentist.id)
-    if (!error) navigate('/owner/staff')
-  }
-
+  
   const exportHistory = () =>
     printReport(`Service History — ${dentist.full_name} (${tab})`, rows.map((a) =>
       `${a.services?.name ?? 'Service'} · ${fmt(a.scheduled_at ?? a.requested_date)} · ${peso(a.price ?? 0)} paid · ${a.patients?.full_name ?? ''}`))

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import Skel from '../../components/Skel'
 import { useAuth } from '../../context/RoleContext'
 import { listChat, sendChat, subscribeChat, listPatients } from '../../lib/api'
 
@@ -27,6 +28,7 @@ function StaffPatientPicker({ onPick }) {
             <svg viewBox="0 0 24 24" className="w-4 h-4 text-gray-500 flex-none" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 6 6 6-6 6" /></svg>
           </button>
         ))}
+        {!patients && <Skel lines={3} h="h-14" />}
         {patients && filtered.length === 0 && <div className="px-3.5 py-3 text-sm text-gray-500">No patients found.</div>}
       </div>
     </div>
@@ -82,6 +84,7 @@ export default function Chat({ patient }) {
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2 bg-gray-50">
+        {messages === null && <Skel lines={3} h="h-12" />}
         {messages?.length === 0 && <p className="text-center text-xs text-gray-500 py-8">No messages yet — say hi!</p>}
         {(messages ?? []).map((m) => {
           const mine = m.sender === me

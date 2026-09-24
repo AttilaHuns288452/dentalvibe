@@ -1,6 +1,8 @@
+import { cleanTestFuture } from './pretest_clean.mjs'
 import('/home/attila/.hermes/hermes-agent/node_modules/playwright/index.mjs').then(async ({ chromium }) => {
 const pickDate = async (pg, daysAhead) => {
   const target = new Date(Date.now() + daysAhead * 864e5)
+  while (target.getDay() === 0) target.setDate(target.getDate() + 1) // clinic closed Sundays
   for (let i = 0; i < 3; i++) {
     const label = await pg.locator('section:has-text("Preferred date") span.text-sm.font-bold').first().textContent()
     const cur = new Date(label.trim() + ' 1')
@@ -12,7 +14,8 @@ const pickDate = async (pg, daysAhead) => {
   await pg.getByRole('button', { name: String(target.getDate()), exact: true }).click()
 }
   const BASE = process.env.QA_BASE || 'https://dentalvibe.vercel.app'
-  const b = await chromium.launch()
+  await cleanTestFuture(['Journey Tester'])
+const b = await chromium.launch()
   const ctx = await b.newContext({ viewport: { width: 390, height: 844 } })
   const pg = await ctx.newPage()
 
@@ -83,7 +86,7 @@ await pg.locator('form section:has-text("Available time") button:not([disabled])
   await pg.setInputFiles('#proofInput', { name: 'gcash-proof.png', mimeType: 'image/png', buffer: png })
   await pg.locator('button:has-text("Confirm Payment")').click()
   await pg.waitForTimeout(2000)
-  check('P8. payment confirms instantly', (await pg.locator('main h1').textContent().catch(() => '')).includes('Appointment Approved'))
+  check('P8. payment confirms instantly', (await pg.locator('main h1').textContent().catch(() => '')).includes('Appointment confirmed'))
   await shot('05-proof-submitted')
 
   // appointments state

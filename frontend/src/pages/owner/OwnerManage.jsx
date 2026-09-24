@@ -1,4 +1,5 @@
 import Skel from '../../components/Skel'
+import { useSubmit } from '../../lib/hooks'
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/RoleContext'
@@ -25,7 +26,7 @@ export default function OwnerManage() {
 
   const reloadServices = () => listServices().then(setServices).catch(() => {})
 
-  const save = async () => {
+  const saveImpl = async () => {
     try {
       await updateClinicSettings({
         clinic_name: settings.clinic_name,
@@ -41,6 +42,7 @@ export default function OwnerManage() {
       setErr(e.message)
     }
   }
+  const [save, saveBusy] = useSubmit(saveImpl)
 
   if (!settings) return <div className="px-4 py-4"><Skel lines={2} h="h-20" /></div>
 
@@ -111,7 +113,7 @@ export default function OwnerManage() {
       </section>
 
       {err && <p className="text-xs text-red-500">{err}</p>}
-      <button onClick={save} className="w-full h-12 rounded-lg bg-primary-600 text-white font-semibold">
+      <button disabled={saveBusy} onClick={save} className="w-full h-12 rounded-lg bg-primary-600 text-white font-semibold">
         {saved ? 'Saved ✓' : 'Save Changes'}
       </button>
       <div className="h-4" />

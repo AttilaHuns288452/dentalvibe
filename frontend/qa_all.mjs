@@ -1,9 +1,11 @@
+import { cleanTestFuture } from './pretest_clean.mjs'
 // Full QA sweep — every role, route, function. usage: node qa_all.mjs (serve :4176)
 import { chromium } from '/home/attila/.hermes/hermes-agent/node_modules/playwright/index.mjs'
 import fs from 'fs'
 
 const pickDate = async (pg, daysAhead) => {
   const target = new Date(Date.now() + daysAhead * 864e5)
+  while (target.getDay() === 0) target.setDate(target.getDate() + 1) // clinic closed Sundays
   for (let i = 0; i < 3; i++) {
     const label = await pg.locator('section:has-text("Preferred date") span.text-sm.font-bold').first().textContent()
     const cur = new Date(label.trim() + ' 1')
@@ -15,6 +17,7 @@ const pickDate = async (pg, daysAhead) => {
   await pg.getByRole('button', { name: String(target.getDate()), exact: true }).click()
 }
 const BASE = 'http://localhost:4176'
+await cleanTestFuture(['QA Final', 'Demo Patient'])
 const b = await chromium.launch()
 const ctx = await b.newContext({ viewport: { width: 390, height: 844 } })
 const pg = await ctx.newPage()
@@ -137,7 +140,8 @@ if ((await pg.locator('body').textContent()).includes('Account Activated')) {
 }
 check('patient: registered', (await pg.locator('header').textContent()).includes('QA Final'))
 check('patient: 5 tabs w/ Book', (t => t.includes('Book') && !t.includes('Manage'))((await pg.locator('nav').textContent()).replace(/\s+/g, ' ')))
-await pg.goto(BASE + '/book', { waitUntil: 'networkidle' }); await pg.waitForTimeout(1200)
+await pg.goto(BASE + '/book', { waitUntil: 'networkidle' });
+await pg.locator('main button[aria-pressed]').first().waitFor({ state: 'visible', timeout: 15000 })
 await pg.locator('main form button[type="button"]').first().click()
 const BDATE = new Date(Date.now() + 9 * 864e5).toISOString().slice(0, 10)
 await pg.locator('button:has-text("Next")').last().click()

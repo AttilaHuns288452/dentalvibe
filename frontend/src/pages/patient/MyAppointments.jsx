@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react'
+import Skel from '../../components/Skel'
+import { useStickyState , useRevalidateOnVisible } from '../../lib/hooks'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/RoleContext'
 import { listMyAppointments, setAppointmentStatus, peso } from '../../lib/api'
@@ -21,15 +23,17 @@ export default function MyAppointments() {
   const { patientRecord, refresh } = useAuth()
   const [appts, setAppts] = useState(null)
   const [err, setErr] = useState('')
-  const [tab, setTab] = useState('All')
+  const [tab, setTab] = useStickyState('dv_appt_tab', 'All') // survives detail -> Back (#52)
   const [openId, setOpenId] = useState(null)
-  const [q, setQ] = useState('')
+  const [q, setQ] = useStickyState('dv_appt_q', '')
   const navigate = useNavigate()
 
-  useEffect(() => {
+  const load = async () => {
     if (!patientRecord?.id) return
     listMyAppointments(patientRecord.id).then(setAppts).catch((e) => setErr(e.message))
-  }, [patientRecord?.id])
+  }
+  useEffect(() => { load() }, [patientRecord?.id])
+  useRevalidateOnVisible(load)
 
   const cancel = async (id) => {
     try {
@@ -53,6 +57,7 @@ export default function MyAppointments() {
     return true
   })
 
+  if (appts === null && !err) return <div className="px-4 py-4"><Skel lines={3} h="h-16" /></div>
   return (
     <div className="px-4 py-4 space-y-3">
       <div>

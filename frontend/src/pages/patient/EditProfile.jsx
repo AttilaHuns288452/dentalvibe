@@ -1,3 +1,4 @@
+import { useSubmit, useUnsavedGuard } from '../../lib/hooks'
 import { useEffect, useState } from 'react'
 import { useAuth } from '../../context/RoleContext'
 import { supabase, peso } from '../../lib/api'
@@ -20,7 +21,8 @@ export default function EditProfile({ onDone }) {
     }
   }, [patientRecord])
 
-  const submit = async (e) => {
+  useUnsavedGuard(phone !== (patientRecord?.phone || '') || address !== (patientRecord?.address || '') || emg !== (patientRecord?.emergency_contact || ''))
+  const submitImpl = async (e) => {
     e.preventDefault()
     setErr('')
     if (phone && !/^[0-9+\-\s()]{7,20}$/.test(phone)) return setErr('Enter a valid phone number.')
@@ -31,6 +33,7 @@ export default function EditProfile({ onDone }) {
     setSaved(true)
     onDone?.()
   }
+  const [submit, subBusy] = useSubmit(submitImpl)
 
   return (
     <div className="px-4 py-4 space-y-4">

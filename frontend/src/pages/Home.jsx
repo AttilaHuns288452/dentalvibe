@@ -1,4 +1,6 @@
+import { useRevalidateOnVisible } from '../lib/hooks'
 import { useEffect, useState } from 'react'
+import Skel from '../components/Skel'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../context/RoleContext'
 import { listAppointments, listMyAppointments, getClinicSettings, peso, setAppointmentStatus } from '../lib/api'
@@ -23,11 +25,13 @@ export default function Home() {
   const [err, setErr] = useState('')
   const [welcome, setWelcome] = useState(() => profile?.role === 'doctor' && !localStorage.getItem('dv_doc_welcomed'))
 
-  useEffect(() => {
+  const load = async () => {
     getClinicSettings().then(setSettings).catch(() => {})
     if (isStaff) listAppointments().then(setAppts).catch((e) => setErr(e?.message || "Couldn't load appointments — check your connection."))
     else if (patientRecord?.id) listMyAppointments(patientRecord.id).then(setAppts).catch((e) => setErr(e?.message || "Couldn't load appointments — check your connection."))
-  }, [isStaff])
+  }
+  useEffect(() => { load() }, [isStaff])
+  useRevalidateOnVisible(load)
 
   const now = new Date()
   const today = now.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' })
@@ -63,6 +67,7 @@ export default function Home() {
           {isStaff ? today : `${greetingWord}, ${(profile?.full_name || '').split(' ')[0]}`}
         </h1>
         {err && <p className="text-xs text-red-500 mt-1">{err}</p>}
+        {appts === null && !err && <div className="mt-3"><Skel lines={2} h="h-20" /></div>}
         <p className="text-xs text-gray-500">{isStaff ? hoursLine : 'Welcome back to your dental care portal'}</p>
       </div>
 

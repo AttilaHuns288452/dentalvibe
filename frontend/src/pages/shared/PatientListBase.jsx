@@ -1,5 +1,6 @@
 import Skel from '../../components/Skel'
 import useEscape from '../../lib/useEscape'
+import { useStickyState , useRevalidateOnVisible } from '../../lib/hooks'
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { listPatients } from '../../lib/api'
@@ -16,7 +17,7 @@ const age = (dob) => {
 
 export default function PatientListBase({ title, subtitle }) {
   const [patients, setPatients] = useState(null)
-  const [q, setQ] = useState('')
+  const [q, setQ] = useStickyState('dv_plb_q', '') // survives Back from a record (#52)
   const [err, setErr] = useState('')
   const [showAdd, setShowAdd] = useState(false)
   const navigate = useNavigate()

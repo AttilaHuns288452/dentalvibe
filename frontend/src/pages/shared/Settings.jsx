@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useUnsavedGuard, useSubmit } from '../../lib/hooks'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/RoleContext'
 import { supabase, getClinicSettings } from '../../lib/api'
@@ -36,7 +37,8 @@ export default function Settings() {
 
   const initials = (profile?.full_name ?? '?').split(' ').map((w) => w[0]).slice(0, 2).join('')
 
-  const saveProfile = async () => {
+  useUnsavedGuard(p.first !== (profile?.full_name ?? '').split(' ')[0] || (p.last || '') !== (profile?.full_name ?? '').split(' ').slice(1).join(' '))
+  const saveProfileImpl = async () => {
     setErr(''); setSavedP(false); setBusy(true)
     const full = `${p.first} ${p.last}`.trim()
     const { error } = await supabase.from('profiles').update({ full_name: full }).eq('id', profile.id)
@@ -47,6 +49,7 @@ export default function Settings() {
     if (error) return setErr(error.message)
     setSavedP(true)
   }
+  const [saveProfile, profBusy] = useSubmit(saveProfileImpl)
 
   const saveClinic = async () => {
     setErr(''); setSavedC(false); setBusy(true)

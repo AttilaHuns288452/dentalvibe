@@ -1,5 +1,6 @@
 import Skel from '../../components/Skel'
 import useEscape from '../../lib/useEscape'
+import { useSubmit } from '../../lib/hooks'
 import { useEffect, useState } from 'react'
 import { supabase } from '../../supabaseClient'
 import { createClient } from '@supabase/supabase-js'
@@ -37,10 +38,11 @@ export default function OwnerStaff() {
     load()
   }
 
-  const reactivate = async (d) => {
+  const reactivateImpl = async (d) => {
     await supabase.from('dentists').update({ active: true }).eq('id', d.id)
     load()
   }
+  const [reactivate, reactBusy] = useSubmit(reactivateImpl)
 
   const Row = ({ d }) => (
     <button onClick={() => navigate('/owner/staff/dentist', { state: { dentist: d } })} className="w-full flex items-center gap-3 px-3.5 py-3 text-left">
@@ -132,7 +134,7 @@ export default function OwnerStaff() {
                   </span>
                   <span className="block text-xs text-gray-500 mt-0.5">Deactivated · {d.email}</span>
                 </span>
-                <button onClick={() => reactivate(d)} className="text-xs font-semibold text-primary-700 border border-primary-200 rounded-full px-3 py-1 flex-none">Restore</button>
+                <button disabled={reactBusy} onClick={() => reactivate(d)} className="text-xs font-semibold text-primary-700 border border-primary-200 rounded-full px-3 py-1 flex-none">Restore</button>
               </div>
             ))}
           </div>
@@ -154,7 +156,7 @@ function AddDentist({ onCreated }) {
     return `${last}${first}${String(Math.floor(Math.random() * 90) + 10)}`
   }
 
-  const submit = async (e) => {
+  const submitImpl = async (e) => {
     e.preventDefault()
     setErr('')
     if (!name.trim()) return setErr('Enter the dentist\'s full name.')
@@ -176,6 +178,7 @@ function AddDentist({ onCreated }) {
     setBusy(false)
     onCreated({ email, tempPw: pw })
   }
+  const [submit, addBusy] = useSubmit(submitImpl)
 
   return (
     <form onSubmit={submit} className="bg-white border border-gray-200 rounded-lg p-4 space-y-3.5">

@@ -1,3 +1,4 @@
+import { useSubmit } from '../../lib/hooks'
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/RoleContext'
@@ -18,7 +19,7 @@ export default function Profile() {
   const [err, setErr] = useState('')
   const [editing, setEditing] = useState(false)
 
-  const save = async () => {
+  const saveImpl = async () => {
     setErr('')
     try {
       const { supabase } = await import('../../supabaseClient')
@@ -34,6 +35,7 @@ export default function Profile() {
       setErr(ex.message)
     }
   }
+  const [save, saving] = useSubmit(saveImpl)
 
   const rows = [
     ['Birthdate', patientRecord?.birthdate ? new Date(patientRecord.birthdate).toLocaleDateString('en-PH', { month: 'long', day: 'numeric', year: 'numeric' }) : '—'],
@@ -90,7 +92,7 @@ export default function Profile() {
           </label>
           {editing && (
             <div className="flex gap-2">
-              <button onClick={save} className="flex-1 h-10 rounded-lg bg-primary-600 text-white text-sm font-semibold">Save</button>
+              <button disabled={saving} onClick={save} className="flex-1 h-10 rounded-lg bg-primary-600 text-white text-sm font-semibold">Save</button>
               <button onClick={() => { setEditing(false); setPhone(patientRecord?.phone || ''); setAddress(patientRecord?.address || '') }}
                       className="flex-1 h-10 rounded-lg border border-gray-200 text-sm text-gray-500">Cancel</button>
             </div>

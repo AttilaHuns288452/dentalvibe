@@ -1,9 +1,11 @@
+import { cleanTestFuture } from './pretest_clean.mjs'
 // PRODUCTION E2E: patient books → pays → owner approves (gated) → completes → income
 import { chromium } from '/home/attila/.hermes/hermes-agent/node_modules/playwright/index.mjs'
 import { createClient } from 'file:///home/attila/Documents/Projects/dentalvibe/frontend/node_modules/@supabase/supabase-js/dist/index.cjs'
 import fs from 'fs'
 const pickDate = async (pg, daysAhead) => {
   const target = new Date(Date.now() + daysAhead * 864e5)
+  while (target.getDay() === 0) target.setDate(target.getDate() + 1) // clinic closed Sundays
   for (let i = 0; i < 3; i++) {
     const label = await pg.locator('section:has-text("Preferred date") span.text-sm.font-bold').first().textContent()
     const cur = new Date(label.trim() + ' 1')
@@ -16,6 +18,7 @@ const pickDate = async (pg, daysAhead) => {
 }
 const env = Object.fromEntries(fs.readFileSync('/home/attila/Documents/Projects/dentalvibe/frontend/.env.local', 'utf8').trim().split('\n').map((l) => l.split('=')))
 
+await cleanTestFuture(['Prod Patient'])
 const b = await chromium.launch()
 const pg = await b.newPage({ viewport: { width: 390, height: 844 } })
 const pageErrors = []
@@ -85,7 +88,7 @@ const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
 await pg.setInputFiles('#proofInput', { name: 'proof.png', mimeType: 'image/png', buffer: png })
 await pg.locator('button:has-text("Confirm Payment")').click()
 await pg.waitForTimeout(2000)
-check('7. payment confirms instantly', (await pg.locator('main h1').textContent()).includes('Appointment Approved'))
+check('7. payment confirms instantly', (await pg.locator('main h1').textContent()).includes('Appointment confirmed'))
 await pg.locator('button:has-text("My Appointments")').click()
 await pg.waitForTimeout(1200)
 check('8. status shows Confirmed', (await pg.locator('main').textContent()).includes('Confirmed'))
@@ -121,7 +124,8 @@ await sbs2.auth.signInWithPassword({ email: em, password: 'Password123' })
 const { data: steal, error: stealErr } = await sbs2.from('patients').select('id, full_name')
 check('16. patient cannot read other patients (RLS)', stealErr ? true : (steal ?? []).length === 1)
 const { data: stealAppts } = await sbs2.from('appointments').select('*')
-check('17. patient cannot read clinic appointments', (stealAppts ?? []).every((a) => a.requested_date === BDATE))
+const myId = (await sbs2.from('patients').select('id').eq('user_id', (await sbs2.auth.getUser()).data.user.id)).data?.[0]?.id
+check('17. patient cannot read clinic appointments', (stealAppts ?? []).every((a) => a.patient_id === myId))
 
 // ---- EDGE: approve without payment blocked (server-side) ----
 // book unpaid as fresh patient via API, then try approve as doctor

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import Skel from '../../components/Skel'
-import { useNavigate } from 'react-router-dom'
+import { useStickyState } from '../../lib/hooks'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/RoleContext'
 import { listServices, bookAppointment, peso, supabase } from '../../lib/api'
 
@@ -16,15 +17,16 @@ const fmtSlot = (t) => t.replace(/^(\d+):(\d+)$/, (_, h, m) => `${((+h + 11) % 1
 export default function Book() {
   const { patientRecord } = useAuth()
   const navigate = useNavigate()
-  const [step, setStep] = useState(1)
+  const location = useLocation()
   const [services, setServices] = useState([])
   const [prices, setPrices] = useState({})
-  const [picked, setPicked] = useState([])
+  // draft survives Back/Forward/refresh (#44/#53); step lives in the URL so history is truthful (#43)
+  const [picked, setPicked] = useStickyState('dv_book_picked', [])
   const [q, setQ] = useState('')
-  const [date, setDate] = useState('')
-  const [time, setTime] = useState('')
+  const [date, setDate] = useStickyState('dv_book_date', '')
+  const [time, setTime] = useStickyState('dv_book_time', '')
+  const [notes, setNotes] = useStickyState('dv_book_notes', '')
   const [busyRanges, setBusyRanges] = useState([]) // [{start: Date, mins}] of paid visits
-  const [notes, setNotes] = useState('')
   const [err, setErr] = useState('')
   const [busy, setBusy] = useState(false)
 
@@ -56,6 +58,8 @@ export default function Book() {
       .then(({ data }) => setBusyRanges((data ?? []).map((r) => ({ start: new Date(r.scheduled_at), mins: r.duration_minutes ?? 30 }))))
   }, [date])
 
+  const urlStep = new URLSearchParams(location.search).get('step')
+  const step = urlStep === '2' && picked.length ? 2 : 1 // clamp: step 2 needs a picked service
   const chosen = services.filter((s) => picked.includes(s.id))
   const total = chosen.reduce((sum, s) => sum + (prices[s.id] ?? s.price), 0)
   const visitMins = chosen.reduce((sum, s) => sum + (s.duration_minutes ?? 30), 0)
@@ -96,7 +100,9 @@ export default function Book() {
         notes,
         price: total,
       })
-      navigate('/book/confirm', { state: { appointment: { ...appt, price: total, services: { name: chosen.map((s) => s.name).join(' + ') } } } })
+      sessionStorage.removeItem('dv_book_picked'); sessionStorage.removeItem('dv_book_date')
+      sessionStorage.removeItem('dv_book_time'); sessionStorage.removeItem('dv_book_notes')
+      navigate('/book/confirm?appt=' + appt.id, { state: { appointment: { ...appt, price: total, services: { name: chosen.map((s) => s.name).join(' + ') } } } })
     } catch (ex) {
       setErr(/ux_appt_paid_slot|overlaps/.test(ex.message) ? 'That slot was just taken — pick another time.'
         : /ux_appt_patient_date/.test(ex.message) ? 'You already have a booking that day.'
@@ -227,10 +233,10 @@ export default function Book() {
         {err && <p className="text-xs text-red-500 mb-2">{err}</p>}
         <div className="flex gap-2.5">
           {step === 2 && (
-            <button type="button" onClick={() => setStep(1)} className="w-[35%] h-12 rounded-lg border border-gray-200 bg-white text-gray-700 font-semibold">‹ Back</button>
+            <button type="button" onClick={() => navigate('/book')} className="w-[35%] h-12 rounded-lg border border-gray-200 bg-white text-gray-700 font-semibold">‹ Back</button>
           )}
           {step === 1 ? (
-            <button type="button" disabled={!picked.length} onClick={() => { setErr(''); setStep(2) }}
+            <button type="button" disabled={!picked.length} onClick={() => { setErr(''); navigate('/book?step=2') }}
                     className="flex-1 h-12 rounded-lg bg-primary-600 text-white font-semibold disabled:opacity-50">
               Next{total ? ` · ${peso(total)}` : ''}
             </button>

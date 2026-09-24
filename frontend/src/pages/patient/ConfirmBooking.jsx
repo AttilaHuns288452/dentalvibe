@@ -1,18 +1,48 @@
+import { useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { peso } from '../../lib/api'
+import { peso, supabase } from '../../lib/api'
 
 // Confirm Your Appointment (p121): summary + Pay Now → QR flow
+// state is a cache, ?appt=<id> is the truth — refresh/deep links revalidate (#44/#47)
 export default function ConfirmBooking() {
-  const { state } = useLocation()
+  const { state, search } = useLocation()
   const navigate = useNavigate()
-  const appt = state?.appointment
+  const id = new URLSearchParams(search).get('appt')
+  const [fetched, setFetched] = useState(state?.appointment || null)
+  const [gone, setGone] = useState(false)
+  const appt = fetched
+
+  useEffect(() => {
+    if (fetched || !id) return
+    supabase.from('appointments')
+      .select('id, price, requested_date, scheduled_at, status, payment_status, services(name)')
+      .eq('id', id).maybeSingle()
+      .then(({ data }) => (data ? setFetched(data) : setGone(true)))
+      .catch(() => setGone(true))
+  }, [id, fetched])
 
   if (!appt) return (
     <div className="px-4 py-16 text-center">
-      <p className="text-sm text-gray-500">Missing appointment.</p>
-      <button onClick={() => navigate('/book')} className="mt-4 h-10 px-4 rounded-lg bg-primary-600 text-white text-sm font-semibold">Book Again</button>
+      {gone ? (
+        <>
+          <p className="text-sm text-gray-500">This appointment no longer exists.</p>
+          <button onClick={() => navigate('/book')} className="mt-4 h-10 px-4 rounded-lg bg-primary-600 text-white text-sm font-semibold">Book Again</button>
+        </>
+      ) : id ? (
+        <p className="text-sm text-gray-500 animate-pulse">Loading appointment…</p>
+      ) : (
+        <>
+          <p className="text-sm text-gray-500">Missing appointment.</p>
+          <button onClick={() => navigate('/book')} className="mt-4 h-10 px-4 rounded-lg bg-primary-600 text-white text-sm font-semibold">Book Again</button>
+        </>
+      )}
     </div>
   )
+
+  if (appt.payment_status === 'verified' || appt.status === 'approved') {
+    navigate('/book/success?appt=' + appt.id, { replace: true, state: { appointment: appt } })
+    return null
+  }
 
   const dt = new Date(appt.requested_date + 'T00:00:00')
   const dateStr = dt.toLocaleDateString('en-PH', { month: 'long', day: 'numeric', year: 'numeric' })
@@ -61,27 +91,52 @@ export default function ConfirmBooking() {
 
       <div className="flex gap-2.5">
         <button onClick={() => history.back()} className="w-[40%] h-11 rounded-lg border border-gray-200 text-gray-700 text-sm font-semibold bg-white">‹ Back</button>
-        <button onClick={() => navigate('/pay/qr', { state: { appointment: appt } })} className="flex-1 h-11 rounded-lg bg-primary-600 text-white text-sm font-semibold">Pay Now</button>
+        <button onClick={() => navigate('/pay/qr?appt=' + appt.id, { state: { appointment: appt } })} className="flex-1 h-11 rounded-lg bg-primary-600 text-white text-sm font-semibold">Pay Now</button>
       </div>
     </div>
   )
 }
 
-// Booking success (p131)
+// Booking success (p131) — authoritative result screen (#54): refresh/reopen shows
+// the REAL appointment state and never offers a second payment.
 export function BookSuccess() {
-  const { state } = useLocation()
+  const { state, search } = useLocation()
   const navigate = useNavigate()
-  const appt = state?.appointment
+  const id = new URLSearchParams(search).get('appt')
+  const [appt, setAppt] = useState(state?.appointment?.payment_status ? state.appointment : null)
+  const [gone, setGone] = useState(false)
+
+  useEffect(() => {
+    if (!id) return
+    supabase.from('appointments')
+      .select('id, price, requested_date, scheduled_at, status, payment_status, services(name)')
+      .eq('id', id).maybeSingle()
+      .then(({ data }) => (data ? setAppt(data) : setGone(true)))
+      .catch(() => setGone(true))
+  }, [id])
   const dt = appt?.requested_date ? new Date(appt.requested_date + 'T00:00:00') : null
 
+  if (!appt) return (
+    <div className="px-4 py-16 text-center">
+      {gone
+        ? <p className="text-sm text-gray-500">This appointment no longer exists.</p>
+        : id ? <p className="text-sm text-gray-500 animate-pulse">Checking your appointment…</p>
+        : <p className="text-sm text-gray-500">Missing appointment.</p>}
+      <button onClick={() => navigate('/appointments')} className="mt-4 h-10 px-4 rounded-lg bg-primary-600 text-white text-sm font-semibold">My Appointments</button>
+    </div>
+  )
+
+  const confirmed = appt.payment_status === 'verified' || appt.status === 'approved'
   return (
     <div className="px-4 py-8 space-y-4">
       <div className="text-center">
         <div className="w-16 h-16 mx-auto rounded-full bg-green-100 text-green-600 flex items-center justify-center">
           <svg viewBox="0 0 24 24" className="w-8 h-8" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 13l4 4L19 7" /></svg>
         </div>
-        <h1 className="text-lg font-bold text-gray-900 mt-3">You have successfully made an appointment</h1>
-        <p className="text-xs text-gray-500 mt-1">The appointment confirmation has been sent to your email.</p>
+        <h1 className="text-lg font-bold text-gray-900 mt-3">{confirmed ? 'Appointment confirmed' : 'Appointment booked'}</h1>
+        <p className="text-xs text-gray-500 mt-1">{confirmed
+          ? 'Your slot is secured — arrive 10 minutes early. Treatment charges are billed at the clinic.'
+          : 'Pay the appointment fee to secure your slot.'}</p>
       </div>
 
       {appt && (
@@ -97,6 +152,9 @@ export function BookSuccess() {
         </div>
       )}
 
+      {!confirmed && (
+        <button onClick={() => navigate('/pay/qr?appt=' + appt.id, { state: { appointment: appt } })} className="w-full h-11 rounded-lg bg-primary-600 text-white text-sm font-semibold">Continue to payment</button>
+      )}
       <button onClick={() => navigate('/appointments')} className="w-full h-11 rounded-lg bg-primary-600 text-white text-sm font-semibold">View My Appointments</button>
       <button onClick={() => navigate('/')} className="w-full h-11 rounded-lg border border-gray-200 text-gray-700 text-sm font-semibold bg-white">Back to Home</button>
     </div>

@@ -1,5 +1,8 @@
 import { useEffect, useState } from 'react'
+import Skel from '../../components/Skel'
 import { supabase } from '../../lib/api'
+import { useAuth } from '../../context/RoleContext'
+import { useRevalidateOnVisible } from '../../lib/hooks'
 
 const ICON_PATHS = {
   check: 'M5 13l4 4L19 7',
@@ -25,26 +28,30 @@ const ago = (iso) => {
 }
 
 export default function Notifications({ roleBase = '' }) {
+  const { refresh } = useAuth() // bell badge lives in context — invalidate it here (#45)
   const [items, setItems] = useState(null)
   const [err, setErr] = useState('')
 
-  useEffect(() => {
+  const load = async () => {
     supabase.from('notifications').select('*').order('created_at', { ascending: false }).limit(50)
       .then(({ data, error }) => {
         if (error) return setErr(error.message)
         setItems(data ?? [])
       })
-  }, [])
+  }
+  useEffect(() => { load() }, [])
+  useRevalidateOnVisible(load)
 
   const markRead = (id) => {
     setItems((a) => a.map((x) => (x.id === id ? { ...x, read: true } : x)))
-    supabase.from('notifications').update({ read: true }).eq('id', id)
+    supabase.from('notifications').update({ read: true }).eq('id', id).then(() => refresh())
   }
   const markAll = () => {
     setItems((a) => a.map((x) => ({ ...x, read: true })))
-    supabase.from('notifications').update({ read: true }).eq('read', false)
+    supabase.from('notifications').update({ read: true }).eq('read', false).then(() => refresh())
   }
 
+  const loadingRows = items === null
   const today = (items ?? []).filter((n) => new Date(n.created_at).toDateString() === new Date().toDateString())
   const earlier = (items ?? []).filter((n) => new Date(n.created_at).toDateString() !== new Date().toDateString())
   const unread = (items ?? []).filter((n) => !n.read).length
@@ -81,6 +88,7 @@ export default function Notifications({ roleBase = '' }) {
       </div>
       {err && <p className="text-xs text-red-500">{err}</p>}
 
+      {loadingRows && <Skel lines={4} h="h-14" />}
       {items?.length === 0 && (
         <div className="bg-white border border-gray-200 rounded-lg py-10 text-center text-sm text-gray-500">No notifications yet.</div>
       )}

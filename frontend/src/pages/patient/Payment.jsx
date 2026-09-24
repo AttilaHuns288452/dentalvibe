@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { supabase } from '../../supabaseClient'
 import { isDev, mockPay } from '../../lib/dev'
@@ -8,20 +8,36 @@ import { peso } from '../../lib/format'
 // No verification queue — proof in, appointment confirmed.
 
 export default function Payment() {
-  const { state } = useLocation()
-  const appt = state?.appointment
+  const { state, search } = useLocation()
   const navigate = useNavigate()
+  const apptId = new URLSearchParams(search).get('appt')
+  const [appt, setAppt] = useState(state?.appointment || null)
+  const [gone, setGone] = useState(false)
   const [file, setFile] = useState(null)
   const [preview, setPreview] = useState(null)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
   const [done, setDone] = useState(false)
 
+  useEffect(() => {
+    if (appt || !apptId) return
+    supabase.from('appointments')
+      .select('id, price, requested_date, scheduled_at, status, payment_status, services(name)')
+      .eq('id', apptId).maybeSingle()
+      .then(({ data }) => (data ? setAppt(data) : setGone(true)))
+      .catch(() => setGone(true))
+  }, [apptId, appt])
+  useEffect(() => {
+    if (appt && (appt.payment_status === 'verified' || appt.status === 'approved')) {
+      navigate('/book/success?appt=' + appt.id, { replace: true, state: { appointment: appt } })
+    }
+  }, [appt, navigate])
+
   if (!appt) {
     return (
       <div className="px-4 py-16 text-center">
         <h1 className="text-lg font-bold text-gray-900">Payment</h1>
-        <p className="text-xs text-gray-500 mt-1">Open this page right after booking.</p>
+        <p className="text-xs text-gray-500 mt-1">{gone ? 'This appointment no longer exists.' : apptId ? 'Loading payment…' : 'Open this page right after booking.'}</p>
         <button onClick={() => navigate('/appointments')} className="mt-4 h-10 px-4 rounded-lg bg-primary-600 text-white text-sm font-semibold">My Appointments</button>
       </div>
     )
@@ -52,7 +68,8 @@ export default function Payment() {
       // ponytail: base64 data-URL in a table (no storage bucket needed); 2MB cap enforced by fn_submit_payment_proof
       const { error } = await supabase.rpc('fn_submit_payment_proof', { p_appointment: appt.id, p_image: dataUrl })
       if (error) throw error
-      setDone(true)
+      // replace = Back can never resubmit this payment (#54)
+      navigate('/book/success?appt=' + appt.id, { replace: true, state: { appointment: { ...appt, status: 'approved', payment_status: 'verified' } } })
     } catch (ex) {
       setErr(/ux_appt_patient_date|duplicate key/.test(ex.message) ? 'You already have a booking that day.' : ex.message)
       setBusy(false)

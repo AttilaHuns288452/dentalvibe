@@ -1,4 +1,5 @@
 import useEscape from '../../lib/useEscape'
+import { useSubmit , useRevalidateOnVisible } from '../../lib/hooks'
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase, peso } from '../../lib/api'
@@ -259,7 +260,7 @@ function AddTransaction({ onDone }) {
     ? ['Pasta (Restoration)', 'Extraction', 'Prophylaxis', 'Whitening', 'Consultation', 'Other']
     : EXP_CATS
 
-  const save = async (e) => {
+  const saveImpl = async (e) => {
     e.preventDefault()
     setErr('')
     const amt = Number(amount)
@@ -273,6 +274,7 @@ function AddTransaction({ onDone }) {
     if (error) return setErr(error.message)
     onDone()
   }
+  const [save, incBusy] = useSubmit(saveImpl)
 
   return (
     <form onSubmit={save} className="bg-white border border-gray-200 rounded-lg p-4 space-y-3.5">

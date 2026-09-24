@@ -1,3 +1,4 @@
+import { useSubmit , useRevalidateOnVisible } from '../../lib/hooks'
 import { useEffect, useState } from 'react'
 import Skel from '../../components/Skel'
 import useEscape from '../../lib/useEscape'
@@ -28,9 +29,12 @@ export default function PatientEHR() {
   const [addOpen, setAddOpen] = useState(false)
   const [err, setErr] = useState('')
 
+  const [missing, setMissing] = useState(false)
+
   const load = async () => {
+    if (!id) return setMissing(true)
     const { data: pat, error } = await supabase.from('staff_patients').select('*').eq('id', id).single()
-    if (error) return setErr(error.message)
+    if (error) return /PGRST116|0 rows/.test(error.message + error.code) ? setMissing(true) : setErr(error.message)
     setP(pat)
     const { data: a } = await supabase.from('appointments')
       .select('id, status, price, scheduled_at, requested_date, clinical_note, services(name), dentists(full_name)')
@@ -41,8 +45,30 @@ export default function PatientEHR() {
   }
   useEffect(() => { load() }, [id])
 
+  const delAttImpl = async (x) => {
+    if (!confirm('Delete this attachment?')) return
+    if (x.path) await supabase.storage.from('ehr-files').remove([x.path])
+    await supabase.from('ehr_attachments').delete().eq('id', x.id)
+    setAtts((a) => a.filter((y) => y.id !== x.id))
+  }
+  const [delAtt, delBusy] = useSubmit(delAttImpl)
+
+  const saveNoteImpl = async () => {
+    const { error } = await supabase.from('patients').update({ medical_note: noteEdit }).eq('id', p.id)
+    if (error) return setErr(error.message)
+    setP((v) => ({ ...v, medical_note: noteEdit }))
+    setNoteEdit(null)
+  }
+  const [saveNote, noteBusy] = useSubmit(saveNoteImpl)
+
   if (err) return <div className="px-4 py-10 text-center text-sm text-red-500">{err}</div>
   useEscape(() => setEditInfo(null), !!editInfo)
+  if (missing) return (
+    <div className="px-4 py-16 text-center">
+      <p className="text-sm text-gray-500">This patient record no longer exists.</p>
+      <button onClick={() => navigate(-1)} className="mt-4 h-10 px-4 rounded-lg bg-primary-600 text-white text-sm font-semibold">Back to patients</button>
+    </div>
+  )
   if (!p) return <div className="px-4 py-4"><Skel lines={2} h="h-20" /></div>
 
   const a = age(p.birthdate)
@@ -59,25 +85,13 @@ export default function PatientEHR() {
     setEditInfo(null)
   }
 
-  const saveNote = async () => {
-    const { error } = await supabase.from('patients').update({ medical_note: noteEdit }).eq('id', p.id)
-    if (error) return setErr(error.message)
-    setP((v) => ({ ...v, medical_note: noteEdit }))
-    setNoteEdit(null)
-  }
-
+  
   const viewAtt = async (x) => {
     if (!x.path) return
     const { data } = await supabase.storage.from('ehr-files').createSignedUrl(x.path, 60)
     if (data?.signedUrl) window.open(data.signedUrl, '_blank')
   }
-  const delAtt = async (x) => {
-    if (!confirm('Delete this attachment?')) return
-    if (x.path) await supabase.storage.from('ehr-files').remove([x.path])
-    await supabase.from('ehr_attachments').delete().eq('id', x.id)
-    setAtts((a) => a.filter((y) => y.id !== x.id))
-  }
-
+  
   const exportEHR = () => {
     printReport(`EHR — ${p.full_name} (${p.patient_code ?? '—'})`, exportLines())
   }
@@ -189,7 +203,7 @@ export default function PatientEHR() {
               </span>
               <span className="flex gap-2 flex-none">
                 <button onClick={() => viewAtt(x)} className="h-8 px-2.5 rounded-md border border-gray-200 bg-white text-[11px] font-semibold text-primary-700">View</button>
-                <button onClick={() => delAtt(x)} className="h-8 px-2.5 rounded-md border border-red-100 bg-white text-[11px] font-semibold text-red-500">Delete</button>
+                <button disabled={delBusy} onClick={() => delAtt(x)} className="h-8 px-2.5 rounded-md border border-red-100 bg-white text-[11px] font-semibold text-red-500">Delete</button>
               </span>
             </div>
           ))}
@@ -259,7 +273,7 @@ export default function PatientEHR() {
                       className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" />
             <div className="flex gap-2.5">
               <button onClick={() => setNoteEdit(null)} className="flex-1 h-10 rounded-lg border border-gray-200 bg-white text-gray-700 text-sm font-semibold">Cancel</button>
-              <button onClick={saveNote} className="flex-1 h-10 rounded-lg bg-primary-600 text-white text-sm font-semibold">Save</button>
+              <button disabled={noteBusy} onClick={saveNote} className="flex-1 h-10 rounded-lg bg-primary-600 text-white text-sm font-semibold">Save</button>
             </div>
           </div>
         </div>
@@ -289,7 +303,7 @@ function AddAttachment({ patient, onClose, onSaved }) {
     setFile(f)
   }
 
-  const upload = async () => {
+  const uploadImpl = async () => {
     if (!file) return setErr('Choose a file first.')
     setBusy(true)
     setErr('')
@@ -310,6 +324,7 @@ function AddAttachment({ patient, onClose, onSaved }) {
       setBusy(false)
     }
   }
+  const [upload, upBusy] = useSubmit(uploadImpl)
 
   useEscape(onClose)
   return (

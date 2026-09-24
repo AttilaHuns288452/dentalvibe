@@ -1,4 +1,5 @@
 import Skel from '../../components/Skel'
+import { useRevalidateOnVisible } from '../../lib/hooks'
 import { useEffect, useState } from 'react'
 import { listAppointments, setAppointmentStatus, getClinicSettings } from '../../lib/api'
 import { fmtTime12 } from '../../lib/format'
@@ -31,10 +32,12 @@ export default function DoctorCalendar() {
   const [day, setDay] = useState(new Date().toISOString().slice(0, 10))
   const [err, setErr] = useState('')
 
-  useEffect(() => {
+  const load = async () => {
     listAppointments().then(setAppts).catch((e) => setErr(e.message))
     getClinicSettings().then(setSettings).catch((e) => setErr(e.message))
-  }, [])
+  }
+  useEffect(() => { load() }, [])
+  useRevalidateOnVisible(load)
 
   const dayAppts = (appts ?? [])
     .filter((a) => (a.scheduled_at || a.requested_date || '').slice(0, 10) === day && a.status !== 'cancelled')

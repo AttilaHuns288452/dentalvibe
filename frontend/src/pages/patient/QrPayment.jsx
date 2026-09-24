@@ -122,9 +122,11 @@ export function QR({ text, size = 180 }) {
 }
 
 export default function QrPayment() {
-  const { state } = useLocation()
+  const { state, search } = useLocation()
   const navigate = useNavigate()
-  const appt = state?.appointment
+  const apptId = new URLSearchParams(search).get('appt')
+  const [appt, setAppt] = useState(state?.appointment || null)
+  const [gone, setGone] = useState(false)
   const [secs, setSecs] = useState(15 * 60)
   const [err, setErr] = useState('')
   const svgRef = useRef(null)
@@ -134,9 +136,27 @@ export default function QrPayment() {
     return () => clearInterval(t)
   }, [])
 
+  useEffect(() => {
+    if (appt || !apptId) return
+    supabase.from('appointments')
+      .select('id, price, requested_date, scheduled_at, status, payment_status, services(name)')
+      .eq('id', apptId).maybeSingle()
+      .then(({ data }) => (data ? setAppt(data) : setGone(true)))
+      .catch(() => setGone(true))
+  }, [apptId, appt])
+  // authoritative check (#54): already paid = straight to the result, never a second payment
+  useEffect(() => {
+    if (appt && (appt.payment_status === 'verified' || appt.status === 'approved')) {
+      navigate('/book/success?appt=' + appt.id, { replace: true, state: { appointment: appt } })
+    }
+  }, [appt, navigate])
+
   if (!appt) return (
     <div className="px-4 py-16 text-center">
-      <p className="text-sm text-gray-500">Missing appointment.</p>
+      {gone
+        ? <p className="text-sm text-gray-500">This appointment no longer exists.</p>
+        : apptId ? <p className="text-sm text-gray-500 animate-pulse">Loading payment…</p>
+        : <p className="text-sm text-gray-500">Missing appointment.</p>}
       <button onClick={() => navigate('/appointments')} className="mt-4 h-10 px-4 rounded-lg bg-primary-600 text-white text-sm font-semibold">My Appointments</button>
     </div>
   )
@@ -191,11 +211,11 @@ export default function QrPayment() {
         ) : (
           <button onClick={download} className="w-full h-11 mt-4 rounded-lg bg-gray-100 text-gray-800 text-sm font-semibold">Download QR image</button>
         )}
-        <button onClick={() => navigate('/pay', { state: { appointment: appt } })} className="w-full h-11 mt-2 rounded-lg bg-primary-600 text-white text-sm font-semibold">
+        <button onClick={() => navigate('/pay?appt=' + appt.id, { state: { appointment: appt } })} className="w-full h-11 mt-2 rounded-lg bg-primary-600 text-white text-sm font-semibold">
           I've paid — upload proof
         </button>
         {isDev() && (
-          <button onClick={async () => { try { await mockPay(supabase, appt.id); navigate('/book/success', { state: { appointment: appt } }) } catch (ex) { alert(ex.message) } }}
+          <button onClick={async () => { try { await mockPay(supabase, appt.id); navigate('/book/success?appt=' + appt.id, { state: { appointment: appt } }) } catch (ex) { alert(ex.message) } }}
                   className="w-full h-10 mt-2 rounded-lg border-2 border-dashed border-gray-800 text-gray-800 text-xs font-bold">
             DEV: mock GCash — mark paid now
           </button>
