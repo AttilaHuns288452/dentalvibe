@@ -7,7 +7,7 @@ import { printReport } from '../../lib/format'
 // someone logs an appointment payment manually; the form hint below prevents that)
 
 // Income hub with 3 segments (p65/111/118): Analytics · Transactions · Reports
-const PERIODS = ['Monthly', 'Yearly', 'All time']
+const PERIODS = ['Monthly', 'Yearly', 'All time', 'Custom']
 const PROCEDURES = ['Pasta (Restoration)', 'Extraction', 'Prophylaxis', 'Whitening', 'Consultation']
 const EXP_CATS = ['Equipment', 'Supplies', 'Utilities', 'Rent', 'Salary', 'Other']
 
@@ -122,6 +122,13 @@ export default function IncomeHub() {
                     className={'h-8 px-3.5 rounded-full text-xs font-semibold ' + (period === p ? 'bg-primary-50 text-primary-700 border border-primary-200' : 'bg-white text-gray-500 border border-gray-200')}>{p}</button>
           ))}
         </div>
+        {period === 'Custom' && (
+          <div className="flex gap-2 items-center text-xs">
+            <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} aria-label="From date" className="h-9 px-2 rounded-lg border border-gray-200 bg-white text-xs font-semibold" />
+            <span className="text-gray-400">to</span>
+            <input type="date" value={to} onChange={(e) => setTo(e.target.value)} aria-label="To date" className="h-9 px-2 rounded-lg border border-gray-200 bg-white text-xs font-semibold" />
+          </div>
+        )}
         <p className="text-[11px] text-gray-400 text-center">{period} totals</p>
 
         <div className="bg-white border border-gray-200 rounded-lg p-4">
