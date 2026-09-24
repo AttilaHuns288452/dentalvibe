@@ -33,6 +33,23 @@ import { BrowserRouter, Navigate, useLocation } from 'react-router-dom'
 
 const HOME = { [ROLES.PATIENT]: '/', [ROLES.DOCTOR]: '/doctor', [ROLES.OWNER]: '/owner' }
 
+function InstallPill() {
+  const [evt, setEvt] = useState(null)
+  useEffect(() => {
+    const h = (e) => { e.preventDefault(); setEvt(e) }
+    window.addEventListener('beforeinstallprompt', h)
+    return () => window.removeEventListener('beforeinstallprompt', h)
+  }, [])
+  if (!evt) return null
+  return (
+    <button onClick={async () => { evt.prompt(); await evt.userChoice; setEvt(null) }}
+            className="fixed right-3 z-[60] flex items-center gap-1.5 bg-primary-600 text-white text-xs font-bold px-3 h-9 rounded-full shadow-lg"
+            style={{ bottom: 'calc(4.5rem + env(safe-area-inset-bottom))' }}>
+      Install app
+    </button>
+  )
+}
+
 function Routes() {
   const { profile } = useAuth()
   const path = useLocation().pathname
@@ -107,6 +124,7 @@ function Shell() {
       <div className="max-w-md mx-auto bg-gray-50 min-h-screen shadow-sm">
         <Navbar pendingCount={pendingCount} />
         <DevPanel />
+        <InstallPill />
         <main className="pb-28">
           <Routes />
         </main>

@@ -155,7 +155,13 @@ export default function Home() {
                   </span>
                 </div>
                 <section>
-                  <h2 className="text-[11px] font-bold uppercase tracking-wide text-gray-500 mb-1.5">Upcoming appointment</h2>
+                  {upcoming?.scheduled_at && Math.abs(new Date(upcoming.scheduled_at) - new Date(Date.now() + 864e5)) < 432e5 && (
+                <div className="bg-amber-50 border border-amber-200 rounded-lg px-3.5 py-2.5 text-xs text-amber-800 font-semibold flex gap-2">
+                  <svg viewBox="0 0 24 24" className="w-4 h-4 flex-none mt-0.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>
+                  Visit tomorrow — arrive 10 minutes early and bring any previous X-rays.
+                </div>
+              )}
+              <h2 className="text-[11px] font-bold uppercase tracking-wide text-gray-500 mb-1.5">Upcoming appointment</h2>
                   <Link to="/appointments" className="bg-white border border-gray-200 rounded-lg p-3.5 flex items-center gap-3">
                     <span className="w-12 rounded-lg bg-primary-50 text-primary-700 flex flex-col items-center py-1.5 flex-none">
                       <span className="text-[9px] font-bold uppercase">{d.toLocaleDateString('en-PH', { month: 'short' })}</span>

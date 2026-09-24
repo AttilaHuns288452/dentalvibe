@@ -62,6 +62,8 @@ import('/home/attila/.hermes/hermes-agent/node_modules/playwright/index.mjs').th
   await pg.goto(BASE + '/book', { waitUntil: 'networkidle' })
   const svcName = (await pg.locator('main form button[type="button"]').first().textContent()).trim().split('\n')[0]
   await pg.locator('main form button[type="button"]').first().click()
+  await pg.locator('button:has-text("Next")').last().click()
+  await pg.waitForTimeout(300)
   await pickDate(pg, 0)
   await pg.waitForTimeout(700)
   await pg.locator('form section:has-text("Available time") button:not([disabled])').last().click()

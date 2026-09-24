@@ -61,6 +61,8 @@ const pickDate = async (pg, daysAhead) => {
   check('P4. book page lists services', (await pg.locator('main form button[type="button"]').count()) >= 4)
   await pg.locator('main form button[type="button"]').nth(1).click() // Oral Prophylaxis
   const BDATE = new Date(Date.now() + 8 * 864e5).toISOString().slice(0, 10)
+  await pg.locator('button:has-text("Next")').last().click()
+  await pg.waitForTimeout(300)
   await pickDate(pg, 8)
 await pg.waitForTimeout(600)
 await pg.locator('form section:has-text("Available time") button:not([disabled])').nth(Date.now() % 8).click()

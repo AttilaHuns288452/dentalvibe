@@ -131,10 +131,10 @@ export async function listPatients() {
 }
 
 // ---- appointments ----
-export async function bookAppointment({ patientId, serviceId, serviceIds, requestedDate, scheduledAt, notes, price }) {
+export async function bookAppointment({ patientId, serviceId, serviceIds, requestedDate, scheduledAt, durationMinutes, notes, price }) {
   const { data, error } = await supabase
     .from('appointments')
-    .insert({ patient_id: patientId, service_id: serviceId, service_ids: serviceIds, requested_date: requestedDate, scheduled_at: scheduledAt, notes, price, status: 'pending' })
+    .insert({ patient_id: patientId, service_id: serviceId, service_ids: serviceIds, requested_date: requestedDate, scheduled_at: scheduledAt, duration_minutes: durationMinutes, notes, price, status: 'pending' })
     .select()
     .single()
   if (error) throw error

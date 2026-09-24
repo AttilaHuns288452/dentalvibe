@@ -17,6 +17,7 @@ export default function IncomeHub() {
   const navigate = useNavigate()
   const [seg, setSeg] = useState('Analytics')
   const [period, setPeriod] = useState('Monthly')
+  const [from, setFrom] = useState(''), [to, setTo] = useState('')
   const [txns, setTxns] = useState(null)
   const [appts, setAppts] = useState([])
   const [adding, setAdding] = useState(false)
@@ -37,6 +38,11 @@ export default function IncomeHub() {
   const inPeriod = (iso) => {
     const d = new Date(iso)
     const now = new Date()
+    if (period === 'Custom') {
+      if (from && d < new Date(from + 'T00:00:00')) return false
+      if (to && d > new Date(to + 'T23:59:59')) return false
+      return true
+    }
     if (period === 'Monthly') return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()
     if (period === 'Yearly') return d.getFullYear() === now.getFullYear()
     return true
