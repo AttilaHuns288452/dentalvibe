@@ -42,7 +42,7 @@ const pickDate = async (pg, daysAhead) => {
   await pg.getByLabel('Emergency contact').fill('Ning · +63 917 555 0000')
   await pg.locator('button:has-text("Next")').click()
   await pg.getByLabel('Email address').last().fill(em)
-  await pg.getByLabel('Password').last().fill('Password123')
+  await pg.getByLabel('Password', { exact: true }).last().fill('Password123')
   await pg.locator('button:has-text("Create Account")').click()
   await pg.waitForTimeout(2500)
   check('P1. register works', (await pg.locator('body').textContent()).includes('Account Activated'))

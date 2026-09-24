@@ -9,7 +9,7 @@ import('/home/attila/.hermes/hermes-agent/node_modules/playwright/index.mjs').th
     const pg = await ctx.newPage()
     await pg.goto(BASE + '/login', { waitUntil: 'networkidle' })
     await pg.getByLabel('Email address').fill(email)
-    await pg.getByLabel('Password').fill(pw)
+    await pg.getByLabel('Password', { exact: true }).fill(pw)
     await pg.locator('form button:has-text("Sign In")').last().click()
     await pg.waitForTimeout(2500)
     return pg
@@ -21,7 +21,7 @@ import('/home/attila/.hermes/hermes-agent/node_modules/playwright/index.mjs').th
   pg.on('pageerror', (e) => errs.push('PAGE: ' + e.message))
   await pg.goto(BASE + '/login', { waitUntil: 'networkidle' })
   await pg.getByLabel('Email address').fill('maria@dentalvibe.ph')
-  await pg.getByLabel('Password').fill('wrongpass')
+  await pg.getByLabel('Password', { exact: true }).fill('wrongpass')
   await pg.locator('form button:has-text("Sign In")').last().click()
   await pg.waitForTimeout(1500)
   t('invalid password shows error', !(await pg.locator('body').textContent()).match(/invalid|incorrect/i), 'no error text')

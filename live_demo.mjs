@@ -28,7 +28,7 @@ import('/home/attila/.hermes/hermes-agent/node_modules/playwright/index.mjs').th
     pg.on('pageerror', (e) => errs.push('PAGE ' + e.message))
     await pg.goto(BASE + '/login', { waitUntil: 'networkidle' })
     await pg.getByLabel('Email address').fill(email)
-    await pg.getByLabel('Password').fill(pw)
+    await pg.getByLabel('Password', { exact: true }).fill(pw)
     await pg.locator('form button:has-text("Sign In")').last().click()
     await pg.waitForTimeout(2500)
     return pg
@@ -50,7 +50,7 @@ import('/home/attila/.hermes/hermes-agent/node_modules/playwright/index.mjs').th
   await pg.getByLabel('Emergency contact').fill('Ning · +63 917 555 0000')
   await pg.locator('button:has-text("Next")').click()
   await pg.getByLabel('Email address').last().fill(DEMO)
-  await pg.getByLabel('Password').last().fill('DemoPass123')
+  await pg.getByLabel('Password', { exact: true }).last().fill('DemoPass123')
   await pg.locator('button:has-text("Create Account")').click()
   await pg.waitForTimeout(2500)
   t('S1 patient registers via UI (wizard)', (await pg.locator('body').textContent()).includes('Account Activated'))
