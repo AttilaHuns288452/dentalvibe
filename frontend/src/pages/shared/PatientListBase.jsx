@@ -105,7 +105,7 @@ function AddPatient({ onClose, onSaved }) {
     // import lazily to avoid circular deps
     const { supabase } = await import('../../lib/api')
     const { error } = await supabase.from('patients').insert({
-      full_name: `${(f.first ?? '').trim()} ${(f.last ?? '').trim()}`.trim().trim(), birthdate: f.birthdate || null, sex: f.sex || null,
+      full_name: `${(f.first ?? '').trim()} ${(f.last ?? '').trim()}`.trim(), birthdate: f.birthdate || null, sex: f.sex || null,
       phone: f.phone || null, email: f.email || null, emergency_contact: f.emergency_contact || null,
       medical_note: f.medical_note || null,
     })
@@ -126,8 +126,12 @@ function AddPatient({ onClose, onSaved }) {
           <button type="button" onClick={onClose} aria-label="Close" className="w-8 h-8 rounded-lg bg-white border border-gray-200 text-gray-500">×</button>
         </div>
         <div className="bg-white border border-gray-200 rounded-lg p-4 space-y-3">
-          <label className="block"><span className="text-xs font-medium text-gray-500">Full name</span>
-            <input value={f.full_name} onChange={set('full_name')} className="mt-1 w-full h-11 border border-gray-200 rounded-lg px-3 text-sm" /></label>
+          <div className="grid grid-cols-2 gap-3">
+            <label className="block"><span className="text-xs font-medium text-gray-500">First name</span>
+              <input value={f.first ?? ''} onChange={set('first')} required className="mt-1 w-full h-11 border border-gray-200 rounded-lg px-3 text-sm" /></label>
+            <label className="block"><span className="text-xs font-medium text-gray-500">Last name</span>
+              <input value={f.last ?? ''} onChange={set('last')} required className="mt-1 w-full h-11 border border-gray-200 rounded-lg px-3 text-sm" /></label>
+          </div>
           <div className="grid grid-cols-2 gap-3">
             <label className="block"><span className="text-xs font-medium text-gray-500">Birthdate</span>
               <input type="date" value={f.birthdate} onChange={set('birthdate')} className="mt-1 w-full h-11 border border-gray-200 rounded-lg px-3 text-sm" /></label>
