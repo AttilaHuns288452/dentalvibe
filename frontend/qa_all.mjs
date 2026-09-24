@@ -2,6 +2,18 @@
 import { chromium } from '/home/attila/.hermes/hermes-agent/node_modules/playwright/index.mjs'
 import fs from 'fs'
 
+const pickDate = async (pg, daysAhead) => {
+  const target = new Date(Date.now() + daysAhead * 864e5)
+  for (let i = 0; i < 3; i++) {
+    const label = await pg.locator('section:has-text("Preferred date") span.text-sm.font-bold').first().textContent()
+    const cur = new Date(label.trim() + ' 1')
+    if (cur.getMonth() === target.getMonth() && cur.getFullYear() === target.getFullYear()) break
+    if (cur < target) await pg.locator('button[aria-label="Next month"]').click()
+    else await pg.locator('button[aria-label="Previous month"]').click()
+    await pg.waitForTimeout(250)
+  }
+  await pg.getByRole('button', { name: String(target.getDate()), exact: true }).click()
+}
 const BASE = 'http://localhost:4176'
 const b = await chromium.launch()
 const ctx = await b.newContext({ viewport: { width: 390, height: 844 } })
@@ -128,7 +140,7 @@ check('patient: 5 tabs w/ Book', (t => t.includes('Book') && !t.includes('Manage
 await pg.goto(BASE + '/book', { waitUntil: 'networkidle' }); await pg.waitForTimeout(1200)
 await pg.locator('main form button[type="button"]').first().click()
 const BDATE = new Date(Date.now() + 9 * 864e5).toISOString().slice(0, 10)
-await pg.fill('input[type="date"]', BDATE)
+await pickDate(pg, 9)
 await pg.waitForTimeout(600)
 await pg.locator('form section:has-text("Available time") button:not([disabled])').nth(Date.now() % 8).click()
 await pg.locator('button:has-text("Continue to Payment")').click()

@@ -1,4 +1,16 @@
 import('/home/attila/.hermes/hermes-agent/node_modules/playwright/index.mjs').then(async ({ chromium }) => {
+const pickDate = async (pg, daysAhead) => {
+  const target = new Date(Date.now() + daysAhead * 864e5)
+  for (let i = 0; i < 3; i++) {
+    const label = await pg.locator('section:has-text("Preferred date") span.text-sm.font-bold').first().textContent()
+    const cur = new Date(label.trim() + ' 1')
+    if (cur.getMonth() === target.getMonth() && cur.getFullYear() === target.getFullYear()) break
+    if (cur < target) await pg.locator('button[aria-label="Next month"]').click()
+    else await pg.locator('button[aria-label="Previous month"]').click()
+    await pg.waitForTimeout(250)
+  }
+  await pg.getByRole('button', { name: String(target.getDate()), exact: true }).click()
+}
   const BASE = 'https://dentalvibe.vercel.app'
   const b = await chromium.launch()
   const ctx = await b.newContext({ viewport: { width: 390, height: 844 } })
@@ -49,7 +61,7 @@ import('/home/attila/.hermes/hermes-agent/node_modules/playwright/index.mjs').th
   check('P4. book page lists services', (await pg.locator('main form button[type="button"]').count()) >= 4)
   await pg.locator('main form button[type="button"]').nth(1).click() // Oral Prophylaxis
   const BDATE = new Date(Date.now() + 8 * 864e5).toISOString().slice(0, 10)
-  await pg.fill('input[type="date"]', BDATE)
+  await pickDate(pg, 8)
 await pg.waitForTimeout(600)
 await pg.locator('form section:has-text("Available time") button:not([disabled])').nth(Date.now() % 8).click()
   await pg.fill('textarea', 'Please be gentle, first visit.')

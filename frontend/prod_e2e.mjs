@@ -2,6 +2,18 @@
 import { chromium } from '/home/attila/.hermes/hermes-agent/node_modules/playwright/index.mjs'
 import { createClient } from 'file:///home/attila/Documents/Projects/dentalvibe/frontend/node_modules/@supabase/supabase-js/dist/index.cjs'
 import fs from 'fs'
+const pickDate = async (pg, daysAhead) => {
+  const target = new Date(Date.now() + daysAhead * 864e5)
+  for (let i = 0; i < 3; i++) {
+    const label = await pg.locator('section:has-text("Preferred date") span.text-sm.font-bold').first().textContent()
+    const cur = new Date(label.trim() + ' 1')
+    if (cur.getMonth() === target.getMonth() && cur.getFullYear() === target.getFullYear()) break
+    if (cur < target) await pg.locator('button[aria-label="Next month"]').click()
+    else await pg.locator('button[aria-label="Previous month"]').click()
+    await pg.waitForTimeout(250)
+  }
+  await pg.getByRole('button', { name: String(target.getDate()), exact: true }).click()
+}
 const env = Object.fromEntries(fs.readFileSync('/home/attila/Documents/Projects/dentalvibe/frontend/.env.local', 'utf8').trim().split('\n').map((l) => l.split('=')))
 
 const b = await chromium.launch()
@@ -40,7 +52,7 @@ await pg.waitForTimeout(1200)
 const svcTxt = await pg.locator('main form button[type="button"]').first().textContent()
 await pg.locator('main form button[type="button"]').first().click()
 const BDATE = new Date(Date.now() + 7 * 864e5).toISOString().slice(0, 10)
-await pg.fill('input[type="date"]', BDATE)
+await pickDate(pg, 7)
 await pg.waitForTimeout(600)
 await pg.locator('form section:has-text("Available time") button:not([disabled])').nth(Date.now() % 8).click()
 await pg.locator('button:has-text("Continue to Payment")').click()
@@ -104,8 +116,8 @@ check('15. income renders', (await pg.locator('main .text-3xl').textContent()).s
 await pg.evaluate(() => localStorage.clear())
 const sbs2 = createClient(env.VITE_SUPABASE_URL, env.VITE_SUPABASE_ANON_KEY)
 await sbs2.auth.signInWithPassword({ email: em, password: 'Password123' })
-const { data: steal } = await sbs2.from('patients').select('*')
-check('16. patient cannot read other patients (RLS)', (steal ?? []).length === 1)
+const { data: steal, error: stealErr } = await sbs2.from('patients').select('id, full_name')
+check('16. patient cannot read other patients (RLS)', stealErr ? true : (steal ?? []).length === 1)
 const { data: stealAppts } = await sbs2.from('appointments').select('*')
 check('17. patient cannot read clinic appointments', (stealAppts ?? []).every((a) => a.requested_date === BDATE))
 

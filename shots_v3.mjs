@@ -35,7 +35,7 @@ import('/home/attila/.hermes/hermes-agent/node_modules/playwright/index.mjs').th
   await shot('03-patient-home')
   await pg.goto(BASE + '/book', { waitUntil: 'networkidle' }); await pg.waitForTimeout(1200)
   await shot('04-book')
-  await pg.locator('input[type="date"]').fill(new Date(Date.now() + 5 * 864e5).toISOString().slice(0, 10))
+  await pg.getByRole('button', { name: String(new Date(Date.now() + 5 * 864e5).getDate()), exact: true }).click().catch(async () => { await pg.locator('button[aria-label="Next month"]').click(); await pg.waitForTimeout(200); await pg.getByRole('button', { name: String(new Date(Date.now() + 5 * 864e5).getDate()), exact: true }).click() })
   await pg.waitForTimeout(800)
   await shot('04b-book-time-slots')
   await pg.goto(BASE + '/appointments', { waitUntil: 'networkidle' }); await pg.waitForTimeout(1200)
