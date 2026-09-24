@@ -40,3 +40,25 @@ div.fixed.inset-0.z-50 {
     scroll-behavior: auto !important;
   }
 }
+
+/* ---- craft layer (make-interfaces-feel-better) — presentation only, Figma structure untouched ----
+   ponytail: all class-level/global rules here; component-scoped tweaks would touch 40+ files. */
+html {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+h1, h2, h3, h4 { text-wrap: balance; }
+p, li, figcaption, blockquote { text-wrap: pretty; }
+body {
+  font-variant-numeric: tabular-nums; /* counters, prices, times stop jittering */
+}
+main > * {
+  animation: dv-enter 0.18s ease-out both;
+}
+@keyframes dv-enter {
+  from { opacity: 0; transform: translateY(4px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  main > * { animation: none; }
+}
+::selection { background: #ccfbf1; color: #134e4a; }

@@ -128,7 +128,7 @@ export default function Book() {
             <span key={n} className="flex items-center gap-1.5">
               <span className={'w-6 h-6 rounded-full flex items-center justify-center ' + (active ? 'bg-primary-700 text-white' : 'bg-primary-100 text-primary-700')}>{n}</span>
               <span className={active ? 'text-gray-900' : 'text-gray-500'}>{label}</span>
-              {i === 0 && <span className="w-6 border-t border-dashed border-gray-300" />}
+              {i === 0 && <span className="w-8 h-0.5 rounded bg-gray-300" />}
             </span>
           )
         })}
@@ -224,7 +224,7 @@ export default function Book() {
         )}
 
         {/* sticky action bar — fee context + CTA always in reach */}
-        <div className="sticky -mx-4 px-4 pt-2 pb-2 bottom-[calc(4.25rem+env(safe-area-inset-bottom))] md:bottom-0 bg-gradient-to-t from-gray-50 via-gray-50 to-transparent">
+        <div className="sticky -mx-4 px-4 pt-6 pb-2 bottom-[calc(4.25rem+env(safe-area-inset-bottom))] md:bottom-0 bg-gradient-to-t from-gray-50 via-gray-50 to-transparent">
         {step === 1 && (
           <p className="text-[11px] text-gray-500 bg-primary-50 border border-primary-100 rounded-lg px-3 py-2 mb-2">
             The appointment fee reserves your slot — it is <b>not</b> your full treatment bill. Any treatment is charged at the clinic.
