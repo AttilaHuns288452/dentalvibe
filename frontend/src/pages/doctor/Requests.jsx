@@ -13,6 +13,8 @@ const STATUS_PILL = {
   cancelled: 'bg-red-100 text-red-600',
 }
 
+const fmtDate = (d) => d ? new Date(d + 'T00:00:00').toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' }) : ''
+
 function ProofModal({ apptId, onClose }) {
   const [proofs, setProofs] = useState(null)
   useEffect(() => {
@@ -70,7 +72,7 @@ export default function Requests() {
             <h3 className="text-sm font-bold text-gray-900 mt-2">Confirm Patient Appointment</h3>
             <p className="text-xs text-gray-600 mt-2 leading-relaxed">
               Accept appointment request for <b>{confirming.patients?.full_name}</b> on{' '}
-              <b className="text-primary-700">{confirming.when ? new Date(confirming.when).toLocaleString('en-PH', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : confirming.requested_date}</b> for <b>{confirming.services?.name}</b>? A
+              <b className="text-primary-700">{confirming.when ? new Date(confirming.when).toLocaleString('en-PH', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : fmtDate(confirming.requested_date)}</b> for <b>{confirming.services?.name}</b>? A
               confirmation notification will be sent to the patient.
             </p>
             <div className="bg-green-50 text-green-700 text-xs font-semibold rounded-full px-3 py-1.5 mt-3 flex items-center justify-center gap-1.5">
@@ -107,7 +109,7 @@ export default function Requests() {
                   {a.payment_status === 'submitted' ? 'Proof submitted ✓' : 'Unpaid'}
                 </span>
               </div>
-              <div className="text-xs text-gray-500">{a.services?.name} · requested {a.requested_date} · {peso(a.price ?? a.services?.price)}</div>
+              <div className="text-xs text-gray-500">{a.services?.name} · requested {fmtDate(a.requested_date)} · {peso(a.price ?? a.services?.price)}</div>
               {a.notes && <div className="text-xs text-gray-500 bg-gray-50 border border-gray-100 rounded-lg px-2.5 py-1.5 italic">"{a.notes}"</div>}
 
               {a.payment_status === 'submitted' && (

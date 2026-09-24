@@ -18,7 +18,14 @@ export default function Navbar({ pendingCount = 0 }) {
   const navigate = useNavigate()
   const links = NAV_BY_ROLE[role] ?? []
   const matches = links.filter((l) => path === l.path || (l.path !== '/' && path.startsWith(l.path + '/')))
+  // ponytail: sub-routes (EHR, pay, settings…) map to their parent tab per the Figma frames
+  const SUFFIX_TAB = {
+    '/ehr': 'Patients', '/notifications': 'Home', '/settings': 'Home',
+    '/security': 'Profile', '/pay': 'Book', '/receipt': 'Appointments',
+  }
+  const suffixHit = Object.entries(SUFFIX_TAB).find(([sfx]) => path.endsWith(sfx))
   const activePath = matches.sort((a, b) => b.path.length - a.path.length)[0]?.path
+    ?? (suffixHit ? links.find((l) => l.label === suffixHit[1])?.path : undefined)
   const roleBase = role === 'patient' ? '' : '/' + role
 
   return (
@@ -55,9 +62,9 @@ export default function Navbar({ pendingCount = 0 }) {
         <div className="max-w-md mx-auto flex">
           {links.map((l) => (
             <button key={l.path} onClick={() => navigate(l.path)}
-                    className={'flex-1 flex flex-col items-center gap-0.5 py-2 ' + (path === activePath ? 'text-primary-600' : 'text-gray-400')}>
-              <TabIcon name={l.icon} active={path === activePath} />
-              <span className={'text-[11px] ' + (path === activePath ? 'font-semibold text-primary-600' : 'text-gray-400')}>{l.label}</span>
+                    className={'flex-1 flex flex-col items-center gap-0.5 py-2 ' + (l.path === activePath ? 'text-primary-600' : 'text-gray-400')}>
+              <TabIcon name={l.icon} active={l.path === activePath} />
+              <span className={'text-[11px] ' + (l.path === activePath ? 'font-semibold text-primary-600' : 'text-gray-400')}>{l.label}</span>
             </button>
           ))}
         </div>
