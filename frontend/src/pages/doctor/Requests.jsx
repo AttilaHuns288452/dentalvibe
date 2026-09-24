@@ -41,6 +41,15 @@ function ProofModal({ apptId, onClose }) {
 export default function Requests() {
   const [appts, setAppts] = useState(null)
   const [confirming, setConfirming] = useState(null)
+  const [conflict, setConflict] = useState(false)
+  // real conflict check — same rule as fn_appointment_guard (same dentist, exact slot)
+  useEffect(() => {
+    setConflict(false)
+    if (!confirming?.when || !confirming?.dentist_id) return
+    supabase.from('appointments').select('id', { count: 'exact', head: true })
+      .eq('status', 'approved').eq('scheduled_at', confirming.when).eq('dentist_id', confirming.dentist_id)
+      .then(({ count }) => setConflict((count ?? 0) > 0))
+  }, [confirming])
   const [err, setErr] = useState('')
   const [assigning, setAssigning] = useState(null)
   const [when, setWhen] = useState('')
@@ -75,9 +84,9 @@ export default function Requests() {
               <b className="text-primary-700">{confirming.when ? new Date(confirming.when).toLocaleString('en-PH', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : fmtDate(confirming.requested_date)}</b> for <b>{confirming.services?.name}</b>? A
               confirmation notification will be sent to the patient.
             </p>
-            <div className="bg-green-50 text-green-700 text-xs font-semibold rounded-full px-3 py-1.5 mt-3 flex items-center justify-center gap-1.5">
-              <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M5 13l4 4L19 7" /></svg>
-              No schedule conflicts
+            <div className={(conflict ? 'bg-amber-50 text-amber-700' : 'bg-green-50 text-green-700') + ' text-xs font-semibold rounded-full px-3 py-1.5 mt-3 flex items-center justify-center gap-1.5'}>
+              {!conflict && <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M5 13l4 4L19 7" /></svg>}
+              {conflict ? 'Schedule conflict — that slot is taken' : 'No schedule conflicts'}
             </div>
             <div className="flex gap-2.5 mt-4">
               <button onClick={() => setConfirming(null)} className="flex-1 h-10 rounded-lg border border-gray-200 bg-white text-gray-600 text-sm font-semibold">Cancel</button>

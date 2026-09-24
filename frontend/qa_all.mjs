@@ -20,7 +20,7 @@ const login = async (email) => {
   await pg.waitForTimeout(800)
   await pg.fill('input[type="email"]', email)
   await pg.fill('input[type="password"]', 'password123')
-  await pg.locator('form button').last().click()
+  await pg.locator('form button:has-text("Sign In")').last().click()
   await pg.waitForTimeout(2500)
 }
 const tab = async (label) => {
@@ -109,15 +109,18 @@ await pg.waitForTimeout(800)
 await pg.locator('button:has-text("Register")').click()
 _role = 'patient'
 const em = `qapat${Date.now()}@dentalvibe.ph`
-await pg.fill('input:not([type="email"]):not([type="password"])', 'QA Final')
-await pg.fill('input[type="email"]', em)
-await pg.fill('input[type="password"]', 'password123')
-await pg.locator('form button').last().click()
+await pg.getByLabel('First name').fill('QA')
+await pg.getByLabel('Last name').fill('Final')
+await pg.getByLabel('Birthdate').fill('1990-01-01')
+await pg.locator('button:has-text("Next")').click()
+await pg.getByLabel('Emergency contact').fill('Ning · +63 917 555 0000')
+await pg.locator('button:has-text("Next")').click()
+await pg.getByLabel('Email address').last().fill(em)
+await pg.getByLabel('Password').last().fill('Password123')
+await pg.locator('button:has-text("Create Account")').click()
 await pg.waitForTimeout(2500)
-if (!(await pg.locator('button[aria-label="Notifications"]').count())) {
-  await pg.fill('input[type="email"]', em)
-  await pg.fill('input[type="password"]', 'password123')
-  await pg.locator('form button:has-text("Sign In")').last().click()
+if ((await pg.locator('body').textContent()).includes('Account Activated')) {
+  await pg.locator('button:has-text("Go to my dashboard")').click()
   await pg.waitForTimeout(3000)
 }
 check('patient: registered', (await pg.locator('header').textContent()).includes('QA Final'))
