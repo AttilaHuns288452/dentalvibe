@@ -33,7 +33,7 @@ export default function ConfirmBooking() {
           <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2.5C9.4 2.5 7.5 4.6 7.5 7.2c0 1.7.5 3.1 1.1 4.6.5 1.2 1 2.5 1.3 3.9.2 1 .4 1.9.4 2.4 0 1.4.8 2.4 1.7 2.4s1.7-1 1.7-2.4c0-.5.2-1.4.4-2.4.3-1.4.8-2.7 1.3-3.9.6-1.5 1.1-2.9 1.1-4.6C16.5 4.6 14.6 2.5 12 2.5z" /></svg>
         </div>
         <div>
-          <div className="text-[10px] font-bold uppercase tracking-wide text-gray-400">Selected service</div>
+          <div className="text-[10px] font-bold uppercase tracking-wide text-gray-500">Selected service</div>
           <div className="text-sm font-bold text-gray-900">{appt.services?.name ?? 'Service'}</div>
         </div>
       </div>
@@ -43,7 +43,7 @@ export default function ConfirmBooking() {
           <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 5h18v16H3zM3 10h18M8 3v4M16 3v4" /></svg>
         </div>
         <div>
-          <div className="text-[10px] font-bold uppercase tracking-wide text-gray-400">Scheduled date &amp; time</div>
+          <div className="text-[10px] font-bold uppercase tracking-wide text-gray-500">Scheduled date &amp; time</div>
           <div className="text-sm font-bold text-gray-900">{dateStr}</div>
           <div className="text-xs text-gray-500">{dayStr}</div>
         </div>
@@ -87,11 +87,11 @@ export function BookSuccess() {
       {appt && (
         <div className="bg-white border border-gray-200 rounded-lg p-4 space-y-2.5">
           <div>
-            <div className="text-[10px] font-bold uppercase tracking-wide text-gray-400">Selected service</div>
+            <div className="text-[10px] font-bold uppercase tracking-wide text-gray-500">Selected service</div>
             <div className="text-sm font-bold text-gray-900">{appt.services?.name ?? 'Service'}</div>
           </div>
           <div className="border-t border-gray-100 pt-2.5">
-            <div className="text-[10px] font-bold uppercase tracking-wide text-gray-400">Scheduled date &amp; time</div>
+            <div className="text-[10px] font-bold uppercase tracking-wide text-gray-500">Scheduled date &amp; time</div>
             <div className="text-sm font-bold text-gray-900">{dt ? dt.toLocaleDateString('en-PH', { month: 'long', day: 'numeric', year: 'numeric' }) : '—'}</div>
           </div>
         </div>

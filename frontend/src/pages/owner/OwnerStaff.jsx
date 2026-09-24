@@ -1,3 +1,5 @@
+import Skel from '../../components/Skel'
+import useEscape from '../../lib/useEscape'
 import { useEffect, useState } from 'react'
 import { supabase } from '../../supabaseClient'
 import { createClient } from '@supabase/supabase-js'
@@ -57,7 +59,7 @@ export default function OwnerStaff() {
         </span>
         <span className="block text-xs text-gray-500 mt-0.5">{d.email}</span>
       </span>
-      <svg viewBox="0 0 24 24" className="w-4 h-4 text-gray-400 flex-none" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 6 6 6-6 6" /></svg>
+      <svg viewBox="0 0 24 24" className="w-4 h-4 text-gray-500 flex-none" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 6 6 6-6 6" /></svg>
     </button>
   )
 
@@ -68,7 +70,7 @@ export default function OwnerStaff() {
           <h1 className="text-xl font-bold text-gray-900">Staff</h1>
           <p className="text-xs text-gray-500">Dentists &amp; clinic roles</p>
         </div>
-        <span className="text-xs text-gray-400">{active.length} members</span>
+        <span className="text-xs text-gray-500">{active.length} members</span>
       </div>
       {err && <p className="text-xs text-red-500">{err}</p>}
 
@@ -97,10 +99,10 @@ export default function OwnerStaff() {
           <span className="block text-sm font-bold text-gray-900 uppercase tracking-wide">Add New Dentist</span>
           <span className="block text-xs text-gray-500">Create a new dentist account</span>
         </span>
-        <svg viewBox="0 0 24 24" className="w-4 h-4 text-gray-400 flex-none" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 6 6 6-6 6" /></svg>
+        <svg viewBox="0 0 24 24" className="w-4 h-4 text-gray-500 flex-none" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 6 6 6-6 6" /></svg>
       </button>
 
-      {!dentists && <p className="text-sm text-gray-400">Loading…</p>}
+      {!dentists && <Skel lines={3} h="h-14" />}
 
       {active.length > 0 && (
         <section>
@@ -111,10 +113,13 @@ export default function OwnerStaff() {
         </section>
       )}
 
-      {deactivated.length > 0 && (
-        <section>
+      {/* Deactivated group always renders (p44/p67) — empty state keeps section structure stable */}
+      <section>
           <h2 className="text-[11px] font-bold uppercase tracking-wide text-gray-500 mb-1.5">Deactivated</h2>
           <div className="bg-white border border-gray-200 rounded-lg divide-y divide-gray-100">
+            {deactivated.length === 0 && (
+              <div className="px-3.5 py-3 text-sm text-gray-500">All team members are active.</div>
+            )}
             {deactivated.map((d) => (
               <div key={d.id} className="flex items-center gap-3 px-3.5 py-3">
                 <span className="w-10 h-10 rounded-full bg-gray-100 text-gray-500 text-xs font-bold flex items-center justify-center flex-none">
@@ -125,14 +130,14 @@ export default function OwnerStaff() {
                     <span className="text-sm font-semibold text-gray-500 truncate">{d.full_name}</span>
                     <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">Dentist</span>
                   </span>
-                  <span className="block text-xs text-gray-400 mt-0.5">Deactivated · {d.email}</span>
+                  <span className="block text-xs text-gray-500 mt-0.5">Deactivated · {d.email}</span>
                 </span>
                 <button onClick={() => reactivate(d)} className="text-xs font-semibold text-primary-700 border border-primary-200 rounded-full px-3 py-1 flex-none">Restore</button>
               </div>
             ))}
           </div>
         </section>
-      )}
+      
     </div>
   )
 }
@@ -183,7 +188,7 @@ function AddDentist({ onCreated }) {
       <button disabled={busy} className="w-full h-11 rounded-lg bg-primary-600 text-white text-sm font-semibold disabled:opacity-60">
         {busy ? 'Creating…' : 'Create Account'}
       </button>
-      <p className="text-[11px] text-gray-400">A temporary password is generated — share it with the dentist securely.</p>
+      <p className="text-[11px] text-gray-500">A temporary password is generated — share it with the dentist securely.</p>
     </form>
   )
 }

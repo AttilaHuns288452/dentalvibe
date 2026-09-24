@@ -183,6 +183,38 @@ try {
   }
 } catch {}
 
+// --- U3: keyboard modal contract (focus in, Tab cycles, Escape closes) ---
+{
+  _role = 'owner'
+  await login('owner@dentalvibe.ph')
+  await tab('Patients')
+  await pg.waitForTimeout(600)
+  await pg.locator('button:has-text("Add New Patient")').first().click()
+  await pg.waitForTimeout(400)
+  check('U3 focus enters dialog on open', await pg.evaluate(() => !!document.activeElement?.closest('[role="dialog"]')))
+  let escaped = false
+  for (let i = 0; i < 14; i++) {
+    await pg.keyboard.press('Tab')
+    if (!(await pg.evaluate(() => !!document.activeElement?.closest('[role="dialog"]')))) { escaped = true; break }
+  }
+  check('U3 Tab never escapes dialog', !escaped)
+  await pg.keyboard.press('Escape')
+  await pg.waitForTimeout(300)
+  check('U3 Escape closes dialog', (await pg.locator('[role="dialog"]').count()) === 0)
+}
+// --- C3: negative price blocked client-side (belt to S5's DB check) ---
+{
+  await tab('Manage')
+  await pg.waitForTimeout(600)
+  await pg.locator('button:has-text("Add Service")').first().click()
+  await pg.waitForTimeout(300)
+  await pg.locator('input[placeholder="Service name"]').fill('QA Negative Price')
+  await pg.locator('input[placeholder="Price ₱"]').fill('-500')
+  await pg.locator('button:text-is("Add Service")').click()
+  await pg.waitForTimeout(300)
+  check('C3 negative price rejected in UI', (await pg.locator('main').textContent()).includes('above zero'))
+}
+
 console.log(`\n=== QA RESULT: ${pass} passed, ${fail} failed ===`)
 console.log('page errors:', pageErrors.length ? pageErrors.slice(0, 5) : 'NONE')
 await b.close()

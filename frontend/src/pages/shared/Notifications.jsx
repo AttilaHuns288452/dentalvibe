@@ -61,7 +61,7 @@ export default function Notifications({ roleBase = '' }) {
             {n.title}
             {!n.read && <span className="w-2 h-2 rounded-full bg-primary-600 flex-none" aria-label="unread" />}
           </div>
-          <span className="text-[10px] text-gray-400 flex-none">{ago(n.created_at)}</span>
+          <span className="text-[10px] text-gray-500 flex-none">{ago(n.created_at)}</span>
         </div>
         <div className="text-xs text-gray-500 mt-0.5">{n.body}</div>
       </div>
@@ -82,7 +82,7 @@ export default function Notifications({ roleBase = '' }) {
       {err && <p className="text-xs text-red-500">{err}</p>}
 
       {items?.length === 0 && (
-        <div className="bg-white border border-gray-200 rounded-lg py-10 text-center text-sm text-gray-400">No notifications yet.</div>
+        <div className="bg-white border border-gray-200 rounded-lg py-10 text-center text-sm text-gray-500">No notifications yet.</div>
       )}
 
       {today.length > 0 && (

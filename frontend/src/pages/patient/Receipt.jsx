@@ -52,7 +52,7 @@ export default function Receipt() {
       </div>
 
       <div className="bg-white border border-gray-200 rounded-lg p-4">
-        <div className="text-[10px] font-bold uppercase tracking-wide text-gray-400 mb-2">Completed visit</div>
+        <div className="text-[10px] font-bold uppercase tracking-wide text-gray-500 mb-2">Completed visit</div>
         <div className="flex justify-between text-sm py-1.5 border-t border-gray-100">
           <span className="text-gray-600">Service</span><span className="font-bold text-gray-900">{appt.services?.name ?? 'Service'}</span>
         </div>
@@ -69,7 +69,7 @@ export default function Receipt() {
       ) : (
         <>
           <div>
-            <div className="text-[10px] font-bold uppercase tracking-wide text-gray-400 mb-2">Attach your receipt (optional)</div>
+            <div className="text-[10px] font-bold uppercase tracking-wide text-gray-500 mb-2">Attach your receipt (optional)</div>
             <label className="block border-2 border-dashed border-gray-200 rounded-lg bg-gray-50 py-6 text-center cursor-pointer">
               {preview ? (
                 <img src={preview} alt="Receipt preview" className="max-h-40 mx-auto rounded" />
@@ -77,7 +77,7 @@ export default function Receipt() {
                 <>
                   <div className="w-9 h-9 mx-auto rounded-full bg-primary-600 text-white flex items-center justify-center text-lg font-bold">+</div>
                   <div className="text-sm font-semibold text-gray-800 mt-2">Tap to attach your receipt</div>
-                  <div className="text-[11px] text-gray-400">PNG or JPG · max 5 MB</div>
+                  <div className="text-[11px] text-gray-500">PNG or JPG · max 5 MB</div>
                 </>
               )}
               <input type="file" accept="image/png,image/jpeg" onChange={pick} className="hidden" />

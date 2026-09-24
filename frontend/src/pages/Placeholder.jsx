@@ -15,7 +15,7 @@ export default function Placeholder({ path }) {
       </div>
       <h1 className="text-lg font-bold text-gray-900 mt-3">{label}</h1>
       <p className="text-xs text-gray-500 mt-1 capitalize">{role} · coming soon</p>
-      <code className="text-[11px] text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded mt-2 inline-block">{path}</code>
+      <code className="text-[11px] text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded mt-2 inline-block">{path}</code>
     </div>
   )
 }

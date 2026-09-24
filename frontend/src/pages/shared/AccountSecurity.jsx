@@ -53,9 +53,9 @@ export default function AccountSecurity() {
           <input type="password" placeholder="New password" value={pw} onChange={(e) => setPw(e.target.value)}
                  className="w-full h-11 border border-gray-200 rounded-lg px-3 text-sm bg-white" />
           <ul className="text-[11px] space-y-1">
-            <li className={rules.len ? 'text-green-600' : 'text-gray-400'}>{rules.len ? '✓' : '·'} Password must be at least 8 characters</li>
-            <li className={rules.num ? 'text-green-600' : 'text-gray-400'}>{rules.num ? '✓' : '·'} Password must contain 1 number</li>
-            <li className={rules.case ? 'text-green-600' : 'text-gray-400'}>{rules.case ? '✓' : '·'} Password must contain 1 uppercase and 1 lowercase</li>
+            <li className={rules.len ? 'text-green-600' : 'text-gray-500'}>{rules.len ? '✓' : '·'} Password must be at least 8 characters</li>
+            <li className={rules.num ? 'text-green-600' : 'text-gray-500'}>{rules.num ? '✓' : '·'} Password must contain 1 number</li>
+            <li className={rules.case ? 'text-green-600' : 'text-gray-500'}>{rules.case ? '✓' : '·'} Password must contain 1 uppercase and 1 lowercase</li>
           </ul>
           <input type="password" placeholder="Confirm password" value={pw2} onChange={(e) => setPw2(e.target.value)}
                  className="w-full h-11 border border-gray-200 rounded-lg px-3 text-sm bg-white" />

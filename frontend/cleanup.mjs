@@ -1,52 +1,29 @@
-// Cleanup: remove ALL non-seed rows. The seed row map below is the single source of truth —
-// deleting by name/shape guesses is what ate seed data 3x before. If the seed grows, update THIS map.
+// Cleanup: remove every row that is NOT in seed_map.mjs (the single source of truth).
+// Matching is exact — date | patient | service | status. Seed rows are NEVER deleted.
+// Usage: SB_SECRET=... node cleanup.mjs
 import { createClient } from '@supabase/supabase-js'
+import { PATIENTS, SEED_SERVICES, SEED_APPTS, EXCEPTIONS, CHATS, apptKey } from './seed_map.mjs'
 
 const svc = createClient('https://wfmtkmfevdqbhtpqamic.supabase.co', process.env.SB_SECRET, { auth: { persistSession: false } })
-
-// exact curated demo rows: requested_date | patient | status
-const SEED_ROWS = new Set([
-  '2026-09-01|Carlo Bautista|cancelled',
-  '2026-09-02|Andrea Reyes|completed',
-  '2026-09-07|Liza Mendoza|completed',
-  '2026-09-08|Juan Dela Cruz|completed',
-  '2026-09-12|Maria Santos|completed',
-  '2026-09-15|Carlo Bautista|completed',
-  '2026-09-22|Juan Dela Cruz|completed',
-  '2026-09-22|Maria Santos|completed',
-  '2026-09-23|Maria Santos|completed',
-  '2026-09-24|Maria Santos|pending',
-  '2026-09-24|Juan Dela Cruz|completed',
-  '2026-10-05|Andrea Reyes|pending',
-  '2026-10-06|Liza Mendoza|pending',
-  '2026-10-07|Carlo Bautista|approved',
-  '2026-10-08|Andrea Reyes|pending',
-  '2026-10-09|Maria Santos|approved',
-  '2026-10-26|Maria Santos|pending',
-])
-// seed services: name must exist exactly here or it is test junk
-const SEED_SERVICES = new Set(['Consultation', 'Oral Prophylaxis', 'Tooth Filling', 'Tooth Extraction', 'Braces Consultation', 'Fluoride Treatment', 'Whitening'])
-const SEED_PATIENTS = new Set(['Maria Santos', 'Juan Dela Cruz', 'Andrea Reyes', 'Liza Mendoza', 'Carlo Bautista'])
+const SEED_ROWS = new Set(SEED_APPTS.map(([p, s, st, d]) => apptKey(d, p, s, st)))
+const SEED_SVC = new Set(SEED_SERVICES)
+const SEED_PAT = new Set(PATIENTS.map(([n]) => n))
 
 const { data: rows } = await svc.from('appointments')
-  .select('id, requested_date, status, patient_id, patients(full_name), services(name), service_ids')
+  .select('id, requested_date, status, patient_id, patients(full_name), services(name)')
   .order('requested_date')
 let removed = 0
 for (const r of rows ?? []) {
-  const key = `${r.requested_date}|${r.patients?.full_name}|${r.status}`
-  if (!SEED_ROWS.has(key) || !r.services || !SEED_SERVICES.has(r.services.name) || (r.service_ids ?? []).length > 1) {
+  const key = apptKey(r.requested_date, r.patients?.full_name, r.services?.name, r.status)
+  if (!SEED_ROWS.has(key)) {
     await svc.from('payment_proofs').delete().eq('appointment_id', r.id)
-    await svc.from('ehr_attachments').delete().eq('patient_id', r.patient_id).eq('note', 'test')
     await svc.from('appointments').delete().eq('id', r.id)
     removed++
-    console.log('appointment removed:', key, '|', r.services?.name)
+    console.log('appointment removed:', key)
   }
 }
 
-for (const [tbl, col, set] of [
-  ['services', 'name', SEED_SERVICES],
-  ['patients', 'full_name', SEED_PATIENTS],
-]) {
+for (const [tbl, col, set] of [['services', 'name', SEED_SVC], ['patients', 'full_name', SEED_PAT]]) {
   const { data: all } = await svc.from(tbl).select('id, ' + col)
   for (const r of all ?? []) {
     if (!set.has(r[col])) {
@@ -56,13 +33,20 @@ for (const [tbl, col, set] of [
     }
   }
 }
-// stray test users (never seed-auth rows: seed patients' auth users stay)
-const { data: profiles } = await svc.from('profiles').select('id, full_name')
-for (const p of profiles ?? []) {
-  if (!SEED_PATIENTS.has(p.full_name) && p.full_name !== 'Clinic Owner' && p.full_name !== 'Dr. Cruz') {
-    await svc.from('notifications').delete().eq('user_id', p.id)
-  }
+
+// chat + price exceptions are map-scoped too (tests accumulate both)
+const SEED_BODIES = new Set(CHATS.map(([, , b]) => b))
+const { data: msgs } = await svc.from('chat_messages').select('id, body')
+for (const m of msgs ?? []) if (!SEED_BODIES.has(m.body)) { await svc.from('chat_messages').delete().eq('id', m.id); removed++ }
+const SEED_EXC = new Set(EXCEPTIONS.map(([p, s2, pr]) => `${p}|${s2}|${pr}`))
+const { data: excs } = await svc.from('service_prices').select('service_id, patient_id, price, services(name), patients(full_name)')
+for (const e of excs ?? []) {
+  const k = `${e.patients?.full_name}|${e.services?.name}|${e.price}`
+  if (!SEED_EXC.has(k)) { await svc.from('service_prices').delete().eq('service_id', e.service_id).eq('patient_id', e.patient_id); removed++ }
 }
 
 const { count } = await svc.from('appointments').select('*', { count: 'exact', head: true })
-console.log(`cleaned ${removed} appointment(s); state = ${count} appointments (seed map = ${SEED_ROWS.size})`)
+console.log(`cleaned ${removed} appointment(s); state = ${count} (map = ${SEED_ROWS.size})`)
+if (count !== SEED_ROWS.size) {
+  console.log('NOTE: row count differs from map — some map rows may be missing (run seed.mjs), or dupes exist')
+}

@@ -1,3 +1,4 @@
+import Skel from '../../components/Skel'
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/RoleContext'
@@ -41,7 +42,7 @@ export default function OwnerManage() {
     }
   }
 
-  if (!settings) return <p className="px-4 py-10 text-sm text-gray-400">Loading…</p>
+  if (!settings) return <div className="px-4 py-4"><Skel lines={2} h="h-20" /></div>
 
   return (
     <div className="px-4 py-4 space-y-4">
@@ -77,7 +78,7 @@ export default function OwnerManage() {
               const on = settings.open_days.includes(d)
               return (
                 <button key={d} onClick={() => setSettings({ ...settings, open_days: on ? settings.open_days.filter((x) => x !== d) : [...settings.open_days, d] })}
-                        className={'flex-1 rounded-lg border py-2 text-[10px] font-bold ' + (on ? 'border-primary-600 bg-primary-50 text-primary-700' : 'border-gray-200 text-gray-400')}>
+                        className={'flex-1 rounded-lg border py-2 text-[10px] font-bold ' + (on ? 'border-primary-600 bg-primary-50 text-primary-700' : 'border-gray-200 text-gray-500')}>
                   {d.toUpperCase()}
                 </button>
               )
@@ -86,7 +87,7 @@ export default function OwnerManage() {
           <div className="flex gap-2 items-center">
             <input type="time" value={settings.open_time} onChange={(e) => setSettings({ ...settings, open_time: e.target.value })}
                    className="flex-1 h-10 border border-primary-600 bg-primary-50 text-primary-700 rounded-lg px-2 text-sm font-semibold text-center" />
-            <span className="text-gray-400 font-bold">–</span>
+            <span className="text-gray-500 font-bold">–</span>
             <input type="time" value={settings.close_time} onChange={(e) => setSettings({ ...settings, close_time: e.target.value })}
                    className="flex-1 h-10 border border-primary-600 bg-primary-50 text-primary-700 rounded-lg px-2 text-sm font-semibold text-center" />
           </div>
@@ -105,7 +106,7 @@ export default function OwnerManage() {
 
         <div className="space-y-2">
           {services.map((s) => <ServiceCard key={s.id} service={s} navigate={navigate} onDeleted={reloadServices} />)}
-          {!services.length && <div className="bg-white border border-gray-200 rounded-lg px-3.5 py-3 text-sm text-gray-400">No services yet — add one above.</div>}
+          {!services.length && <div className="bg-white border border-gray-200 rounded-lg px-3.5 py-3 text-sm text-gray-500">No services yet — add one above.</div>}
         </div>
       </section>
 
@@ -126,8 +127,8 @@ function AddServiceForm({ onDone }) {
   const [busy, setBusy] = useState(false)
 
   const submit = async (e) => {
-    e.preventDefault()
-    if (!name.trim() || !Number(price)) return setErr('Name and price are required.')
+    e?.preventDefault?.()
+    if (!name.trim() || !(Number(price) > 0)) return setErr('Name and a price above zero are required.')
     setBusy(true)
     try {
       await createService(name.trim(), Number(price), Number(mins) || 30)
@@ -139,7 +140,7 @@ function AddServiceForm({ onDone }) {
   }
 
   return (
-    <form onSubmit={submit} className="bg-primary-50 border border-primary-100 rounded-lg p-3.5 space-y-2.5 mb-2">
+    <div className="bg-primary-50 border border-primary-100 rounded-lg p-3.5 space-y-2.5 mb-2">
       <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Service name"
              className="w-full h-10 border border-gray-200 rounded-lg px-3 text-sm bg-white" />
       <div className="flex gap-2">
@@ -149,8 +150,8 @@ function AddServiceForm({ onDone }) {
                className="w-24 h-10 border border-gray-200 rounded-lg px-3 text-sm bg-white" />
       </div>
       {err && <p className="text-xs text-red-500">{err}</p>}
-      <button disabled={busy} className="w-full h-9 rounded-lg bg-primary-600 text-white text-xs font-semibold">Add Service</button>
-    </form>
+      <button type="button" disabled={busy} onClick={submit} className="w-full h-9 rounded-lg bg-primary-600 text-white text-xs font-semibold">Add Service</button>
+    </div>
   )
 }
 
@@ -176,16 +177,16 @@ function ServiceCard({ service, navigate, onDeleted }) {
           <span className="block mt-1">
             {excCount > 0
               ? <span className="text-[11px] font-bold bg-amber-100 text-amber-700 rounded px-1.5 py-0.5">{excCount} exception{excCount !== 1 ? 's' : ''}</span>
-              : <span className="text-xs text-gray-400">+ Custom price</span>}
+              : <span className="text-xs text-gray-500">+ Custom price</span>}
           </span>
         </span>
         <span className="text-sm font-bold text-gray-900">{peso(service.price)}</span>
-        <svg viewBox="0 0 24 24" className="w-4 h-4 text-gray-400 flex-none" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 6 6 6-6 6" /></svg>
+        <svg viewBox="0 0 24 24" className="w-4 h-4 text-gray-500 flex-none" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 6 6 6-6 6" /></svg>
       </button>
       {confirmDel ? (
         <span className="flex gap-1 flex-none">
           <button onClick={remove} className="text-[11px] font-bold text-red-500 border border-red-200 rounded px-1.5 py-1">Yes</button>
-          <button onClick={() => setConfirmDel(false)} className="text-[11px] text-gray-400 border border-gray-200 rounded px-1.5 py-1">No</button>
+          <button onClick={() => setConfirmDel(false)} className="text-[11px] text-gray-500 border border-gray-200 rounded px-1.5 py-1">No</button>
         </span>
       ) : (
         <button onClick={() => setConfirmDel(true)} aria-label="Delete service" className="text-gray-300 hover:text-red-400 flex-none">

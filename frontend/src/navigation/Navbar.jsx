@@ -4,7 +4,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 
 function TabIcon({ name, active }) {
   return (
-    <svg viewBox="0 0 24 24" className={'w-6 h-6 ' + (active ? 'text-primary-600' : 'text-gray-400')} fill="none"
+    <svg viewBox="0 0 24 24" className={'w-6 h-6 ' + (active ? 'text-primary-600' : 'text-gray-500')} fill="none"
          stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d={ICONS[name]} />
     </svg>
@@ -62,9 +62,9 @@ export default function Navbar({ unreadCount = 0 }) {
         <div className="max-w-md mx-auto flex">
           {links.map((l) => (
             <button key={l.path} onClick={() => navigate(l.path)}
-                    className={'flex-1 flex flex-col items-center gap-0.5 py-2 ' + (l.path === activePath ? 'text-primary-600' : 'text-gray-400')}>
+                    className={'flex-1 flex flex-col items-center gap-0.5 py-2 ' + (l.path === activePath ? 'text-primary-600' : 'text-gray-500')}>
               <TabIcon name={l.icon} active={l.path === activePath} />
-              <span className={'text-[11px] ' + (l.path === activePath ? 'font-semibold text-primary-600' : 'text-gray-400')}>{l.label}</span>
+              <span className={'text-[11px] ' + (l.path === activePath ? 'font-semibold text-primary-600' : 'text-gray-500')}>{l.label}</span>
             </button>
           ))}
         </div>

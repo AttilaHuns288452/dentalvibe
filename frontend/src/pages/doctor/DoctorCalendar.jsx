@@ -1,5 +1,6 @@
+import Skel from '../../components/Skel'
 import { useEffect, useState } from 'react'
-import { listAppointments, setAppointmentStatus } from '../../lib/api'
+import { listAppointments, setAppointmentStatus, getClinicSettings } from '../../lib/api'
 import { fmtTime12 } from '../../lib/format'
 
 // Calendar Day view — Figma frame 29: Day/Week/Month seg control, formatted date
@@ -32,7 +33,7 @@ export default function DoctorCalendar() {
 
   useEffect(() => {
     listAppointments().then(setAppts).catch((e) => setErr(e.message))
-    import('../../lib/api').then(({ getClinicSettings }) => getClinicSettings().then(setSettings).catch(() => {}))
+    getClinicSettings().then(setSettings).catch((e) => setErr(e.message))
   }, [])
 
   const dayAppts = (appts ?? [])
@@ -78,7 +79,7 @@ export default function DoctorCalendar() {
       </div>
 
       {err && <p className="text-xs text-red-500">{err}</p>}
-      {!appts && <p className="text-sm text-gray-400">Loading…</p>}
+      {!appts && <Skel lines={3} h="h-16" />}
 
       <div className="text-sm font-bold text-gray-900">{heading} <span className="text-xs font-medium text-gray-500">· {dayAppts.length} appointment{dayAppts.length !== 1 ? 's' : ''}</span></div>
 
@@ -126,7 +127,7 @@ export default function DoctorCalendar() {
             const items = (appts ?? []).filter((a) => (a.scheduled_at || a.requested_date || '').slice(0, 10) === ds && a.status !== 'cancelled')
             return (
               <div key={ds} className="bg-white border border-gray-200 rounded-lg px-3.5 py-2.5">
-                <div className="text-xs font-bold text-gray-900">{d.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })} <span className="text-gray-400 font-medium">· {items.length} booked</span></div>
+                <div className="text-xs font-bold text-gray-900">{d.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })} <span className="text-gray-500 font-medium">· {items.length} booked</span></div>
                 {items.slice(0, 2).map((a) => (
                   <div key={a.id} className="text-xs text-gray-500 mt-1">{a.patients?.full_name} · {a.services?.name} {a.scheduled_at ? '· ' + fmtTime12(a.scheduled_at.slice(11, 16)) : ''}</div>
                 ))}

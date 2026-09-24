@@ -1,3 +1,5 @@
+import Skel from '../../components/Skel'
+import useEscape from '../../lib/useEscape'
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { listPatients } from '../../lib/api'
@@ -36,12 +38,12 @@ export default function PatientListBase({ title, subtitle }) {
           <h1 className="text-xl font-bold text-gray-900">{title}</h1>
           <p className="text-xs text-gray-500">{subtitle}</p>
         </div>
-        <span className="text-xs text-gray-400">{(patients ?? []).length} total</span>
+        <span className="text-xs text-gray-500">{(patients ?? []).length} total</span>
       </div>
 
       <div className="flex items-center gap-2">
         <div className="relative flex-1">
-          <svg viewBox="0 0 24 24" className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
+          <svg viewBox="0 0 24 24" className="w-4 h-4 text-gray-500 absolute left-3 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name, ID, or phone…"
                  className="w-full h-10 border border-gray-200 rounded-lg pl-9 pr-3 text-sm bg-white" />
         </div>
@@ -51,8 +53,8 @@ export default function PatientListBase({ title, subtitle }) {
       </div>
 
       {err && <p className="text-xs text-red-500">{err}</p>}
-      {!patients && <p className="text-sm text-gray-400">Loading…</p>}
-      {patients && filtered.length === 0 && <p className="text-sm text-gray-400 py-6 text-center">No patients found.</p>}
+      {!patients && <Skel lines={3} h="h-14" />}
+      {patients && filtered.length === 0 && <p className="text-sm text-gray-500 py-6 text-center">No patients found.</p>}
 
       {patients?.length > 0 && (
         <section>
@@ -72,7 +74,7 @@ export default function PatientListBase({ title, subtitle }) {
                       {[a != null ? a : null, p.sex?.[0]?.toUpperCase(), p.patient_code].filter(Boolean).join(' · ') || p.phone || '—'}
                     </span>
                   </span>
-                  <svg viewBox="0 0 24 24" className="w-4 h-4 text-gray-400 flex-none" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 6 6 6-6 6" /></svg>
+                  <svg viewBox="0 0 24 24" className="w-4 h-4 text-gray-500 flex-none" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 6 6 6-6 6" /></svg>
                 </button>
               )
             })}
@@ -114,6 +116,7 @@ function AddPatient({ onClose, onSaved }) {
     onSaved()
   }
 
+  useEscape(onClose)
   return (
     <div role="dialog" aria-modal="true" className="fixed inset-0 z-50 bg-black/40 flex items-end justify-center" onClick={onClose}>
       <form onSubmit={save} onClick={(e) => e.stopPropagation()}

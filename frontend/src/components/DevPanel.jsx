@@ -20,7 +20,7 @@ export default function DevPanel() {
     <div className="fixed left-3 z-[60]" style={{ bottom: 'calc(4.5rem + env(safe-area-inset-bottom))' }}>
       {open && (
         <div className="mb-2 bg-gray-900 text-white rounded-xl p-2 w-56 shadow-xl text-xs space-y-1">
-          <div className="px-1 pb-1 text-[10px] font-bold uppercase tracking-wide text-gray-400">Dev login</div>
+          <div className="px-1 pb-1 text-[10px] font-bold uppercase tracking-wide text-gray-500">Dev login</div>
           {DEV_ACCOUNTS.map((acc) => (
             <button key={acc.role} onClick={() => loginAs(acc)} disabled={!!busy}
                     className="w-full text-left px-2.5 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 disabled:opacity-50">
@@ -29,7 +29,7 @@ export default function DevPanel() {
           ))}
           <div className="px-1 pt-1 text-[10px] text-gray-500">pw: {DEV_PW}</div>
           <button onClick={() => { devLogout(); location.reload() }}
-                  className="w-full text-left px-2.5 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-400">
+                  className="w-full text-left px-2.5 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-500">
             Hide dev tools
           </button>
         </div>

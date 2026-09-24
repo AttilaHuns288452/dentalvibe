@@ -27,7 +27,7 @@ export default function DentistRecord() {
 
   if (!dentist) return (
     <div className="px-4 py-10 text-center">
-      <p className="text-sm text-gray-400">No dentist selected.</p>
+      <p className="text-sm text-gray-500">No dentist selected.</p>
       <button onClick={() => navigate('/owner/staff')} className="mt-3 h-10 px-4 rounded-lg bg-primary-600 text-white text-sm font-semibold">Back to Staff</button>
     </div>
   )
@@ -80,7 +80,7 @@ export default function DentistRecord() {
           ))}
         </div>
         <div className="bg-white border border-gray-200 rounded-lg divide-y divide-gray-100">
-          {rows.length === 0 && <div className="px-3.5 py-4 text-sm text-gray-400">No completed services in this period.</div>}
+          {rows.length === 0 && <div className="px-3.5 py-4 text-sm text-gray-500">No completed services in this period.</div>}
           {rows.map((a) => (
             <div key={a.id} className="px-3.5 py-3">
               <div className="text-sm font-semibold text-gray-900">{a.services?.name ?? 'Service'}{a.services?.duration_minutes ? ` · ${a.services.duration_minutes} min` : ''}</div>

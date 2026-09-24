@@ -39,7 +39,7 @@ export default function ResetPassword() {
           <button disabled={busy} className="w-full h-11 rounded-lg bg-primary-600 text-white text-sm font-semibold disabled:opacity-60">
             {busy ? 'Sending…' : 'Send Reset Link'}
           </button>
-          <p className="text-[11px] text-gray-400 text-center">Tip: reset links expire in 15 minutes — request a new one anytime if it lapses.</p>
+          <p className="text-[11px] text-gray-500 text-center">Tip: reset links expire in 15 minutes — request a new one anytime if it lapses.</p>
         </form>
       ) : (
         <div className="text-center py-8">
@@ -109,9 +109,9 @@ export function ResetConfirm() {
       <input type="password" placeholder="New password" value={pw} onChange={(e) => setPw(e.target.value)}
              className="w-full h-11 border border-gray-200 rounded-lg px-3 text-sm bg-white" />
       <ul className="text-[11px] space-y-1">
-        <li className={rules.len ? 'text-green-600' : 'text-gray-400'}>Password must be at least 8 characters</li>
-        <li className={rules.num ? 'text-green-600' : 'text-gray-400'}>Password must contain 1 number</li>
-        <li className={rules.case ? 'text-green-600' : 'text-gray-400'}>Password must contain 1 uppercase and 1 lowercase</li>
+        <li className={rules.len ? 'text-green-600' : 'text-gray-500'}>Password must be at least 8 characters</li>
+        <li className={rules.num ? 'text-green-600' : 'text-gray-500'}>Password must contain 1 number</li>
+        <li className={rules.case ? 'text-green-600' : 'text-gray-500'}>Password must contain 1 uppercase and 1 lowercase</li>
       </ul>
       <input type="password" placeholder="Confirm password" value={pw2} onChange={(e) => setPw2(e.target.value)}
              className="w-full h-11 border border-gray-200 rounded-lg px-3 text-sm bg-white" />

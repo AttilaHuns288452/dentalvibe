@@ -25,8 +25,8 @@ export default function Home() {
 
   useEffect(() => {
     getClinicSettings().then(setSettings).catch(() => {})
-    if (isStaff) listAppointments().then(setAppts).catch((e) => setErr(e.message))
-    else if (patientRecord?.id) listMyAppointments(patientRecord.id).then(setAppts).catch(() => {})
+    if (isStaff) listAppointments().then(setAppts).catch((e) => setErr(e?.message || "Couldn't load appointments — check your connection."))
+    else if (patientRecord?.id) listMyAppointments(patientRecord.id).then(setAppts).catch((e) => setErr(e?.message || "Couldn't load appointments — check your connection."))
   }, [isStaff])
 
   const now = new Date()
@@ -62,6 +62,7 @@ export default function Home() {
         <h1 className="text-xl font-bold text-gray-900">
           {isStaff ? today : `${greetingWord}, ${(profile?.full_name || '').split(' ')[0]}`}
         </h1>
+        {err && <p className="text-xs text-red-500 mt-1">{err}</p>}
         <p className="text-xs text-gray-500">{isStaff ? hoursLine : 'Welcome back to your dental care portal'}</p>
       </div>
 
@@ -86,7 +87,7 @@ export default function Home() {
           <section>
             <h2 className="text-[11px] font-bold uppercase tracking-wide text-gray-500 mb-1.5">Today's schedule</h2>
             <div className="bg-white border border-gray-200 rounded-lg divide-y divide-gray-100">
-              {schedule.length === 0 && <div className="px-3.5 py-3 text-sm text-gray-400">No appointments today.</div>}
+              {schedule.length === 0 && <div className="px-3.5 py-3 text-sm text-gray-500">No appointments today.</div>}
               {schedule.map((a) => (
                 <div key={a.id} className="flex items-center gap-3 px-3.5 py-2.5">
                   <div className="text-xs font-bold text-gray-900 w-16 flex-none">{a.scheduled_at ? new Date(a.scheduled_at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : 'TBA'}</div>
@@ -105,7 +106,7 @@ export default function Home() {
           <section>
             <h2 className="text-[11px] font-bold uppercase tracking-wide text-gray-500 mb-1.5">Week ahead</h2>
             <div className="bg-white border border-gray-200 rounded-lg divide-y divide-gray-100">
-              {weekAhead.length === 0 && <div className="px-3.5 py-3 text-sm text-gray-400">Nothing scheduled in the next 7 days.</div>}
+              {weekAhead.length === 0 && <div className="px-3.5 py-3 text-sm text-gray-500">Nothing scheduled in the next 7 days.</div>}
               {weekAhead.map((a) => (
                 <div key={a.id} className="flex justify-between items-center px-3.5 py-2.5 text-sm">
                   <span className="text-gray-500 text-xs">{new Date(a.scheduled_at).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })}</span>
@@ -222,7 +223,6 @@ export default function Home() {
           </div>
         </div>
       )}
-      {err && <p className="text-xs text-red-500">{err}</p>}
     </div>
   )
 }

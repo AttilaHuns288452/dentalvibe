@@ -8,7 +8,8 @@ import { listChat, sendChat, subscribeChat, listPatients } from '../../lib/api'
 function StaffPatientPicker({ onPick }) {
   const [patients, setPatients] = useState(null)
   const [q, setQ] = useState('')
-  useEffect(() => { listPatients().then(setPatients).catch(() => setPatients([])) }, [])
+  const [loadErr, setLoadErr] = useState('')
+  useEffect(() => { listPatients().then(setPatients).catch((e) => { setPatients([]); setLoadErr(e?.message || "connection lost") }) }, [])
   const filtered = (patients ?? []).filter((p) => p.full_name?.toLowerCase().includes(q.toLowerCase()))
   return (
     <div className="px-4 py-4 space-y-3">
@@ -23,10 +24,10 @@ function StaffPatientPicker({ onPick }) {
               {(p.full_name || '?').split(' ').map((w) => w[0]).slice(0, 2).join('')}
             </span>
             <span className="flex-1 min-w-0 text-sm font-semibold text-gray-900 truncate">{p.full_name}</span>
-            <svg viewBox="0 0 24 24" className="w-4 h-4 text-gray-400 flex-none" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 6 6 6-6 6" /></svg>
+            <svg viewBox="0 0 24 24" className="w-4 h-4 text-gray-500 flex-none" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 6 6 6-6 6" /></svg>
           </button>
         ))}
-        {patients && filtered.length === 0 && <div className="px-3.5 py-3 text-sm text-gray-400">No patients found.</div>}
+        {patients && filtered.length === 0 && <div className="px-3.5 py-3 text-sm text-gray-500">No patients found.</div>}
       </div>
     </div>
   )
@@ -38,6 +39,7 @@ export default function Chat({ patient }) {
   const [picked, setPicked] = useState(null) // staff picks from inline picker (deep link)
   const active = picked ?? thread
   const me = profile?.role === 'patient' ? 'patient' : 'clinic'
+  const [threadErr, setThreadErr] = useState('')
   const [messages, setMessages] = useState(null)
   const [text, setText] = useState('')
   const [sendErr, setSendErr] = useState('')
@@ -46,7 +48,7 @@ export default function Chat({ patient }) {
   useEffect(() => {
     if (!active?.id) return
     let unsub
-    listChat(active.id).then(setMessages).catch(() => setMessages([]))
+    listChat(active.id).then(setMessages).catch((e) => { setMessages([]); setThreadErr(e?.message || "connection lost") })
     unsub = subscribeChat(active.id, (m) => setMessages((prev) => [...(prev ?? []), m]))
     return unsub
   }, [active?.id])
@@ -80,13 +82,13 @@ export default function Chat({ patient }) {
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2 bg-gray-50">
-        {messages?.length === 0 && <p className="text-center text-xs text-gray-400 py-8">No messages yet — say hi!</p>}
+        {messages?.length === 0 && <p className="text-center text-xs text-gray-500 py-8">No messages yet — say hi!</p>}
         {(messages ?? []).map((m) => {
           const mine = m.sender === me
           return (
             <div key={m.id} className={'max-w-[78%] px-3 py-2 rounded-lg text-sm ' + (mine ? 'ml-auto bg-primary-50 text-gray-800' : 'bg-white border border-gray-200 text-gray-800')}>
               {m.body}
-              <div className={'text-[10px] text-gray-400 mt-1 ' + (mine ? 'text-right' : '')}>
+              <div className={'text-[10px] text-gray-500 mt-1 ' + (mine ? 'text-right' : '')}>
                 {new Date(m.created_at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
               </div>
             </div>

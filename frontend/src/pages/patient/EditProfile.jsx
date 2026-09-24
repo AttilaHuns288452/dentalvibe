@@ -67,7 +67,7 @@ export default function EditProfile({ onDone }) {
           <input value={emg} onChange={(e) => setEmg(e.target.value)} placeholder="Name · +63 918 000 0000"
                  className="mt-1 w-full h-11 border border-gray-200 rounded-lg px-3 text-sm bg-white" />
         </label>
-        <p className="text-[11px] text-gray-400">Name, birthdate, and Patient ID are clinic-managed — ask the front desk to update them.</p>
+        <p className="text-[11px] text-gray-500">Name, birthdate, and Patient ID are clinic-managed — ask the front desk to update them.</p>
         {err && <p className="text-xs text-red-500">{err}</p>}
         <div className="flex gap-2.5">
           <button type="button" onClick={() => history.back()} className="flex-1 h-11 rounded-lg border border-gray-200 text-gray-700 text-sm font-semibold bg-white">Cancel</button>

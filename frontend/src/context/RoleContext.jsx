@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState } from 'react'
+import { createContext, useContext, useEffect, useMemo, useState } from 'react'
 import { getSession, getProfile, getMyPatientRecord, signOut, supabase } from '../lib/api'
 
 // Real Supabase session. Role comes from profiles table (set at signup).
@@ -71,7 +71,10 @@ export function RoleProvider({ children }) {
   }
 
   return (
-    <AuthContext.Provider value={{ session, profile, patientRecord, unreadCount, loading, deactivated, refresh: hydrate, logout }}>
+    <AuthContext.Provider value={useMemo(
+      () => ({ session, profile, patientRecord, unreadCount, loading, deactivated, refresh: hydrate, logout }),
+      [session, profile, patientRecord, unreadCount, loading, deactivated],
+    )}>
       {children}
     </AuthContext.Provider>
   )

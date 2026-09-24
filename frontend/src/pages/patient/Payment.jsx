@@ -84,7 +84,7 @@ export default function Payment() {
           <span className="text-gray-500">{appt.services?.name}</span>
           <span className="font-bold text-gray-900">{peso(appt.price ?? appt.services?.price)}</span>
         </div>
-        <div className="flex justify-between text-xs text-gray-400 mt-1">
+        <div className="flex justify-between text-xs text-gray-500 mt-1">
           <span>Requested: {appt.requested_date}</span>
           <span>Ref: {appt.id.slice(0, 8).toUpperCase()}</span>
         </div>
@@ -123,7 +123,7 @@ export default function Payment() {
           DEV: mock GCash — mark paid now
         </button>
       )}
-      <button onClick={() => navigate('/appointments')} className="w-full h-10 text-xs text-gray-400">Skip for now — pay later</button>
+      <button onClick={() => navigate('/appointments')} className="w-full h-10 text-xs text-gray-500">Skip for now — pay later</button>
     </div>
   )
 }

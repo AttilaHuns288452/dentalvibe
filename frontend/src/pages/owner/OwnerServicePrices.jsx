@@ -1,3 +1,4 @@
+import Skel from '../../components/Skel'
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { listPatients, listPriceExceptions, upsertPriceException, deletePriceException, peso } from '../../lib/api'
@@ -45,7 +46,7 @@ export default function OwnerServicePrices() {
     setTimeout(() => setSaved(false), 1500)
   }
 
-  if (!serviceId) return <p className="px-4 py-10 text-sm text-gray-400">Open this screen from a service in Manage.</p>
+  if (!serviceId) return <p className="px-4 py-10 text-sm text-gray-500">Open this screen from a service in Manage.</p>
 
   const filtered = (patients ?? []).filter((p) => p.full_name?.toLowerCase().includes(q.toLowerCase()))
 
@@ -70,7 +71,7 @@ export default function OwnerServicePrices() {
       <h2 className="text-[11px] font-bold uppercase tracking-wide text-primary-700">{exceptions.length} exception{exceptions.length !== 1 ? 's' : ''} set</h2>
 
       {err && <p className="text-xs text-red-500">{err}</p>}
-      {!patients && <p className="text-sm text-gray-400">Loading…</p>}
+      {!patients && <Skel lines={3} h="h-14" />}
 
       <div className="space-y-2">
         {filtered.map((p) => {
@@ -89,7 +90,7 @@ export default function OwnerServicePrices() {
                 <input type="number" defaultValue={exc.price} onBlur={(e) => setPrice(p, e.target.value)} aria-label="Custom price"
                        className="w-20 h-9 border border-primary-600 rounded-lg px-2 text-sm font-bold text-right bg-white" />
               ) : (
-                <span className="text-xs text-gray-400 w-20 text-right">{peso(base)}</span>
+                <span className="text-xs text-gray-500 w-20 text-right">{peso(base)}</span>
               )}
               <button onClick={() => toggle(p)} aria-label={on ? 'Remove custom price' : 'Set custom price'}
                       className={'w-6 h-6 rounded-full border-2 flex items-center justify-center flex-none ' + (on ? 'border-primary-600 bg-primary-600' : 'border-gray-300')}>
@@ -101,7 +102,7 @@ export default function OwnerServicePrices() {
       </div>
 
       {saved && <p className="text-xs text-green-600 text-center">Saved ✓</p>}
-      <p className="text-[11px] text-gray-400 text-center pr-16 pb-20">Tap the circle to add/remove an exception · edit the price inline</p>
+      <p className="text-[11px] text-gray-500 text-center pr-16 pb-20">Tap the circle to add/remove an exception · edit the price inline</p>
     </div>
   )
 }

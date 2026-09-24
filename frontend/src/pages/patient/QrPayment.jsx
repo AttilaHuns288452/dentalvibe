@@ -178,7 +178,7 @@ export default function QrPayment() {
         <div className="flex justify-between text-sm font-bold text-gray-900 border-t border-gray-100 pt-3">
           <span>Total payment</span><span>{peso(amount)}</span>
         </div>
-        <div className="text-[11px] text-gray-400 mt-1">Ref: {ref} · {svc}</div>
+        <div className="text-[11px] text-gray-500 mt-1">Ref: {ref} · {svc}</div>
         <p className="text-[11px] text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2 mt-2">
           This is your <b>appointment fee</b> — it reserves the slot. Treatment charges are billed separately at the clinic.
         </p>

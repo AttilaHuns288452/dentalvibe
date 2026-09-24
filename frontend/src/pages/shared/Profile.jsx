@@ -10,7 +10,7 @@ export default function Profile() {
   const [visits, setVisits] = useState([])
   useEffect(() => {
     if (patientRecord?.id) listMyAppointments(patientRecord.id)
-      .then((a) => setVisits((a ?? []).filter((x) => x.status === 'completed'))).catch(() => {})
+      .then((a) => setVisits((a ?? []).filter((x) => x.status === 'completed'))).catch((e) => setErr(e?.message || "Couldn't load visit history — check your connection."))
   }, [patientRecord?.id])
   const [phone, setPhone] = useState(patientRecord?.phone || '')
   const [address, setAddress] = useState(patientRecord?.address || '')
@@ -109,11 +109,12 @@ export default function Profile() {
         </div>
       </div>
 
+      {err && <p className="text-xs text-red-500">Couldn't load visit history: {err}</p>}
       {/* visit history (p38) */}
       <section>
         <h2 className="text-[11px] font-bold uppercase tracking-wide text-gray-500 mb-1.5">Visit history</h2>
         <div className="bg-white border border-gray-200 rounded-lg divide-y divide-gray-100">
-          {visits.length === 0 && <div className="px-3.5 py-3 text-sm text-gray-400">No completed visits yet.</div>}
+          {visits.length === 0 && <div className="px-3.5 py-3 text-sm text-gray-500">No completed visits yet.</div>}
           {visits.map((v) => (
             <div key={v.id} className="px-3.5 py-2.5">
               <div className="text-sm font-semibold text-gray-900">{v.services?.name ?? 'Service'}</div>

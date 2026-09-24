@@ -11,7 +11,7 @@ const pickDate = async (pg, daysAhead) => {
   }
   await pg.getByRole('button', { name: String(target.getDate()), exact: true }).click()
 }
-  const BASE = 'https://dentalvibe.vercel.app'
+  const BASE = process.env.QA_BASE || 'https://dentalvibe.vercel.app'
   const b = await chromium.launch()
   const ctx = await b.newContext({ viewport: { width: 390, height: 844 } })
   const pg = await ctx.newPage()

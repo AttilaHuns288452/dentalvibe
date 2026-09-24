@@ -70,26 +70,26 @@ export default function MyAppointments() {
 
       {/* search */}
       <div className="relative">
-        <svg viewBox="0 0 24 24" className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
+        <svg viewBox="0 0 24 24" className="w-4 h-4 text-gray-500 absolute left-3 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search appointments…"
                className="w-full h-10 border border-gray-200 rounded-lg pl-9 pr-3 text-sm bg-white" />
       </div>
 
-      <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-400">{(filtered ?? []).length} appointments</p>
+      <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">{(filtered ?? []).length} appointments</p>
       {err && <p className="text-xs text-red-500">{err}</p>}
-      {appts?.length === 0 && <p className="text-sm text-gray-400 py-8 text-center">No appointments yet — book one from the Book tab.</p>}
+      {appts?.length === 0 && <p className="text-sm text-gray-500 py-8 text-center">No appointments yet — book one from the Book tab.</p>}
       <div className="space-y-2">
         {(filtered ?? []).map((a) => (
           <div key={a.id} className="bg-white border border-gray-200 rounded-lg px-3.5 py-3">
             <button type="button" onClick={() => setOpenId(openId === a.id ? null : a.id)} className="w-full flex items-center gap-2 text-left">
               <div className="flex-1 min-w-0 text-sm font-semibold text-gray-900">{a.services?.name || 'Appointment'}</div>
               <StatusPill status={a.status} />
-              <svg viewBox="0 0 24 24" className={'w-4 h-4 text-gray-400 flex-none transition-transform ' + (openId === a.id ? 'rotate-90' : '')} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 6 6 6-6 6" /></svg>
+              <svg viewBox="0 0 24 24" className={'w-4 h-4 text-gray-500 flex-none transition-transform ' + (openId === a.id ? 'rotate-90' : '')} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 6 6 6-6 6" /></svg>
             </button>
             {openId === a.id && (
               <div className="mt-2 pt-2 border-t border-gray-100 text-xs text-gray-600 space-y-1">
-                <div className="flex justify-between"><span className="text-gray-400">Reference</span><span className="font-semibold">{a.id.slice(0, 8).toUpperCase()}</span></div>
-                <div className="flex justify-between"><span className="text-gray-400">Service fee</span><span className="font-semibold">{peso(a.price ?? a.services?.price)}</span></div>
+                <div className="flex justify-between"><span className="text-gray-500">Reference</span><span className="font-semibold">{a.id.slice(0, 8).toUpperCase()}</span></div>
+                <div className="flex justify-between"><span className="text-gray-500">Service fee</span><span className="font-semibold">{peso(a.price ?? a.services?.price)}</span></div>
                 {a.notes && <div className="italic text-gray-500">"{a.notes}"</div>}
               </div>
             )}
@@ -129,7 +129,7 @@ export default function MyAppointments() {
 
         {/* CLINIC INFORMATION card (Figma p35) */}
         <div className="bg-white border border-gray-200 rounded-lg p-4 mt-4">
-          <div className="text-[11px] font-bold uppercase tracking-wide text-gray-400 mb-2">Clinic information</div>
+          <div className="text-[11px] font-bold uppercase tracking-wide text-gray-500 mb-2">Clinic information</div>
           <div className="flex justify-between text-sm py-1.5 border-t border-gray-100">
             <span className="text-gray-500">Hours</span><span className="font-semibold text-gray-900">Mon - Sat · 8 AM – 5 PM</span>
           </div>

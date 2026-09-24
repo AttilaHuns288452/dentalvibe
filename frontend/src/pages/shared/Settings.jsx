@@ -31,7 +31,7 @@ export default function Settings() {
         email: s?.clinic_email ?? 'dr.joson@dardenal.ph',
         hours: `${fmtTime12(s?.open_time ?? '08:00')} – ${fmtTime12(s?.close_time ?? '17:00')}`,
       })
-    }).catch(() => {})
+    }).catch((e) => setErr(e?.message || "Couldn't load clinic info — check your connection."))
   }, [profile?.full_name, patientRecord?.id])
 
   const initials = (profile?.full_name ?? '?').split(' ').map((w) => w[0]).slice(0, 2).join('')

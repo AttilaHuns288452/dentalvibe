@@ -4,6 +4,13 @@ import { supabase } from '../supabaseClient'
 // ponytail: no React Query/SWR; components fetch on mount, refresh on action.
 
 export { supabase }
+
+// transport failures may resolve { data: null, error: null } — null data is a failed load, not an empty list
+const must = (data, error) => {
+  if (error) throw error
+  if (data === null) throw new Error("Couldn't load — check your connection.")
+  return data
+}
 export const peso = (v) => '₱' + Number(v ?? 0).toLocaleString('en-US')
 
 // ---- auth ----
@@ -14,8 +21,7 @@ export async function getSession() {
 
 export async function signIn(email, password) {
   const { data, error } = await supabase.auth.signInWithPassword({ email, password })
-  if (error) throw error
-  return data
+  return must(data, error)
 }
 
 export async function signUp(email, password, fullName, role, extra = {}) {
@@ -24,8 +30,7 @@ export async function signUp(email, password, fullName, role, extra = {}) {
     password,
     options: { data: { full_name: fullName, role, ...extra } },
   })
-  if (error) throw error
-  return data
+  return must(data, error)
 }
 
 export async function signOut() {
@@ -39,8 +44,7 @@ export async function getProfile(userId) {
     .select('*')
     .eq('id', userId)
     .single()
-  if (error) throw error
-  return data
+  return must(data, error)
 }
 
 export async function getMyPatientRecord(userId) {
@@ -50,21 +54,18 @@ export async function getMyPatientRecord(userId) {
     .select('id, user_id, full_name, email, phone, birthdate, sex, address, emergency_contact, created_at')
     .eq('user_id', userId)
     .maybeSingle()
-  if (error) throw error
-  return data
+  return must(data, error)
 }
 
 // ---- catalog / settings (public read) ----
 export async function listServices() {
   const { data, error } = await supabase.from('services').select('*').order('price')
-  if (error) throw error
-  return data ?? []
+  return must(data, error) ?? []
 }
 
 export async function getClinicSettings() {
   const { data, error } = await supabase.from('clinic_settings').select('*').eq('id', 1).single()
-  if (error) throw error
-  return data
+  return must(data, error)
 }
 
 export async function updateClinicSettings(patch) {
@@ -89,8 +90,7 @@ export async function listPriceExceptions(serviceId) {
     .from('service_prices')
     .select('patient_id, price')
     .eq('service_id', serviceId)
-  if (error) throw error
-  return data ?? []
+  return must(data, error) ?? []
 }
 
 export async function upsertPriceException(serviceId, patientId, price) {
@@ -126,8 +126,7 @@ export async function listPatients() {
     .from('staff_patients')
     .select('*')
     .order('full_name')
-  if (error) throw error
-  return data ?? []
+  return must(data, error) ?? []
 }
 
 // ---- appointments ----
@@ -137,8 +136,7 @@ export async function bookAppointment({ patientId, serviceId, serviceIds, reques
     .insert({ patient_id: patientId, service_id: serviceId, service_ids: serviceIds, requested_date: requestedDate, scheduled_at: scheduledAt, duration_minutes: durationMinutes, notes, price, status: 'pending' })
     .select()
     .single()
-  if (error) throw error
-  return data
+  return must(data, error)
 }
 
 export async function listAppointments() {
@@ -146,8 +144,7 @@ export async function listAppointments() {
     .from('appointments')
     .select('*, patients(full_name), dentists(full_name), services(name, price)')
     .order('created_at', { ascending: false })
-  if (error) throw error
-  return data ?? []
+  return must(data, error) ?? []
 }
 
 export async function listMyAppointments(patientId) {
@@ -156,17 +153,13 @@ export async function listMyAppointments(patientId) {
     .select('*, patients(full_name), dentists(full_name), services(name, price)')
     .eq('patient_id', patientId)
     .order('created_at', { ascending: false })
-  if (error) throw error
-  return data ?? []
+  return must(data, error) ?? []
 }
 
 export async function setAppointmentStatus(id, status, extra = {}) {
-  const { payment_verified, ...rest } = extra
-  const payload = { status, ...rest }
-  if (payment_verified) payload.payment_status = 'verified'
   const { error } = await supabase
     .from('appointments')
-    .update(payload)
+    .update({ status, ...extra })
     .eq('id', id)
   if (error) throw error
 }
@@ -178,8 +171,7 @@ export async function listChat(patientId) {
     .select('*')
     .eq('patient_id', patientId)
     .order('created_at')
-  if (error) throw error
-  return data ?? []
+  return must(data, error) ?? []
 }
 
 export async function sendChat(patientId, sender, body) {

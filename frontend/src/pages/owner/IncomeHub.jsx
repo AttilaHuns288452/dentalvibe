@@ -1,3 +1,4 @@
+import useEscape from '../../lib/useEscape'
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase, peso } from '../../lib/api'
@@ -125,11 +126,11 @@ export default function IncomeHub() {
         {period === 'Custom' && (
           <div className="flex gap-2 items-center text-xs">
             <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} aria-label="From date" className="h-9 px-2 rounded-lg border border-gray-200 bg-white text-xs font-semibold" />
-            <span className="text-gray-400">to</span>
+            <span className="text-gray-500">to</span>
             <input type="date" value={to} onChange={(e) => setTo(e.target.value)} aria-label="To date" className="h-9 px-2 rounded-lg border border-gray-200 bg-white text-xs font-semibold" />
           </div>
         )}
-        <p className="text-[11px] text-gray-400 text-center">{period} totals</p>
+        <p className="text-[11px] text-gray-500 text-center">{period} totals</p>
 
         <div className="bg-white border border-gray-200 rounded-lg p-4">
           <div className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide">Net income</div>
@@ -154,9 +155,9 @@ export default function IncomeHub() {
         <div className="bg-white border border-gray-200 rounded-lg p-4">
           <div className="flex justify-between items-center mb-3">
             <div className="text-sm font-bold text-gray-900">Revenue by procedure</div>
-            <div className="text-[11px] text-gray-400">{period}</div>
+            <div className="text-[11px] text-gray-500">{period}</div>
           </div>
-          {byProc.length === 0 && <p className="text-xs text-gray-400 py-2">No completed visits in this period.</p>}
+          {byProc.length === 0 && <p className="text-xs text-gray-500 py-2">No completed visits in this period.</p>}
           {byProc.map(([name, v]) => (
             <div key={name} className="mb-2.5 last:mb-0">
               <div className="flex justify-between text-xs mb-1"><span className="text-gray-700 font-medium">{name}</span><span className="font-bold text-gray-900">{peso(v)}</span></div>
@@ -169,11 +170,11 @@ export default function IncomeHub() {
 
         <div className="bg-white border border-gray-200 rounded-lg p-4">
           <div className="text-sm font-bold text-gray-900 mb-3">Expenses by category</div>
-          {byExpCat.length === 0 && <p className="text-xs text-gray-400">No expenses recorded in this period.</p>}
+          {byExpCat.length === 0 && <p className="text-xs text-gray-500">No expenses recorded in this period.</p>}
           {byExpCat.map(([name, v, pct]) => (
             <div key={name} className="flex justify-between text-xs py-1.5 border-t border-gray-50">
               <span className="text-gray-700">{name}</span>
-              <span className="font-bold text-gray-900">{peso(v)} <span className="text-gray-400 font-medium">· {pct}%</span></span>
+              <span className="font-bold text-gray-900">{peso(v)} <span className="text-gray-500 font-medium">· {pct}%</span></span>
             </div>
           ))}
         </div>
@@ -184,16 +185,16 @@ export default function IncomeHub() {
         <div className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
             <div className="bg-white border border-gray-200 rounded-lg p-3.5">
-              <div className="text-[10px] font-bold uppercase tracking-wide text-gray-400">Income This Month</div>
+              <div className="text-[10px] font-bold uppercase tracking-wide text-gray-500">Income This Month</div>
               <div className="text-xl font-bold text-gray-900">{peso(pIncome)}</div>
             </div>
             <div className="bg-white border border-gray-200 rounded-lg p-3.5">
-              <div className="text-[10px] font-bold uppercase tracking-wide text-gray-400">Expenses This Month</div>
+              <div className="text-[10px] font-bold uppercase tracking-wide text-gray-500">Expenses This Month</div>
               <div className="text-xl font-bold text-red-500">{peso(pExpenses)}</div>
             </div>
           </div>
           <div className="bg-white border border-gray-200 rounded-lg divide-y divide-gray-100">
-            {(txns ?? []).length === 0 && <div className="px-3.5 py-4 text-sm text-gray-400">No transactions recorded.</div>}
+            {(txns ?? []).length === 0 && <div className="px-3.5 py-4 text-sm text-gray-500">No transactions recorded.</div>}
             {(txns ?? []).map((t) => (
               <div key={t.id} className="flex justify-between items-center px-3.5 py-2.5">
                 <div className="min-w-0">
@@ -214,16 +215,16 @@ export default function IncomeHub() {
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <div className="bg-white border border-gray-200 rounded-lg p-3.5">
-              <div className="text-[10px] font-bold uppercase tracking-wide text-gray-400">Total Income</div>
+              <div className="text-[10px] font-bold uppercase tracking-wide text-gray-500">Total Income</div>
               <div className="text-xl font-bold text-gray-900">{peso(pIncome)}</div>
             </div>
             <div className="bg-white border border-gray-200 rounded-lg p-3.5">
-              <div className="text-[10px] font-bold uppercase tracking-wide text-gray-400">Net Income</div>
+              <div className="text-[10px] font-bold uppercase tracking-wide text-gray-500">Net Income</div>
               <div className="text-xl font-bold text-primary-700">{peso(net)}</div>
             </div>
           </div>
           <div className="bg-white border border-gray-200 rounded-lg p-4">
-            <div className="text-[10px] font-bold uppercase tracking-wide text-gray-400 mb-2">Report contents</div>
+            <div className="text-[10px] font-bold uppercase tracking-wide text-gray-500 mb-2">Report contents</div>
             {[
               ['Net income', peso(net)], ['Total income', peso(pIncome)], ['Total expenses', peso(pExpenses)],
               ['Completed visits', completedCount], ['Average per visit', peso(avg)], ['Period', period],
@@ -234,7 +235,7 @@ export default function IncomeHub() {
             ))}
           </div>
           <div className="bg-white border border-gray-200 rounded-lg p-4 space-y-2.5">
-            <div className="text-[10px] font-bold uppercase tracking-wide text-gray-400">Generate</div>
+            <div className="text-[10px] font-bold uppercase tracking-wide text-gray-500">Generate</div>
             <button onClick={() => exportReport('Monthly')} className="w-full h-11 rounded-lg bg-primary-600 text-white text-sm font-semibold">⬇ Export Monthly Report</button>
             <button onClick={() => exportReport('Annual')} className="w-full h-11 rounded-lg border border-gray-200 text-gray-800 text-sm font-semibold bg-white">⬇ Export Annual Report</button>
           </div>

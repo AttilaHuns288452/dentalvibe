@@ -59,7 +59,7 @@ export default function OwnerIncome() {
       <section>
         <h2 className="text-[11px] font-bold uppercase tracking-wide text-gray-500 mb-1.5">Transactions ({completed.length})</h2>
         <div className="bg-white border border-gray-200 rounded-lg divide-y divide-gray-100">
-          {completed.length === 0 && <div className="px-3.5 py-3 text-sm text-gray-400">No completed appointments yet.</div>}
+          {completed.length === 0 && <div className="px-3.5 py-3 text-sm text-gray-500">No completed appointments yet.</div>}
           {completed.map((a) => (
             <div key={a.id} className="flex justify-between items-center px-3.5 py-2.5">
               <div className="min-w-0">
@@ -91,10 +91,10 @@ export default function OwnerIncome() {
           </form>
         )}
         <div className="bg-white border border-gray-200 rounded-lg divide-y divide-gray-100">
-          {expenses.length === 0 && <div className="px-3.5 py-3 text-sm text-gray-400">No expenses recorded.</div>}
+          {expenses.length === 0 && <div className="px-3.5 py-3 text-sm text-gray-500">No expenses recorded.</div>}
           {expenses.map((e) => (
             <div key={e.id} className="flex justify-between items-center px-3.5 py-2.5 text-sm">
-              <span className="text-gray-700">{e.name} <span className="text-gray-400">· {new Date(e.spent_on).toLocaleDateString([], { month: 'short', day: 'numeric' })}</span></span>
+              <span className="text-gray-700">{e.name} <span className="text-gray-500">· {new Date(e.spent_on).toLocaleDateString([], { month: 'short', day: 'numeric' })}</span></span>
               <span className="flex items-center gap-2">
                 <span className="font-bold text-red-500">−{peso(e.amount)}</span>
                 <button onClick={() => removeExpense(e.id)} aria-label="Delete expense" className="text-gray-300 hover:text-red-400">

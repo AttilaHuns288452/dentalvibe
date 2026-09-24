@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react'
+import Skel from '../../components/Skel'
+import useEscape from '../../lib/useEscape'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { supabase, peso } from '../../lib/api'
 import { printReport } from '../../lib/format'
@@ -40,7 +42,8 @@ export default function PatientEHR() {
   useEffect(() => { load() }, [id])
 
   if (err) return <div className="px-4 py-10 text-center text-sm text-red-500">{err}</div>
-  if (!p) return <div className="px-4 py-10 text-center text-sm text-gray-400">Loading…</div>
+  useEscape(() => setEditInfo(null), !!editInfo)
+  if (!p) return <div className="px-4 py-4"><Skel lines={2} h="h-20" /></div>
 
   const a = age(p.birthdate)
   const initials = (p.full_name || '?').split(' ').map((w) => w[0]).slice(0, 2).join('')
@@ -142,7 +145,7 @@ export default function PatientEHR() {
           <button onClick={() => setNoteEdit(p.medical_note ?? '')} className="text-xs font-semibold text-primary-700 lowercase">edit</button>
         </div>
         <div className="bg-white border border-gray-200 rounded-lg px-3.5 py-3 text-sm text-gray-800">
-          {p.medical_note || <span className="text-gray-400">No medical note yet.</span>}
+          {p.medical_note || <span className="text-gray-500">No medical note yet.</span>}
         </div>
       </section>
 
@@ -150,7 +153,7 @@ export default function PatientEHR() {
       <section>
         <h2 className="text-[11px] font-bold uppercase tracking-wide text-gray-500 mb-1.5">Treatment history</h2>
         <div className="bg-white border border-gray-200 rounded-lg divide-y divide-gray-100">
-          {appts.length === 0 && <div className="px-3.5 py-3 text-sm text-gray-400">No treatments recorded yet.</div>}
+          {appts.length === 0 && <div className="px-3.5 py-3 text-sm text-gray-500">No treatments recorded yet.</div>}
           {appts.map((x) => (
             <div key={x.id} className="px-3.5 py-3">
               <div className="flex items-center justify-between gap-2">
@@ -174,7 +177,7 @@ export default function PatientEHR() {
           <button onClick={() => setAddOpen(true)} className="text-xs font-semibold text-primary-700">+ Add</button>
         </div>
         <div className="bg-white border border-gray-200 rounded-lg divide-y divide-gray-100">
-          {atts.length === 0 && <div className="px-3.5 py-3 text-sm text-gray-400">No attachments yet.</div>}
+          {atts.length === 0 && <div className="px-3.5 py-3 text-sm text-gray-500">No attachments yet.</div>}
           {atts.map((x) => (
             <div key={x.id} className="flex items-center gap-3 px-3.5 py-2.5">
               <span className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center flex-none">
@@ -308,6 +311,7 @@ function AddAttachment({ patient, onClose, onSaved }) {
     }
   }
 
+  useEscape(onClose)
   return (
     <div role="dialog" aria-modal="true" className="fixed inset-0 z-50 bg-black/40 flex items-end justify-center" onClick={onClose}>
       <form onSubmit={(e) => { e.preventDefault(); upload() }} onClick={(e) => e.stopPropagation()}
@@ -332,7 +336,7 @@ function AddAttachment({ patient, onClose, onSaved }) {
 
         <label className="block border-2 border-dashed border-gray-200 rounded-lg bg-white py-6 text-center cursor-pointer">
           <div className="text-sm font-semibold text-gray-800">{file ? file.name : 'Tap to choose file'}</div>
-          <div className="text-[11px] text-gray-400">PNG · JPG · PDF · max 10 MB</div>
+          <div className="text-[11px] text-gray-500">PNG · JPG · PDF · max 10 MB</div>
           <input type="file" accept=".png,.jpg,.jpeg,.pdf" onChange={pick} className="hidden" />
         </label>
 

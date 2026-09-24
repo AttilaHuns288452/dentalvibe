@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
+import Skel from '../../components/Skel'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/RoleContext'
-import { listServices, bookAppointment, peso, getEffectivePrice, supabase } from '../../lib/api'
+import { listServices, bookAppointment, peso, supabase } from '../../lib/api'
 
 // Booking — two focused steps (p36 → p87→121):
 //   1 · Services (search, multi-select, fee notice)   2 · Date & time (calendar grid, fit-checked slots, notes)
@@ -28,16 +29,17 @@ export default function Book() {
   const [busy, setBusy] = useState(false)
 
   useEffect(() => {
-    listServices()
-      .then(async (svcs) => {
-        setServices(svcs)
-        if (!patientRecord?.id) return
-        const entries = await Promise.all(
-          svcs.map(async (s) => [s.id, await getEffectivePrice(patientRecord.id, s.id, s.price)]),
-        )
-        setPrices(Object.fromEntries(entries))
-      })
-      .catch((e) => setErr(e.message))
+    // one catalog query + one exception query (was N+1: an exception query per service)
+    Promise.all([
+      listServices(),
+      patientRecord?.id
+        ? supabase.from('service_prices').select('service_id, price').eq('patient_id', patientRecord.id)
+        : { data: [] },
+    ]).then(async ([svcs, exc]) => {
+      setServices(svcs)
+      const overrides = Object.fromEntries((exc.data ?? []).map((x) => [x.service_id, x.price]))
+      setPrices(Object.fromEntries(svcs.map((s) => [s.id, overrides[s.id] ?? s.price])))
+    }).catch((e) => setErr(e.message))
   }, [patientRecord?.id])
 
   // paid visits for the chosen day (the only things that hold the chair)
@@ -119,7 +121,7 @@ export default function Book() {
           return (
             <span key={n} className="flex items-center gap-1.5">
               <span className={'w-6 h-6 rounded-full flex items-center justify-center ' + (active ? 'bg-primary-700 text-white' : 'bg-primary-100 text-primary-700')}>{n}</span>
-              <span className={active ? 'text-gray-900' : 'text-gray-400'}>{label}</span>
+              <span className={active ? 'text-gray-900' : 'text-gray-500'}>{label}</span>
               {i === 0 && <span className="w-6 border-t border-dashed border-gray-300" />}
             </span>
           )
@@ -132,7 +134,7 @@ export default function Book() {
             <section>
               <h2 className="text-[11px] font-bold uppercase tracking-wide text-gray-500 mb-1.5">Select dental service</h2>
               <div className="relative mb-2">
-                <svg viewBox="0 0 24 24" className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
+                <svg viewBox="0 0 24 24" className="w-4 h-4 text-gray-500 absolute left-3 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
                 <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search services…"
                        className="w-full h-10 border border-gray-200 rounded-lg pl-9 pr-3 text-sm bg-white placeholder:text-gray-500" />
               </div>
@@ -159,7 +161,7 @@ export default function Book() {
                     </button>
                   )
                 })}
-                {!services.length && !err && <div className="bg-white border border-gray-200 rounded-lg px-3.5 py-3 text-sm text-gray-400 animate-pulse">Loading services…</div>}
+                {!services.length && !err && <Skel lines={4} h="h-14" />}
               </div>
             </section>
 
@@ -173,7 +175,7 @@ export default function Book() {
               <div className="bg-white border border-gray-200 rounded-lg divide-y divide-gray-100">
                 {chosen.map((s) => (
                   <div key={s.id} className="flex justify-between px-3.5 py-2 text-sm">
-                    <span className="font-semibold text-gray-900">{s.name} <span className="text-gray-400 font-normal">· {s.duration_minutes} min</span></span>
+                    <span className="font-semibold text-gray-900">{s.name} <span className="text-gray-500 font-normal">· {s.duration_minutes} min</span></span>
                     <span className="text-gray-600 tabular-nums">{peso(prices[s.id] ?? s.price)}</span>
                   </div>
                 ))}
@@ -188,17 +190,17 @@ export default function Book() {
             {date && (
               <section>
                 <h2 className="text-[11px] font-bold uppercase tracking-wide text-gray-500 mb-1.5">
-                  Available time {visitMins > 30 && <span className="text-gray-400 normal-case font-normal">· needs {visitMins} min</span>}
+                  Available time {visitMins > 30 && <span className="text-gray-500 normal-case font-normal">· needs {visitMins} min</span>}
                 </h2>
                 <div className="grid grid-cols-4 gap-2">
                   {SLOTS.map((t) => {
                     const ok = fits(t)
-                    return (t === '13:00' ? <div key="lunch" className="col-span-4 text-[10px] text-gray-400 text-center py-0.5">— Lunch break · 12:00–1:00 —</div> : null) || (
+                    return (t === '13:00' ? <div key="lunch" className="col-span-4 text-[10px] text-gray-500 text-center py-0.5">— Lunch break · 12:00–1:00 —</div> : null) || (
                       <button type="button" key={t} disabled={!ok} onClick={() => setTime(t)}
                               className={'h-10 rounded-lg border text-xs font-semibold ' +
                                 (!ok ? 'border-gray-100 bg-gray-50 text-gray-300'
                                   : time === t ? 'border-primary-600 bg-primary-50 text-primary-700'
-                                  : 'border-gray-200 bg-white text-gray-700')}>
+                                  : 'border-gray-200 bg-white text-gray-700 hover:border-primary-300')}>
                         {fmtSlot(t)}
                       </button>
                     )
@@ -270,7 +272,7 @@ function DateGrid({ date, setDate }) {
         </div>
       </div>
       <div className="bg-white border border-gray-200 rounded-lg p-2">
-        <div className="grid grid-cols-7 gap-1 text-center text-[10px] font-bold text-gray-400 mb-1">
+        <div className="grid grid-cols-7 gap-1 text-center text-[10px] font-bold text-gray-500 mb-1">
           {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((d, i) => <span key={i}>{d}</span>)}
         </div>
         <div className="grid grid-cols-7 gap-1">

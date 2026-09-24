@@ -59,7 +59,7 @@ export default function Login() {
                 <input id="login-pw" type={showPw ? 'text' : 'password'} value={password} onChange={(e) => setPassword(e.target.value)} required
                        className="mt-1 w-full h-11 border border-gray-200 rounded-lg px-3 pr-11 text-sm" placeholder="••••••••" />
                 <button type="button" onClick={() => setShowPw(!showPw)} aria-label={showPw ? 'Hide password' : 'Show password'}
-                        className="absolute right-1 top-1/2 -translate-y-1/2 w-9 h-9 text-gray-400 text-xs font-semibold">
+                        className="absolute right-1 top-1/2 -translate-y-1/2 w-9 h-9 text-gray-500 text-xs font-semibold">
                   {showPw ? 'Hide' : 'Show'}
                 </button>
               </span>
@@ -149,7 +149,7 @@ function RegisterWizard({ onDone, onSwitch }) {
           {STEPS.map((label, i) => (
             <div key={label} className="flex items-center gap-1.5">
               <div className={'w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold ' + (step === i + 1 ? 'bg-primary-700 text-white' : 'bg-primary-100 text-primary-700')}>{i + 1}</div>
-              <span className={'text-[11px] ' + (step === i + 1 ? 'font-bold text-gray-900' : 'text-gray-400')}>{label}</span>
+              <span className={'text-[11px] ' + (step === i + 1 ? 'font-bold text-gray-900' : 'text-gray-500')}>{label}</span>
               {i < 2 && <span className="w-4 border-t border-dashed border-gray-300" />}
             </div>
           ))}
@@ -203,14 +203,14 @@ function RegisterWizard({ onDone, onSwitch }) {
               <span className="relative block">
                 <input id="reg-pw" type={showPw ? 'text' : 'password'} value={f.password} onChange={set('password')} required className="mt-1 w-full h-11 border border-gray-200 rounded-lg px-3 pr-11 text-sm" />
                 <button type="button" onClick={() => setShowPw(!showPw)} aria-label={showPw ? 'Hide password' : 'Show password'}
-                        className="absolute right-1 top-1/2 -translate-y-1/2 w-9 h-9 text-gray-400 text-xs font-semibold">{showPw ? 'Hide' : 'Show'}</button>
+                        className="absolute right-1 top-1/2 -translate-y-1/2 w-9 h-9 text-gray-500 text-xs font-semibold">{showPw ? 'Hide' : 'Show'}</button>
               </span>
             </div>
             {/* p80 password rules */}
             <ul className="text-[11px] space-y-1">
-              <li className={pwRules.len ? 'text-green-600' : 'text-gray-400'}>{pwRules.len ? '✓' : '·'} Password must be at least 8 characters</li>
-              <li className={pwRules.num ? 'text-green-600' : 'text-gray-400'}>{pwRules.num ? '✓' : '·'} Password must contain 1 number</li>
-              <li className={pwRules.case ? 'text-green-600' : 'text-gray-400'}>{pwRules.case ? '✓' : '·'} Password must contain 1 uppercase and 1 lowercase</li>
+              <li className={pwRules.len ? 'text-green-600' : 'text-gray-500'}>{pwRules.len ? '✓' : '·'} Password must be at least 8 characters</li>
+              <li className={pwRules.num ? 'text-green-600' : 'text-gray-500'}>{pwRules.num ? '✓' : '·'} Password must contain 1 number</li>
+              <li className={pwRules.case ? 'text-green-600' : 'text-gray-500'}>{pwRules.case ? '✓' : '·'} Password must contain 1 uppercase and 1 lowercase</li>
             </ul>
           </>
         )}
@@ -231,7 +231,7 @@ function RegisterWizard({ onDone, onSwitch }) {
 
       <p className="text-center text-xs text-gray-500">
         Already have an account?{' '}
-        <button type="button" onClick={onSwitch} className="font-semibold text-primary-700">Log in</button>
+        <button type="button" onClick={onSwitch} className="font-semibold text-primary-700">Sign in</button>
       </p>
     </form>
   )
