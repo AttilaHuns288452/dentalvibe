@@ -141,7 +141,8 @@ import('/home/attila/.hermes/hermes-agent/node_modules/playwright/index.mjs').th
   await shot('10-confirm-dialog')
   check('D8. dialog has No schedule conflicts', (await pg.locator('body').textContent()).includes('No schedule conflicts'))
   await pg.locator('div.fixed button:has-text("Approve")').click(); await pg.waitForTimeout(1800)
-  check('D9. request approved (gone from pending)', !(await pg.locator('main .space-y-2').first().textContent().catch(() => '')).includes('Journey Tester'))
+  const d9txt = (await pg.locator('main').textContent()).split('Approved & history')[0] // pending section only
+  check('D9. request approved (gone from pending)', !d9txt.includes('Journey Tester'))
 
   // patients → EHR
   await pg.goto(BASE + '/doctor/patients', { waitUntil: 'networkidle' }); await pg.waitForTimeout(1200)
