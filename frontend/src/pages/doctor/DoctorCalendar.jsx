@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { listAppointments } from '../../lib/api'
+import { listAppointments, setAppointmentStatus } from '../../lib/api'
 import { fmtTime12 } from '../../lib/format'
 
 // Calendar Day view — Figma frame 29: Day/Week/Month seg control, formatted date
@@ -89,7 +89,17 @@ export default function DoctorCalendar() {
                       <span className={'text-[10px] font-bold px-1.5 py-0.5 rounded capitalize ' + (STATUS_PILL[block.status] || '')}>{block.status}</span>
                     </div>
                     <div className="text-sm font-semibold text-gray-900">{block.patients?.full_name}</div>
-                    <div className="text-xs text-gray-500">{block.services?.name}</div>
+                    <div className="text-xs text-gray-500 flex items-center justify-between">
+                      <span>{block.services?.name}</span>
+                      {block.status === 'approved' && (
+                        <button onClick={async () => {
+                          try {
+                            await setAppointmentStatus(block.id, 'completed')
+                            setAppts((list) => list.map((x) => (x.id === block.id ? { ...x, status: 'completed' } : x)))
+                          } catch (e) { alert(e.message) }
+                        }} className="h-7 px-2.5 rounded-md bg-blue-600 text-white text-[11px] font-semibold">Mark completed</button>
+                      )}
+                    </div>
                   </div>
                 ) : (
                   <div className="flex-1 border border-dashed border-gray-200 rounded-lg px-3 py-2 text-xs text-gray-300 flex items-center">Open slot</div>

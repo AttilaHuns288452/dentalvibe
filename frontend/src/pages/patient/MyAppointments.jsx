@@ -41,9 +41,13 @@ export default function MyAppointments() {
   }
 
   const todayStr = new Date().toISOString().slice(0, 10)
+  const isPast = (a) => {
+    const d = a.scheduled_at ? new Date(a.scheduled_at) : new Date((a.requested_date ?? '') + 'T23:59:59')
+    return ['completed', 'cancelled'].includes(a.status) || d < new Date()
+  }
   const filtered = (appts ?? []).filter((a) => {
-    if (tab === 'Upcoming' && !['pending', 'approved'].includes(a.status)) return false
-    if (tab === 'Past' && !['completed', 'cancelled'].includes(a.status)) return false
+    if (tab === 'Upcoming' && (isPast(a) || !['pending', 'approved'].includes(a.status))) return false
+    if (tab === 'Past' && !isPast(a)) return false
     if (q && !(a.services?.name ?? '').toLowerCase().includes(q.toLowerCase())) return false
     return true
   })
@@ -106,7 +110,7 @@ export default function MyAppointments() {
             {a.status === 'approved' && a.payment_status === 'verified' && (
               <span className="inline-block mt-2 text-[11px] font-bold px-2 py-0.5 rounded bg-green-50 text-green-700">Paid ✓ · slot secured</span>
             )}
-            {a.status === 'completed' && (
+            {(a.status === 'completed' || (a.payment_status === 'verified' && isPast(a))) && (
               <button onClick={() => navigate('/receipt', { state: { appointment: a } })}
                       className="mt-2 h-8 px-3 rounded-lg border border-primary-200 text-primary-700 text-xs font-semibold bg-white">
                 Attach receipt
