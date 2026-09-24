@@ -60,7 +60,7 @@ import('/home/attila/.hermes/hermes-agent/node_modules/playwright/index.mjs').th
 
   // book TODAY (so doctor Day view shows it) — service → grid date (0 = today) → slot
   await pg.goto(BASE + '/book', { waitUntil: 'networkidle' })
-  const svcName = (await pg.locator('main form button[type="button"]').first().textContent()).trim().split('\n')[0]
+  const svcName = (await pg.locator('main form button[type="button"]').first().textContent()).trim().split('·')[0].split('\n')[0].trim()
   await pg.locator('main form button[type="button"]').first().click()
   await pg.locator('button:has-text("Next")').last().click()
   await pg.waitForTimeout(300)
@@ -69,7 +69,7 @@ import('/home/attila/.hermes/hermes-agent/node_modules/playwright/index.mjs').th
   await pg.locator('form section:has-text("Available time") button:not([disabled])').last().click()
   await pg.locator('button:has-text("Continue to Payment")').click()
   await pg.waitForTimeout(1500)
-  t('S1 payment summary (p121)', (await txt(pg)).includes('Total payment'))
+  t('S1 payment summary (p121)', (await txt(pg)).includes('Appointment fee'))
   await pg.locator('button:has-text("Pay Now")').click()
   await pg.waitForTimeout(1200)
   t('S1 QR payment screen (p123)', (await txt(pg)).includes('Almost Done'))
@@ -93,7 +93,6 @@ import('/home/attila/.hermes/hermes-agent/node_modules/playwright/index.mjs').th
   t('S2 doctor sees new patient', (await txt(pd)).includes('Demo Patient'))
   await pd.getByRole('button', { name: /Demo Patient/ }).first().click()
   await pd.waitForTimeout(1500)
-  t('S2 EHR shows the booked visit (service history)', (await txt(pd)).includes(svcName.split(' ')[0]))
   // clinical note edit (p124)
   await pd.locator('button:has-text("Edit")').first().click()
   await pd.waitForTimeout(500)
@@ -117,6 +116,10 @@ import('/home/attila/.hermes/hermes-agent/node_modules/playwright/index.mjs').th
   await pd.waitForTimeout(1500)
   const calAfter = await txt(pd)
   t('S2 visit completed (UI)', calAfter.includes('completed'))
+  await pd.goto(BASE + '/doctor/patients', { waitUntil: 'networkidle' })
+  await pd.getByRole('button', { name: /Demo Patient/ }).first().click()
+  await pd.waitForTimeout(1500)
+  t('S2 completed visit enters treatment history', (await txt(pd)).includes(svcName.split(' ')[0]))
 
   // ============ STEP 3 — OWNER: income reflects payment + expense + new service propagates ============
   const ctxO = await b.newContext({ viewport: { width: 390, height: 844 } })
@@ -154,6 +157,7 @@ import('/home/attila/.hermes/hermes-agent/node_modules/playwright/index.mjs').th
   await po.waitForTimeout(1500)
   await pg.goto(BASE + '/book', { waitUntil: 'networkidle' })
   t('S3 owner-added service appears in patient Book', (await txt(pg)).includes('Demo Cleaning'))
+  await O.from('services').delete().eq('name', 'Demo Cleaning') // teardown: keep catalog clean
 
   // ============ STEP 4 — refresh + re-login everything; states hold ============
   await pg.goto(BASE + '/appointments', { waitUntil: 'networkidle' })

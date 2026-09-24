@@ -134,7 +134,7 @@ export default function Book() {
               <div className="relative mb-2">
                 <svg viewBox="0 0 24 24" className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
                 <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search services…"
-                       className="w-full h-10 border border-gray-200 rounded-lg pl-9 pr-3 text-sm bg-white" />
+                       className="w-full h-10 border border-gray-200 rounded-lg pl-9 pr-3 text-sm bg-white placeholder:text-gray-500" />
               </div>
               <div className="space-y-2">
                 {services.filter((s) => s.name.toLowerCase().includes(q.toLowerCase())).map((s) => {
@@ -144,7 +144,7 @@ export default function Book() {
                   return (
                     <button type="button" key={s.id} onClick={() => setPicked((p) => (on ? p.filter((x) => x !== s.id) : [...p, s.id]))}
                             aria-pressed={on}
-                            className={'w-full text-left bg-white border rounded-lg px-3.5 py-2.5 flex items-center gap-3 ' + (on ? 'border-primary-600 bg-primary-50' : 'border-gray-200')}>
+                            className={'w-full text-left border rounded-lg px-3.5 py-2.5 flex items-center gap-3 ' + (on ? 'border-primary-600 bg-primary-100 ring-1 ring-primary-300' : 'bg-white border-gray-200')}>
                       <span className={'w-5 h-5 rounded border-2 flex-none flex items-center justify-center ' + (on ? 'border-primary-600 bg-primary-600 text-white' : 'border-gray-300')}>
                         {on && <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M5 13l4 4L19 7" /></svg>}
                       </span>
@@ -155,7 +155,7 @@ export default function Book() {
                           {custom && <span className="ml-1 text-primary-700 font-semibold">· your price</span>}
                         </span>
                       </span>
-                      <span className="text-sm font-bold text-gray-900">{peso(shown)}</span>
+                      <span className="text-sm font-bold text-gray-900 tabular-nums">{peso(shown)}</span>
                     </button>
                   )
                 })}
@@ -163,9 +163,6 @@ export default function Book() {
               </div>
             </section>
 
-            <p className="text-[11px] text-gray-500 bg-primary-50 border border-primary-100 rounded-lg px-3 py-2">
-              The appointment fee reserves your slot — it is <b>not</b> your full treatment bill. Any treatment is charged at the clinic.
-            </p>
           </>
         )}
 
@@ -177,11 +174,11 @@ export default function Book() {
                 {chosen.map((s) => (
                   <div key={s.id} className="flex justify-between px-3.5 py-2 text-sm">
                     <span className="font-semibold text-gray-900">{s.name} <span className="text-gray-400 font-normal">· {s.duration_minutes} min</span></span>
-                    <span className="text-gray-600">{peso(prices[s.id] ?? s.price)}</span>
+                    <span className="text-gray-600 tabular-nums">{peso(prices[s.id] ?? s.price)}</span>
                   </div>
                 ))}
                 <div className="flex justify-between px-3.5 py-2 text-sm font-bold">
-                  <span>Total appointment fee</span><span className="text-primary-700">{peso(total)}</span>
+                  <span>Total appointment fee</span><span className="text-primary-700 tabular-nums">{peso(total)}</span>
                 </div>
               </div>
             </section>
@@ -196,10 +193,10 @@ export default function Book() {
                 <div className="grid grid-cols-4 gap-2">
                   {SLOTS.map((t) => {
                     const ok = fits(t)
-                    return (
+                    return (t === '13:00' ? <div key="lunch" className="col-span-4 text-[10px] text-gray-400 text-center py-0.5">— Lunch break · 12:00–1:00 —</div> : null) || (
                       <button type="button" key={t} disabled={!ok} onClick={() => setTime(t)}
                               className={'h-10 rounded-lg border text-xs font-semibold ' +
-                                (!ok ? 'border-gray-100 bg-gray-50 text-gray-300 line-through'
+                                (!ok ? 'border-gray-100 bg-gray-50 text-gray-300'
                                   : time === t ? 'border-primary-600 bg-primary-50 text-primary-700'
                                   : 'border-gray-200 bg-white text-gray-700')}>
                         {fmtSlot(t)}
@@ -218,7 +215,14 @@ export default function Book() {
           </>
         )}
 
-        {err && <p className="text-xs text-red-500">{err}</p>}
+        {/* sticky action bar — fee context + CTA always in reach */}
+        <div className="sticky bottom-0 -mx-4 px-4 pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] bg-gradient-to-t from-gray-50 via-gray-50 to-transparent">
+        {step === 1 && (
+          <p className="text-[11px] text-gray-500 bg-primary-50 border border-primary-100 rounded-lg px-3 py-2 mb-2">
+            The appointment fee reserves your slot — it is <b>not</b> your full treatment bill. Any treatment is charged at the clinic.
+          </p>
+        )}
+        {err && <p className="text-xs text-red-500 mb-2">{err}</p>}
         <div className="flex gap-2.5">
           {step === 2 && (
             <button type="button" onClick={() => setStep(1)} className="w-[35%] h-12 rounded-lg border border-gray-200 bg-white text-gray-700 font-semibold">‹ Back</button>
@@ -233,6 +237,7 @@ export default function Book() {
               {busy ? 'Submitting…' : `Continue to Payment${total ? ' · ' + peso(total) : ''}`}
             </button>
           )}
+        </div>
         </div>
       </form>
     </div>
@@ -272,10 +277,10 @@ function DateGrid({ date, setDate }) {
           {cells.map((d, i) => {
             if (!d) return <span key={'e' + i} />
             const sel = date === iso(d)
-            const isToday = iso(d) === new Date().toISOString().slice(0, 10)
+            const t0 = new Date(); const isToday = iso(d) === `${t0.getFullYear()}-${String(t0.getMonth() + 1).padStart(2, '0')}-${String(t0.getDate()).padStart(2, '0')}`
             return (
               <button type="button" key={d} disabled={past(d)} onClick={() => setDate(iso(d))}
-                      className={'h-9 rounded-lg text-sm font-semibold ' +
+                      className={'h-11 rounded-lg text-sm font-semibold ' +
                         (past(d) ? 'text-gray-300'
                           : sel ? 'bg-primary-600 text-white'
                           : 'text-gray-700 hover:bg-primary-50 ' + (isToday ? 'ring-1 ring-primary-400' : ''))}>
