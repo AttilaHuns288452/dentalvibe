@@ -25,6 +25,7 @@ import EditProfile from './pages/patient/EditProfile'
 import Notifications from './pages/shared/Notifications'
 import AccountSecurity from './pages/shared/AccountSecurity'
 import Settings from './pages/shared/Settings'
+import DevPanel from './components/DevPanel'
 import DentistRecord from './pages/shared/DentistRecord'
 import ResetPassword, { ResetConfirm } from './pages/shared/ResetPassword'
 import Placeholder from './pages/Placeholder'
@@ -91,10 +92,8 @@ function Shell() {
   const { session, profile, loading, pendingCount, deactivated, logout } = useAuth()
   if (import.meta.env.DEV) window.__auth = { session: !!session, profile, loading }
 
-  if (loading) {
-    return <div className="min-h-screen flex items-center justify-center text-sm text-gray-400">Loading…</div>
-  }
-  if (!session || !profile) return <Login />
+  if (loading) return <><DevPanel /><div className="max-w-md mx-auto min-h-screen flex items-center justify-center text-sm text-gray-400">Loading…</div></>
+  if (!session || !profile) return <><DevPanel /><Login /></>
   if (deactivated) return (
     <div className="max-w-md mx-auto min-h-screen flex flex-col items-center justify-center gap-4 px-6 text-center">
       <h1 className="text-lg font-bold text-gray-900">Account deactivated</h1>
@@ -107,6 +106,7 @@ function Shell() {
     <>
       <div className="max-w-md mx-auto bg-gray-50 min-h-screen shadow-sm">
         <Navbar pendingCount={pendingCount} />
+        <DevPanel />
         <main className="pb-28">
           <Routes />
         </main>

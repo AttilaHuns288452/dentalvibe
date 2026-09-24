@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
+import { isDev, mockPay } from '../../lib/dev'
+import { supabase } from '../../supabaseClient'
 import { peso } from '../../lib/api'
 
 // Booking payment flow (p121→123): confirm summary → QR with 15:00 countdown →
@@ -182,6 +184,12 @@ export default function QrPayment() {
         <button onClick={() => navigate('/pay', { state: { appointment: appt } })} className="w-full h-11 mt-2 rounded-lg bg-primary-600 text-white text-sm font-semibold">
           I've paid — upload proof
         </button>
+        {isDev() && (
+          <button onClick={async () => { try { await mockPay(supabase, appt.id); navigate('/book/success', { state: { appointment: appt } }) } catch (ex) { alert(ex.message) } }}
+                  className="w-full h-10 mt-2 rounded-lg border-2 border-dashed border-gray-800 text-gray-800 text-xs font-bold">
+            DEV: mock GCash — mark paid now
+          </button>
+        )}
         {err && <p className="text-xs text-red-500 mt-2">{err}</p>}
       </div>
     </div>

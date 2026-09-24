@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { supabase } from '../../supabaseClient'
+import { isDev, mockPay } from '../../lib/dev'
 import { peso } from '../../lib/format'
 
 // Payment secures the slot instantly (video: "the slot is secured the moment payment lands").
@@ -116,6 +117,12 @@ export default function Payment() {
               className="w-full h-12 rounded-lg bg-primary-600 text-white font-semibold disabled:opacity-50">
         {busy ? 'Processing…' : 'Confirm Payment'}
       </button>
+      {isDev() && (
+        <button onClick={async () => { setBusy(true); try { await mockPay(supabase, appt.id); setDone(true) } catch (ex) { setErr(ex.message) } finally { setBusy(false) } }}
+                className="w-full h-10 rounded-lg border-2 border-dashed border-gray-800 text-gray-800 text-xs font-bold">
+          DEV: mock GCash — mark paid now
+        </button>
+      )}
       <button onClick={() => navigate('/appointments')} className="w-full h-10 text-xs text-gray-400">Skip for now — pay later</button>
     </div>
   )
