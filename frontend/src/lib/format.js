@@ -17,8 +17,14 @@ export const dayNum = (offset = 0) => {
 
 // ponytail: PDF export = browser print dialog (Save as PDF). No jsPDF dep needed.
 export function printReport(title, lines) {
-  const w = window.open('', '_blank', 'width=480,height=720')
-  if (!w) return
+  let w = window.open('', '_blank', 'width=480,height=720')
+  if (!w) {
+    // popup-blocked fallback: hidden iframe print
+    const ifr = document.createElement('iframe')
+    ifr.style.display = 'none'
+    document.body.appendChild(ifr)
+    w = ifr.contentWindow
+  }
   w.document.write(`<!doctype html><title>${title}</title><style>body{font:13px/1.5 system-ui;padding:24px;color:#17242b}h1{font-size:16px}pre{white-space:pre-wrap;font:12px/1.6 system-ui}</style><h1>${title}</h1><pre>${lines.join('\n')}</pre>`)
   w.document.close()
   w.focus()

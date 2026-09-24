@@ -27,7 +27,7 @@ export default function PatientEHR() {
   const [err, setErr] = useState('')
 
   const load = async () => {
-    const { data: pat, error } = await supabase.from('patients').select('*').eq('id', id).single()
+    const { data: pat, error } = await supabase.from('staff_patients').select('*').eq('id', id).single()
     if (error) return setErr(error.message)
     setP(pat)
     const { data: a } = await supabase.from('appointments')

@@ -8,6 +8,55 @@ import { listServices, bookAppointment, peso, getEffectivePrice, supabase } from
 // A PAID appointment holds its slot; unpaid bookings hold nothing (video: "the slot is secured
 // the moment payment lands").
 
+// Month-grid date picker (Figma p87: month header + day grid)
+function DateGrid({ date, setDate }) {
+  const today = new Date(); today.setHours(0, 0, 0, 0)
+  const [month, setMonth] = useState(() => new Date(today.getFullYear(), today.getMonth(), 1))
+  const monthName = month.toLocaleDateString('en-PH', { month: 'long', year: 'numeric' })
+  const firstDay = month.getDay()
+  const days = new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate()
+  const cells = [...Array(firstDay).fill(null), ...Array.from({ length: days }, (_, i) => i + 1)]
+  const iso = (d) => `${month.getFullYear()}-${String(month.getMonth() + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`
+  const past = (d) => new Date(`${iso(d)}T00:00:00`) < today
+  const atEdge = (dir) => dir < 0
+    ? month <= new Date(today.getFullYear(), today.getMonth(), 1)
+    : month >= new Date(today.getFullYear(), today.getMonth() + 2, 1)
+  return (
+    <section>
+      <div className="flex items-center justify-between mb-1.5">
+        <h2 className="text-[11px] font-bold uppercase tracking-wide text-gray-500">Preferred date</h2>
+        <div className="flex items-center gap-2">
+          <button type="button" aria-label="Previous month" disabled={atEdge(-1)} onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() - 1, 1))}
+                  className="w-7 h-7 rounded border border-gray-200 bg-white text-gray-500 disabled:opacity-40">‹</button>
+          <span className="text-sm font-bold text-gray-900 w-36 text-center">{monthName}</span>
+          <button type="button" aria-label="Next month" disabled={atEdge(1)} onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() + 1, 1))}
+                  className="w-7 h-7 rounded border border-gray-200 bg-white text-gray-500 disabled:opacity-40">›</button>
+        </div>
+      </div>
+      <div className="bg-white border border-gray-200 rounded-lg p-2">
+        <div className="grid grid-cols-7 gap-1 text-center text-[10px] font-bold text-gray-400 mb-1">
+          {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => <span key={i}>{d}</span>)}
+        </div>
+        <div className="grid grid-cols-7 gap-1">
+          {cells.map((d, i) => {
+            if (!d) return <span key={'e' + i} />
+            const sel = date === iso(d)
+            return (
+              <button type="button" key={d} disabled={past(d)} onClick={() => setDate(iso(d))}
+                      className={'h-9 rounded-lg text-sm font-semibold ' +
+                        (past(d) ? 'text-gray-300'
+                          : sel ? 'bg-primary-600 text-white'
+                          : 'text-gray-700 hover:bg-primary-50')}>
+                {d}
+              </button>
+            )
+          })}
+        </div>
+      </div>
+    </section>
+  )
+}
+
 const SLOTS = ['08:00', '08:30', '09:00', '09:30', '10:00', '10:30', '11:00', '11:30',
   '13:00', '13:30', '14:00', '14:30', '15:00', '15:30', '16:00', '16:30']
 
@@ -70,7 +119,10 @@ export default function Book() {
       })
       navigate('/book/confirm', { state: { appointment: { ...appt, services: { name: services.find((s) => s.id === serviceId)?.name } } } })
     } catch (ex) {
-      setErr(ex.message === 'duplicate key value violates unique constraint "ux_appt_paid_slot"' ? 'That slot was just taken — pick another time.' : ex.message)
+      setErr(/ux_appt_paid_slot/.test(ex.message) ? 'That slot was just taken — pick another time.'
+        : /ux_appt_patient_date/.test(ex.message) ? 'You already have a booking that day.'
+        : /price does not match/.test(ex.message) ? 'Price changed — reload and try again.'
+        : ex.message)
     } finally {
       setBusy(false)
     }
@@ -109,11 +161,7 @@ export default function Book() {
           </div>
         </section>
 
-        <label className="block">
-          <span className="text-xs font-medium text-gray-500">Preferred date</span>
-          <input type="date" value={date} min={new Date().toISOString().slice(0, 10)} onChange={(e) => setDate(e.target.value)}
-                 className="mt-1 w-full h-11 border border-gray-200 rounded-lg px-3 text-sm bg-white" />
-        </label>
+        <DateGrid date={date} setDate={setDate} />
 
         {date && (
           <section>

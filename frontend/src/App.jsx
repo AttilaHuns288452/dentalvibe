@@ -88,13 +88,20 @@ function Routes() {
 }
 
 function Shell() {
-  const { session, profile, loading, pendingCount } = useAuth()
+  const { session, profile, loading, pendingCount, deactivated, logout } = useAuth()
   if (import.meta.env.DEV) window.__auth = { session: !!session, profile, loading }
 
   if (loading) {
     return <div className="min-h-screen flex items-center justify-center text-sm text-gray-400">Loading…</div>
   }
   if (!session || !profile) return <Login />
+  if (deactivated) return (
+    <div className="max-w-md mx-auto min-h-screen flex flex-col items-center justify-center gap-4 px-6 text-center">
+      <h1 className="text-lg font-bold text-gray-900">Account deactivated</h1>
+      <p className="text-sm text-gray-500">Your clinic access has been turned off. Contact the clinic owner.</p>
+      <button onClick={logout} className="h-11 px-6 rounded-lg bg-primary-600 text-white text-sm font-semibold">Sign Out</button>
+    </div>
+  )
 
   return (
     <>

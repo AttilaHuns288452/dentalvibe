@@ -53,7 +53,7 @@ export default function Payment() {
       if (error) throw error
       setDone(true)
     } catch (ex) {
-      setErr(ex.message)
+      setErr(/ux_appt_patient_date|duplicate key/.test(ex.message) ? 'You already have a booking that day.' : ex.message)
       setBusy(false)
     }
   }

@@ -44,9 +44,10 @@ export async function getProfile(userId) {
 }
 
 export async function getMyPatientRecord(userId) {
+  // patient-safe columns only — medical_note/patient_code are staff-only at the column level
   const { data, error } = await supabase
     .from('patients')
-    .select('*')
+    .select('id, user_id, full_name, email, phone, birthdate, sex, address, emergency_contact, created_at')
     .eq('user_id', userId)
     .maybeSingle()
   if (error) throw error
@@ -122,7 +123,7 @@ export async function getEffectivePrice(patientId, serviceId, basePrice) {
 // ---- patients (staff) ----
 export async function listPatients() {
   const { data, error } = await supabase
-    .from('patients')
+    .from('staff_patients')
     .select('*')
     .order('full_name')
   if (error) throw error

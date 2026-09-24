@@ -2,6 +2,9 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase, peso } from '../../lib/api'
 import { printReport } from '../../lib/format'
+// ponytail: transactions ledger = walk-in/counter entries only; appointment income
+// derives from paid appointments at query time (no FK by design — double-entry only if
+// someone logs an appointment payment manually; the form hint below prevents that)
 
 // Income hub with 3 segments (p65/111/118): Analytics · Transactions · Reports
 const PERIODS = ['Monthly', 'Yearly', 'All time']
@@ -39,13 +42,13 @@ export default function IncomeHub() {
     return true
   }
   const pIncome = useMemo(() => (txns ?? []).filter((t) => t.type === 'income' && inPeriod(t.entry_date)).reduce((s, t) => s + Number(t.amount), 0)
-    + appts.filter((a) => inPeriod(a.scheduled_at ?? new Date())).reduce((s, a) => s + Number(a.price ?? 0), 0), [txns, appts, period])
+    + appts.filter((a) => inPeriod(a.scheduled_at ?? a.requested_date)).reduce((s, a) => s + Number(a.price ?? 0), 0), [txns, appts, period])
   const pExpenses = useMemo(() => (txns ?? []).filter((t) => t.type === 'expense' && inPeriod(t.entry_date)).reduce((s, t) => s + Number(t.amount), 0), [txns, period])
   const net = pIncome - pExpenses
 
   const byProc = useMemo(() => {
     const counts = {}
-    appts.filter((a) => inPeriod(a.scheduled_at ?? new Date())).forEach((a) => {
+    appts.filter((a) => inPeriod(a.scheduled_at ?? a.requested_date)).forEach((a) => {
       const name = a.services?.name ?? 'Other'
       counts[name] = (counts[name] ?? 0) + Number(a.price ?? 0)
     })
@@ -61,7 +64,7 @@ export default function IncomeHub() {
     return Object.entries(counts).sort((a, b) => b[1] - a[1]).map(([k, v]) => [k, v, Math.round((v / tot) * 100)])
   }, [txns, period])
 
-  const completedCount = appts.filter((a) => inPeriod(a.scheduled_at ?? new Date())).length
+  const completedCount = appts.filter((a) => inPeriod(a.scheduled_at ?? a.requested_date)).length
   const patientCount = new Set(appts.map((a) => a.patients?.full_name)).size
   const avg = completedCount ? Math.round(pIncome / completedCount) : 0
 

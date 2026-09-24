@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState } from 'react'
-import { getSession, getProfile, getMyPatientRecord, listAppointments, signOut } from '../lib/api'
+import { getSession, getProfile, getMyPatientRecord, listAppointments, signOut, supabase } from '../lib/api'
 
 // Real Supabase session. Role comes from profiles table (set at signup).
 // Staff accounts are provisioned by the clinic owner, not public signup.
@@ -18,6 +18,7 @@ export function RoleProvider({ children }) {
   const [patientRecord, setPatientRecord] = useState(null)
   const [pendingCount, setPendingCount] = useState(0)
   const [loading, setLoading] = useState(true)
+  const [deactivated, setDeactivated] = useState(false)
 
   const hydrate = async () => {
     const s = await getSession()
@@ -36,6 +37,12 @@ export function RoleProvider({ children }) {
     } catch {
       setProfile(null)
       return
+    }
+    // BUG-005 fix: dentists.active is authorization, not decoration
+    setDeactivated(false)
+    if (p?.role === 'doctor' || p?.role === 'owner') {
+      const { data: d } = await supabase.from('dentists').select('active').eq('email', s.user.email).limit(1)
+      if (d?.[0]?.active === false) setDeactivated(true)
     }
     try {
       if (p?.role === 'patient') {
@@ -68,7 +75,7 @@ export function RoleProvider({ children }) {
   }
 
   return (
-    <AuthContext.Provider value={{ session, profile, patientRecord, pendingCount, loading, refresh: hydrate, logout }}>
+    <AuthContext.Provider value={{ session, profile, patientRecord, pendingCount, loading, deactivated, refresh: hydrate, logout }}>
       {children}
     </AuthContext.Provider>
   )
