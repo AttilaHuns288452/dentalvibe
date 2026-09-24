@@ -11,12 +11,11 @@ const STATUS_PILL = {
   cancelled: 'bg-red-100 text-red-600',
 }
 
-function StatusPill({ status, payment }) {
-  const map = { ...STATUS_PILL, submitted: 'bg-sky-100 text-sky-700', unpaid: 'bg-gray-100 text-gray-600' }
-  const label = payment && status === 'pending' ? (payment === 'submitted' ? 'Verifying payment' : 'Unpaid') : status
-  return <span className={`text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full ${map[label] ?? map.pending}`}>{label}</span>
+const STATUS_LABEL = { pending: 'Unpaid', approved: 'Confirmed', completed: 'Completed', cancelled: 'Cancelled' }
+function StatusPill({ status }) {
+  return <span className={`text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full ${STATUS_PILL[status] ?? 'bg-gray-100 text-gray-600'}`}>{STATUS_LABEL[status] ?? status}</span>
 }
-const PAY_LABEL = { unpaid: 'Unpaid', submitted: 'Verifying payment', verified: 'Paid ✓' }
+const PAY_LABEL = { unpaid: 'Unpaid', verified: 'Paid ✓' }
 
 export default function MyAppointments() {
   const { patientRecord, refresh } = useAuth()
@@ -79,7 +78,7 @@ export default function MyAppointments() {
           <div key={a.id} className="bg-white border border-gray-200 rounded-lg px-3.5 py-3">
             <div className="flex items-center gap-2">
               <div className="flex-1 min-w-0 text-sm font-semibold text-gray-900">{a.services?.name || 'Appointment'}</div>
-              <StatusPill status={a.status} payment={a.payment_status} />
+              <StatusPill status={a.status} />
               <svg viewBox="0 0 24 24" className="w-4 h-4 text-gray-400 flex-none" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 6 6 6-6 6" /></svg>
             </div>
             <div className="text-xs text-gray-500 mt-1">
@@ -101,11 +100,11 @@ export default function MyAppointments() {
                     Pay now
                   </button>
                 )}
-                <button onClick={() => cancel(a.id)} className="ml-auto text-xs font-semibold text-red-500">Cancel request</button>
+                <button onClick={() => cancel(a.id)} className="ml-auto text-xs font-semibold text-red-500">Cancel booking</button>
               </div>
             )}
             {a.status === 'approved' && a.payment_status === 'verified' && (
-              <span className="inline-block mt-2 text-[11px] font-bold px-2 py-0.5 rounded bg-green-50 text-green-700">Payment verified ✓</span>
+              <span className="inline-block mt-2 text-[11px] font-bold px-2 py-0.5 rounded bg-green-50 text-green-700">Paid ✓ · slot secured</span>
             )}
             {a.status === 'completed' && (
               <button onClick={() => navigate('/receipt', { state: { appointment: a } })}

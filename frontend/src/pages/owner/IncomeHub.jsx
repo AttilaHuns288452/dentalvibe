@@ -22,7 +22,7 @@ export default function IncomeHub() {
   const load = () => {
     supabase.from('transactions').select('*').order('entry_date', { ascending: false })
       .then(({ data, error }) => (error ? setErr(error.message) : setTxns(data ?? [])))
-    supabase.from('appointments').select('id, status, price, scheduled_at, services(name), patients(full_name)').eq('status', 'completed')
+    supabase.from('appointments').select('id, status, price, scheduled_at, services(name), patients(full_name)').eq('payment_status', 'verified').neq('status', 'cancelled')
       .then(({ data }) => setAppts(data ?? []))
   }
   useEffect(load, [])

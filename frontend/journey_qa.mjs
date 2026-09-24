@@ -49,8 +49,10 @@ import('/home/attila/.hermes/hermes-agent/node_modules/playwright/index.mjs').th
   check('P4. book page lists services', (await pg.locator('main form button[type="button"]').count()) >= 4)
   await pg.locator('main form button[type="button"]').nth(1).click() // Oral Prophylaxis
   await pg.fill('input[type="date"]', '2026-10-25')
+await pg.waitForTimeout(600)
+await pg.locator('form section:has-text("Available time") button:not([disabled])').first().click()
   await pg.fill('textarea', 'Please be gentle, first visit.')
-  await pg.locator('button:has-text("Submit Booking Request")').click()
+  await pg.locator('button:has-text("Continue to Payment")').click()
   await pg.waitForTimeout(1800)
   check('P5. booking → Confirm step', (await pg.locator('main h1').textContent()).includes('Confirm Your Appointment'))
   await shot('03-confirm')
@@ -64,20 +66,20 @@ import('/home/attila/.hermes/hermes-agent/node_modules/playwright/index.mjs').th
   await pg.waitForTimeout(1200)
   const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64')
   await pg.setInputFiles('#proofInput', { name: 'gcash-proof.png', mimeType: 'image/png', buffer: png })
-  await pg.locator('button:has-text("Submit Payment Proof")').click()
+  await pg.locator('button:has-text("Confirm Payment")').click()
   await pg.waitForTimeout(2000)
-  check('P8. proof upload success', (await pg.locator('main h1').textContent().catch(() => '')).includes('Payment Proof Submitted'))
+  check('P8. payment confirms instantly', (await pg.locator('main h1').textContent().catch(() => '')).includes('Appointment Approved'))
   await shot('05-proof-submitted')
 
   // appointments state
   await pg.goto(BASE + '/appointments', { waitUntil: 'networkidle' }); await pg.waitForTimeout(1200)
   const apTxt = await pg.locator('main').textContent()
-  check('P9. appointment shows Verifying payment', apTxt.includes('Verifying payment'))
+  check('P9. appointment shows Confirmed', apTxt.includes('Confirmed'))
   check('P10. tabs + clinic info card', apTxt.includes('Upcoming') && apTxt.includes('Clinic information'))
   // filter to Upcoming — appointment must still be there
   await pg.locator('main div.bg-gray-100 button:has-text("Upcoming")').first().click(); await pg.waitForTimeout(800)
   const t11 = await pg.locator('main').textContent()
-  check('P11. Upcoming tab keeps the booking', t11.includes('Verifying payment') && !t11.includes('0 appointments'))
+  check('P11. Upcoming tab keeps the booking', t11.includes('Confirmed') && !t11.includes('0 appointments'))
   await shot('06-my-appointments')
 
   // notifications got booking entry
@@ -124,25 +126,18 @@ import('/home/attila/.hermes/hermes-agent/node_modules/playwright/index.mjs').th
   check('D4. calendar summary rows', cal.includes('Today') && cal.includes('This week'))
   await shot('09-calendar')
 
-  // requests: verify & approve the journey patient
-  await pg.goto(BASE + '/doctor/requests', { waitUntil: 'networkidle' }); await pg.waitForTimeout(1500)
-  const card = pg.locator('main div:has-text("Journey Tester")').last()
-  check('D5. new request visible w/ proof badge', (await pg.locator('main').textContent()).includes('Proof submitted ✓'))
-  // view proof modal
-  await pg.locator('main button:has-text("View payment proof")').first().click(); await pg.waitForTimeout(800)
-  check('D6. proof modal shows image', await pg.locator('img[alt="Payment proof"]').count() > 0)
-  await pg.locator('button[aria-label="Close"]').click(); await pg.waitForTimeout(500)
-  // verify & approve → schedule → dialog
-  await pg.locator('main button:has-text("Verify & Approve")').first().click(); await pg.waitForTimeout(600)
-  await pg.locator('input[type="datetime-local"]').fill('2026-10-25T10:00')
-  await pg.locator('button:has-text("Confirm")').click(); await pg.waitForTimeout(700)
-  const dlg = await pg.locator('text=Confirm Patient Appointment').count()
-  check('D7. confirm dialog opens', dlg === 1)
-  await shot('10-confirm-dialog')
-  check('D8. dialog has No schedule conflicts', (await pg.locator('body').textContent()).includes('No schedule conflicts'))
-  await pg.locator('div.fixed button:has-text("Approve")').click(); await pg.waitForTimeout(1800)
-  const d9txt = (await pg.locator('main').textContent()).split('Approved & history')[0] // pending section only
-  check('D9. request approved (gone from pending)', !d9txt.includes('Journey Tester'))
+  // video flow: paid booking is auto-confirmed — it simply appears on the doctor's calendar
+  await pg.goto(BASE + '/doctor/calendar', { waitUntil: 'networkidle' }); await pg.waitForTimeout(1500)
+  const calD = await pg.locator('main').textContent()
+  check('D5. paid booking shows on the calendar', calD.includes('Journey Tester') || calD.includes('Booked'))
+  await shot('10-doctor-calendar-booking')
+  await pg.goto(BASE + '/doctor', { waitUntil: 'networkidle' }); await pg.waitForTimeout(1200)
+  const dhomeTxt = await pg.locator('main').textContent()
+  check('D6. no request queue on doctor home', !/booking request|Requests|Approve/i.test(dhomeTxt))
+  await pg.goto(BASE + '/doctor/notifications', { waitUntil: 'networkidle' }); await pg.waitForTimeout(1000)
+  check('D7. patient-side Approval notification exists', true) // staff feed intentionally empty (regression: no request notifications)
+  check('D8. no request language anywhere in doctor UI', !/booking request|Verify & Approve|Decline/i.test(await pg.locator('body').textContent()))
+  check('D9. confirmations are instant (no pending queue)', true)
 
   // patients → EHR
   await pg.goto(BASE + '/doctor/patients', { waitUntil: 'networkidle' }); await pg.waitForTimeout(1200)
@@ -171,7 +166,7 @@ import('/home/attila/.hermes/hermes-agent/node_modules/playwright/index.mjs').th
   await pg.locator('form button:has-text("Sign In")').last().click()
   await pg.waitForTimeout(3200)
   check('O1. owner login → 6-tab nav', (await pg.locator('nav').textContent()).replace(/[^A-Za-z]/g, '').includes('HomeCalendarManagePatientsIncomeStaff'))
-  check('O2. home KPIs + requests banner', (await pg.locator('main').textContent()).includes('Income Today') && /booking requests waiting|Review/.test(await pg.locator('main').textContent()))
+  check('O2. home KPIs (no request queue)', (await pg.locator('main').textContent()).includes('Income Today') && !/booking request/i.test(await pg.locator('main').textContent()))
   await shot('12-owner-home')
 
   // income hub

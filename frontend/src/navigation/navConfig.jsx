@@ -31,7 +31,7 @@ export const NAV_BY_ROLE = {
     { label: 'Home', path: '/doctor', icon: 'home' },
     { label: 'Calendar', path: '/doctor/calendar', icon: 'cal' },
     { label: 'Patients', path: '/doctor/patients', icon: 'users' },
-    { label: 'Profile', path: '/doctor/profile', icon: 'user' },
+    { label: 'Messages', path: '/doctor/messages', icon: 'chat' },
   ],
   // Owner — Home·Calendar·Manage·Patients·Income·Staff (new navbar, no Requests tab)
   [ROLES.OWNER]: [

@@ -106,7 +106,7 @@ export default function PatientEHR() {
           </span>
         </span>
         <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-green-100 text-green-700 flex items-center gap-1 flex-none">
-          <span className="w-1.5 h-1.5 rounded-full bg-green-500" /> Approved
+          <span className="w-1.5 h-1.5 rounded-full bg-green-500" /> Confirmed
         </span>
         <button onClick={() => setEditInfo({ ...p })} aria-label="Edit patient info"
                 className="w-8 h-8 rounded-lg border border-gray-200 bg-white text-gray-500 flex items-center justify-center flex-none">

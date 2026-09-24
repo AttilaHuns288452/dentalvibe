@@ -3,8 +3,8 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { supabase } from '../../supabaseClient'
 import { peso } from '../../lib/format'
 
-// Payment-before-confirmation: patient uploads payment proof after booking.
-// Appointment stays pending until the clinic verifies the proof.
+// Payment secures the slot instantly (video: "the slot is secured the moment payment lands").
+// No verification queue — proof in, appointment confirmed.
 
 export default function Payment() {
   const { state } = useLocation()
@@ -64,8 +64,8 @@ export default function Payment() {
         <div className="w-16 h-16 mx-auto rounded-full bg-primary-50 text-primary-600 flex items-center justify-center">
           <svg viewBox="0 0 24 24" className="w-8 h-8" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m5 12 5 5L20 7" /></svg>
         </div>
-        <h1 className="text-lg font-bold text-gray-900 mt-3">Payment Proof Submitted</h1>
-        <p className="text-xs text-gray-500 mt-1">The clinic will verify your payment. Your appointment will be confirmed once verified.</p>
+        <h1 className="text-lg font-bold text-gray-900 mt-3">Appointment Approved</h1>
+        <p className="text-xs text-gray-500 mt-1">Payment recorded — your slot is secured and the appointment is confirmed.</p>
         <button onClick={() => navigate('/appointments')} className="mt-4 h-10 px-4 rounded-lg bg-primary-600 text-white text-sm font-semibold">My Appointments</button>
       </div>
     )
@@ -75,7 +75,7 @@ export default function Payment() {
     <div className="px-4 py-4 space-y-4">
       <div>
         <h1 className="text-xl font-bold text-gray-900">Payment</h1>
-        <p className="text-xs text-gray-500">Upload proof to confirm your booking</p>
+        <p className="text-xs text-gray-500">Pay and confirm — instantly</p>
       </div>
 
       <div className="bg-white border border-gray-200 rounded-lg p-4">
@@ -90,7 +90,7 @@ export default function Payment() {
       </div>
 
       <div className="bg-amber-50 border border-amber-100 rounded-lg p-3.5 text-xs text-amber-800">
-        <b>GCash / Bank transfer</b> — pay the exact amount, then upload a screenshot of your receipt below. The clinic verifies it before confirming your appointment.
+        <b>GCash / Bank transfer</b> — pay the exact amount, then upload a screenshot of your receipt below. Your appointment is confirmed the moment your payment lands.
       </div>
 
       <label className="block">
@@ -114,7 +114,7 @@ export default function Payment() {
       {err && <p className="text-xs text-red-500">{err}</p>}
       <button onClick={submit} disabled={busy || !file}
               className="w-full h-12 rounded-lg bg-primary-600 text-white font-semibold disabled:opacity-50">
-        {busy ? 'Uploading…' : 'Submit Payment Proof'}
+        {busy ? 'Processing…' : 'Confirm Payment'}
       </button>
       <button onClick={() => navigate('/appointments')} className="w-full h-10 text-xs text-gray-400">Skip for now — pay later</button>
     </div>

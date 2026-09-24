@@ -7,7 +7,6 @@ import Book from './pages/patient/Book'
 import MyAppointments from './pages/patient/MyAppointments'
 import Chat from './pages/shared/Chat'
 import Profile from './pages/shared/Profile'
-import Requests from './pages/doctor/Requests'
 import DoctorCalendar from './pages/doctor/DoctorCalendar'
 import DoctorPatients from './pages/doctor/DoctorPatients'
 import StaffMessages from './pages/doctor/Messages'
@@ -59,7 +58,6 @@ function Routes() {
     case '/notifications': return <Notifications roleBase="" />
     case '/doctor': return <Home />
     case '/doctor/calendar': return <DoctorCalendar />
-    case '/doctor/requests': return <Requests />
     case '/doctor/patients': return <DoctorPatients />
     case '/doctor/patients/ehr': return <PatientEHR />
     case '/doctor/messages': return <StaffMessages />
@@ -68,7 +66,6 @@ function Routes() {
     case '/doctor/settings': return <Settings />
     case '/owner': return <Home />
     case '/owner/calendar': return <DoctorCalendar />
-    case '/owner/requests': return <Requests />
     case '/owner/patients': return <OwnerPatients />
     case '/owner/patients/ehr': return <PatientEHR />
     case '/owner/messages': return <StaffMessages />

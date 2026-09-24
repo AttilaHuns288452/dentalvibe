@@ -5,8 +5,8 @@ import { listAppointments, listMyAppointments, getClinicSettings, peso, setAppoi
 import { fmtTime12 } from '../lib/format'
 
 // Owner/Doctor home — Figma frame 48: date + hours header, KPI cards
-// (Appointments · Pending · Income Today), TODAY'S SCHEDULE with status pills,
-// booking-requests banner, WEEK AHEAD, View full calendar button.
+// (Appointments · This week · Income Today), TODAY'S SCHEDULE with status pills,
+// WEEK AHEAD, View full calendar button.
 
 const STATUS_PILL = {
   approved: 'bg-green-100 text-green-700',
@@ -36,7 +36,6 @@ export default function Home() {
     ? `Clinic hours today: ${fmtTime12(settings.open_time)} – ${fmtTime12(settings.close_time)}`
     : 'Clinic hours today: 8:00 AM – 5:00 PM'
 
-  const pending = (appts ?? []).filter((a) => a.status === 'pending')
   const approved = (appts ?? []).filter((a) => a.status === 'approved')
   const todayStr = new Date().toISOString().slice(0, 10)
   const todays = approved.filter((a) => (a.scheduled_at || '').slice(0, 10) === todayStr)
@@ -74,8 +73,8 @@ export default function Home() {
               <div className="text-xl font-bold text-gray-900">{approved.length}</div>
             </div>
             <div className="bg-white border border-gray-200 rounded-lg px-3 py-2.5">
-              <div className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">Pending</div>
-              <div className="text-xl font-bold text-gray-900">{pending.length}</div>
+              <div className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">This week</div>
+              <div className="text-xl font-bold text-gray-900">{weekAhead.length}</div>
             </div>
             <div className="bg-white border border-gray-200 rounded-lg px-3 py-2.5">
               <div className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">Income Today</div>
@@ -101,21 +100,6 @@ export default function Home() {
             </div>
           </section>
 
-          {/* booking requests banner (Figma: after schedule) */}
-          {pending.length > 0 && (
-            <Link to={profile.role === 'owner' ? '/owner/requests' : '/doctor/requests'} className="block bg-white border border-gray-200 rounded-lg p-3.5">
-              <div className="flex items-center gap-3">
-                <span className="w-10 h-10 rounded-lg bg-amber-100 text-amber-600 flex items-center justify-center flex-none">
-                  <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 8-3 8h18s-3-1-3-8M10.3 21a1.9 1.9 0 0 0 3.4 0" /></svg>
-                </span>
-                <span className="flex-1 min-w-0">
-                  <span className="block text-sm font-semibold text-gray-900">{pending.length} booking request{pending.length !== 1 ? 's' : ''} waiting</span>
-                  <span className="block text-xs text-gray-500">Review and assign times in Requests</span>
-                </span>
-                <span className="h-8 px-3 rounded-lg bg-primary-600 text-white text-xs font-semibold flex items-center flex-none">Review</span>
-              </div>
-            </Link>
-          )}
 
           {/* WEEK AHEAD (Figma) */}
           <section>
@@ -167,7 +151,7 @@ export default function Home() {
                   <span className="text-xs text-green-700">
                     <b>Upcoming Appointment</b> — Your {upcoming.services?.name} on{' '}
                     {d.toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}
-                    {upcoming.scheduled_at ? ` · ${fmtTime12(upcoming.scheduled_at.slice(11, 16))}` : ''} is {isApproved ? 'confirmed' : 'pending confirmation'}.
+                    {upcoming.scheduled_at ? ` · ${fmtTime12(upcoming.scheduled_at.slice(11, 16))}` : ''} — {isApproved ? 'confirmed' : 'pay to confirm your slot'}.
                   </span>
                 </div>
                 <section>
