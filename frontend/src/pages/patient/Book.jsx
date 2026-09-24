@@ -216,7 +216,7 @@ export default function Book() {
         )}
 
         {/* sticky action bar — fee context + CTA always in reach */}
-        <div className="sticky bottom-0 -mx-4 px-4 pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] bg-gradient-to-t from-gray-50 via-gray-50 to-transparent">
+        <div className="sticky -mx-4 px-4 pt-2 pb-2 bottom-[calc(4.25rem+env(safe-area-inset-bottom))] bg-gradient-to-t from-gray-50 via-gray-50 to-transparent">
         {step === 1 && (
           <p className="text-[11px] text-gray-500 bg-primary-50 border border-primary-100 rounded-lg px-3 py-2 mb-2">
             The appointment fee reserves your slot — it is <b>not</b> your full treatment bill. Any treatment is charged at the clinic.
