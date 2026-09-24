@@ -45,6 +45,9 @@ export default function OwnerManage() {
 
   return (
     <div className="px-4 py-4 space-y-4">
+      <button onClick={() => navigate('/owner')} aria-label="Back" className="w-9 h-9 rounded-lg bg-white border border-gray-200 flex items-center justify-center text-gray-600">
+        <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 12H5M11 18l-6-6 6-6" /></svg>
+      </button>
       <div>
         <h1 className="text-xl font-bold text-gray-900">Manage</h1>
         <p className="text-xs text-gray-500">Clinic setup · hours &amp; pricing</p>

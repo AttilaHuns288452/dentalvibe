@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../../supabaseClient'
+import { createClient } from '@supabase/supabase-js'
 import { useAuth } from '../../context/RoleContext'
+import { useNavigate } from 'react-router-dom'
 
 // Staff (Figma p44/68): count label, ADD NEW DENTIST card, CLINIC TEAM rows
 // (Owner badge + You badge + email + chevron), DEACTIVATED section w/ Remove.
@@ -8,6 +10,7 @@ import { useAuth } from '../../context/RoleContext'
 
 export default function OwnerStaff() {
   const { profile } = useAuth()
+  const navigate = useNavigate()
   const [dentists, setDentists] = useState(null)
   const [err, setErr] = useState('')
   const [adding, setAdding] = useState(false)
@@ -38,7 +41,7 @@ export default function OwnerStaff() {
   }
 
   const Row = ({ d }) => (
-    <div className="flex items-center gap-3 px-3.5 py-3">
+    <button onClick={() => navigate('/owner/staff/dentist', { state: { dentist: d } })} className="w-full flex items-center gap-3 px-3.5 py-3 text-left">
       <span className="w-10 h-10 rounded-full bg-primary-50 text-primary-700 text-xs font-bold flex items-center justify-center flex-none">
         {(d.full_name || '?').split(' ').map((w) => w[0]).slice(0, 2).join('')}
       </span>
@@ -55,7 +58,7 @@ export default function OwnerStaff() {
         <span className="block text-xs text-gray-500 mt-0.5">{d.email}</span>
       </span>
       <svg viewBox="0 0 24 24" className="w-4 h-4 text-gray-400 flex-none" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 6 6 6-6 6" /></svg>
-    </div>
+    </button>
   )
 
   return (
@@ -153,9 +156,18 @@ function AddDentist({ onCreated }) {
     if (!/^\S+@\S+\.\S+$/.test(email)) return setErr('Enter a valid email address.')
     setBusy(true)
     const pw = tempPw()
-    const { error } = await supabase.auth.signUp({ email, password: pw, options: { data: { full_name: name.trim(), role: 'doctor' } } })
+    // isolated client so the owner's session is untouched (signUp auto-switches session)
+    const anon = createClient(import.meta.env.VITE_SUPABASE_URL, import.meta.env.VITE_SUPABASE_ANON_KEY,
+      { auth: { persistSession: false, autoRefreshToken: false, storage: {} } })
+    const { data, error } = await anon.auth.signUp({ email, password: pw, options: { data: { full_name: name.trim() } } })
     if (error) { setBusy(false); return setErr(error.message) }
-    await supabase.auth.signOut()
+    // promote to dentist + roster row; drop the auto-created patient placeholder
+    const uid = data.user?.id
+    if (uid) {
+      await supabase.from('profiles').update({ role: 'doctor', full_name: name.trim() }).eq('id', uid)
+      await supabase.from('patients').delete().eq('user_id', uid)
+    }
+    await supabase.from('dentists').upsert({ full_name: name.trim(), email, role: 'doctor', active: true }, { onConflict: 'email' })
     setBusy(false)
     onCreated({ email, tempPw: pw })
   }

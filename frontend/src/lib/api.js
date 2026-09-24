@@ -18,11 +18,11 @@ export async function signIn(email, password) {
   return data
 }
 
-export async function signUp(email, password, fullName, role) {
+export async function signUp(email, password, fullName, role, extra = {}) {
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
-    options: { data: { full_name: fullName, role } },
+    options: { data: { full_name: fullName, role, ...extra } },
   })
   if (error) throw error
   return data

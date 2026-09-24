@@ -76,7 +76,7 @@ export default function Chat({ patient }) {
     <div className="flex flex-col h-[calc(100vh-9.5rem)]">
       <div className="bg-white border-b border-gray-200 px-4 py-3">
         <h1 className="text-base font-bold text-gray-900">{active.full_name || 'DentalVibe'}</h1>
-        <p className="text-[11px] text-primary-600">online</p>
+        <p className="text-[11px] text-primary-600">Mon – Sat · 8 AM – 5 PM</p>
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2 bg-gray-50">

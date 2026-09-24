@@ -27,7 +27,7 @@ export default function Settings() {
     })
     getClinicSettings().then((s) => {
       setClinic({
-        name: 'D.A.R. Dental Clinic',
+        name: s?.clinic_name || 'D.A.R. Dental Clinic',
         email: s?.clinic_email ?? 'dr.joson@dardenal.ph',
         hours: `${fmtTime12(s?.open_time ?? '08:00')} – ${fmtTime12(s?.close_time ?? '17:00')}`,
       })
@@ -50,9 +50,18 @@ export default function Settings() {
 
   const saveClinic = async () => {
     setErr(''); setSavedC(false); setBusy(true)
-    // clinic_settings: single-row upsert (id=1 pattern per getClinicSettings)
+    // parse 'Mon – Sat : 8:00 AM – 5:00 PM' style hours field into open/close times
+    const m = clinic.hours.match(/(\d{1,2}:\d{2})\s*(AM|PM)?.*[–-].*(\d{1,2}:\d{2})\s*(AM|PM)?/i)
+    const to24 = (t, ap) => {
+      if (!t) return null
+      let [h, mi] = t.split(':').map(Number)
+      if (ap === 'PM' && h < 12) h += 12
+      if (ap === 'AM' && h === 12) h = 0
+      return `${String(h).padStart(2, '0')}:${String(mi).padStart(2, '0')}`
+    }
+    const payload = { clinic_name: clinic.name, clinic_email: clinic.email }
+    if (m) { payload.open_time = to24(m[1], (m[2] || '').toUpperCase()); payload.close_time = to24(m[3], (m[4] || '').toUpperCase()) }
     const { data: cur } = await supabase.from('clinic_settings').select('id').limit(1)
-    const payload = { clinic_email: clinic.email }
     if (cur?.[0]) await supabase.from('clinic_settings').update(payload).eq('id', cur[0].id)
     else await supabase.from('clinic_settings').insert(payload)
     setBusy(false)

@@ -30,7 +30,12 @@ export default function Notifications({ roleBase = '' }) {
 
   useEffect(() => {
     supabase.from('notifications').select('*').order('created_at', { ascending: false }).limit(50)
-      .then(({ data, error }) => (error ? setErr(error.message) : setItems(data ?? [])))
+      .then(({ data, error }) => {
+        if (error) return setErr(error.message)
+        setItems(data ?? [])
+        // opening the feed marks everything read
+        supabase.from('notifications').update({ read: true }).eq('read', false)
+      })
   }, [])
 
   const today = (items ?? []).filter((n) => new Date(n.created_at).toDateString() === new Date().toDateString())

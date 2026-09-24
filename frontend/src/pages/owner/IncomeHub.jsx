@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase, peso } from '../../lib/api'
+import { printReport } from '../../lib/format'
 
 // Income hub with 3 segments (p65/111/118): Analytics · Transactions · Reports
 const PERIODS = ['Monthly', 'Yearly', 'All time']
@@ -72,12 +73,7 @@ export default function IncomeHub() {
       'By procedure:', ...byProc.map(([n, v]) => `  ${n}: ${peso(v)}`), '',
       'Expenses by category:', ...byExpCat.map(([n, v, pct]) => `  ${n}: ${peso(v)} (${pct}%)`),
     ]
-    const blob = new Blob([lines.join('\n')], { type: 'text/plain' })
-    const a = document.createElement('a')
-    a.href = URL.createObjectURL(blob)
-    a.download = `report-${which.toLowerCase()}-${new Date().toISOString().slice(0, 10)}.txt`
-    a.click()
-    URL.revokeObjectURL(a.href)
+    printReport(`D.A.R. Dental Clinic — ${which} Report`, lines)
   }
 
   const maxProc = Math.max(1, ...byProc.map(([, v]) => v))
@@ -85,10 +81,16 @@ export default function IncomeHub() {
   return (
     <div className="px-4 py-4 space-y-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-bold text-gray-900">Income</h1>
-        <button onClick={() => setAdding((v) => !v)} className="h-9 px-3.5 rounded-lg bg-primary-600 text-white text-xs font-semibold">
-          {adding ? 'Close' : '+ Add Transaction'}
-        </button>
+        <h1 className="text-xl font-bold text-gray-900">Income Analytics</h1>
+        <div className="flex gap-2">
+          <button onClick={() => exportReport(period)} aria-label="Export report"
+                  className="w-9 h-9 rounded-lg border border-gray-200 bg-white text-gray-600 flex items-center justify-center">
+            <svg viewBox="0 0 24 24" className="w-4.5 h-4.5 w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3v12m0 0 4-4m-4 4-4-4M4 21h16" /></svg>
+          </button>
+          <button onClick={() => setAdding((v) => !v)} className="h-9 px-3.5 rounded-lg bg-primary-600 text-white text-xs font-semibold">
+            {adding ? 'Close' : '+ Add Transaction'}
+          </button>
+        </div>
       </div>
 
       {/* segment tabs */}

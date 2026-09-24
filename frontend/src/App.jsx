@@ -26,6 +26,7 @@ import EditProfile from './pages/patient/EditProfile'
 import Notifications from './pages/shared/Notifications'
 import AccountSecurity from './pages/shared/AccountSecurity'
 import Settings from './pages/shared/Settings'
+import DentistRecord from './pages/shared/DentistRecord'
 import ResetPassword, { ResetConfirm } from './pages/shared/ResetPassword'
 import Placeholder from './pages/Placeholder'
 import { BrowserRouter, Navigate, useLocation } from 'react-router-dom'
@@ -79,6 +80,7 @@ function Routes() {
     case '/owner/income': return <IncomeHub />
     case '/owner/income/legacy': return <OwnerIncome />
     case '/owner/staff': return <OwnerStaff />
+    case '/owner/staff/dentist': return <DentistRecord />
     case '/pay': return <Payment />
     case '/pay/qr': return <QrPayment />
     case '/receipt': return <Receipt />

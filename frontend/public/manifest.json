@@ -1,0 +1,24 @@
+{
+  "name": "D.A.R. Dental Clinic — Appointment & Record System",
+  "short_name": "D.A.R. Dental",
+  "description": "Book appointments, message your clinic, and manage patient records.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#F9FAFB",
+  "theme_color": "#0D9488",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-maskable.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ]
+}

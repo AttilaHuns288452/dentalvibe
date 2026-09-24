@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { supabase, peso } from '../../lib/api'
+import { printReport } from '../../lib/format'
 import { useAuth } from '../../context/RoleContext'
 
 // Patient Record / EHR (Figma p64/98/124): identity card, contact & emergency,
@@ -21,6 +22,7 @@ export default function PatientEHR() {
   const [appts, setAppts] = useState([])
   const [atts, setAtts] = useState([])
   const [noteEdit, setNoteEdit] = useState(null) // {text}
+  const [editInfo, setEditInfo] = useState(null) // patient form copy
   const [addOpen, setAddOpen] = useState(false)
   const [err, setErr] = useState('')
 
@@ -43,6 +45,17 @@ export default function PatientEHR() {
   const a = age(p.birthdate)
   const initials = (p.full_name || '?').split(' ').map((w) => w[0]).slice(0, 2).join('')
 
+  const saveInfo = async () => {
+    const { error } = await supabase.from('patients').update({
+      full_name: editInfo.full_name, birthdate: editInfo.birthdate || null, sex: editInfo.sex || null,
+      phone: editInfo.phone || null, email: editInfo.email || null,
+      emergency_contact: editInfo.emergency_contact || null, medical_note: editInfo.medical_note || null,
+    }).eq('id', p.id)
+    if (error) return setErr(error.message)
+    setP(editInfo)
+    setEditInfo(null)
+  }
+
   const saveNote = async () => {
     const { error } = await supabase.from('patients').update({ medical_note: noteEdit }).eq('id', p.id)
     if (error) return setErr(error.message)
@@ -51,6 +64,10 @@ export default function PatientEHR() {
   }
 
   const exportEHR = () => {
+    printReport(`EHR — ${p.full_name} (${p.patient_code ?? '—'})`, exportLines())
+  }
+
+  const exportLines = () => {
     const lines = [
       'D.A.R. Dental Clinic — Patient Record (EHR)',
       `Generated: ${new Date().toLocaleString()}`, '',
@@ -64,12 +81,7 @@ export default function PatientEHR() {
       '', 'ATTACHMENTS',
       ...atts.map((x) => `  ${x.filename} — ${x.category} · ${fmt(x.created_at)} · ${x.file_size ?? '—'}`),
     ]
-    const blob = new Blob([lines.join('\n')], { type: 'text/plain' })
-    const link = document.createElement('a')
-    link.href = URL.createObjectURL(blob)
-    link.download = `EHR-${(p.patient_code ?? 'patient').replace(/\s/g, '')}-${p.full_name.replace(/\s/g, '')}.txt`
-    link.click()
-    URL.revokeObjectURL(link.href)
+    return lines
   }
 
   return (
@@ -96,6 +108,10 @@ export default function PatientEHR() {
         <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-green-100 text-green-700 flex items-center gap-1 flex-none">
           <span className="w-1.5 h-1.5 rounded-full bg-green-500" /> Approved
         </span>
+        <button onClick={() => setEditInfo({ ...p })} aria-label="Edit patient info"
+                className="w-8 h-8 rounded-lg border border-gray-200 bg-white text-gray-500 flex items-center justify-center flex-none">
+          <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5z" /></svg>
+        </button>
       </div>
 
       {/* contact & emergency */}
@@ -164,6 +180,53 @@ export default function PatientEHR() {
       <button onClick={exportEHR} className="w-full h-11 rounded-lg bg-primary-600 text-white text-sm font-semibold mb-20 mr-16">
         Export EHR (PDF)
       </button>
+
+      {/* edit patient info modal (p82/85) */}
+      {editInfo && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-end justify-center" onClick={() => setEditInfo(null)}>
+          <form onSubmit={(e) => { e.preventDefault(); saveInfo() }} onClick={(e) => e.stopPropagation()}
+                className="bg-gray-50 w-full max-w-md rounded-t-2xl max-h-[92vh] overflow-y-auto p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-bold text-gray-900">Edit Patient Info</h2>
+                <p className="text-xs text-gray-500">{p.full_name} · {p.patient_code ?? '—'}</p>
+              </div>
+              <button type="button" onClick={() => setEditInfo(null)} aria-label="Close" className="w-8 h-8 rounded-lg bg-white border border-gray-200 text-gray-500">×</button>
+            </div>
+            <div className="bg-white border border-gray-200 rounded-lg p-4 space-y-3">
+              <label className="block"><span className="text-xs font-medium text-gray-500">Full name</span>
+                <input value={editInfo.full_name} onChange={(e) => setEditInfo((v) => ({ ...v, full_name: e.target.value }))} required
+                       className="mt-1 w-full h-11 border border-gray-200 rounded-lg px-3 text-sm" /></label>
+              <div className="grid grid-cols-2 gap-3">
+                <label className="block"><span className="text-xs font-medium text-gray-500">Birthdate</span>
+                  <input type="date" value={editInfo.birthdate ?? ''} onChange={(e) => setEditInfo((v) => ({ ...v, birthdate: e.target.value }))}
+                         className="mt-1 w-full h-11 border border-gray-200 rounded-lg px-3 text-sm" /></label>
+                <label className="block"><span className="text-xs font-medium text-gray-500">Sex</span>
+                  <select value={editInfo.sex ?? ''} onChange={(e) => setEditInfo((v) => ({ ...v, sex: e.target.value }))}
+                          className="mt-1 w-full h-11 border border-gray-200 rounded-lg px-3 text-sm bg-white">
+                    <option value="">—</option><option>Female</option><option>Male</option>
+                  </select></label>
+              </div>
+              <label className="block"><span className="text-xs font-medium text-gray-500">Mobile number</span>
+                <input value={editInfo.phone ?? ''} onChange={(e) => setEditInfo((v) => ({ ...v, phone: e.target.value }))}
+                       className="mt-1 w-full h-11 border border-gray-200 rounded-lg px-3 text-sm" /></label>
+              <label className="block"><span className="text-xs font-medium text-gray-500">Email address</span>
+                <input type="email" value={editInfo.email ?? ''} onChange={(e) => setEditInfo((v) => ({ ...v, email: e.target.value }))}
+                       className="mt-1 w-full h-11 border border-gray-200 rounded-lg px-3 text-sm" /></label>
+              <label className="block"><span className="text-xs font-medium text-gray-500">Emergency contact</span>
+                <input value={editInfo.emergency_contact ?? ''} onChange={(e) => setEditInfo((v) => ({ ...v, emergency_contact: e.target.value }))}
+                       className="mt-1 w-full h-11 border border-gray-200 rounded-lg px-3 text-sm" /></label>
+              <label className="block"><span className="text-xs font-medium text-gray-500">Internal notes — visible to clinic staff only</span>
+                <textarea value={editInfo.medical_note ?? ''} onChange={(e) => setEditInfo((v) => ({ ...v, medical_note: e.target.value }))} rows={3}
+                          className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" /></label>
+            </div>
+            <div className="flex gap-2.5 pb-4">
+              <button type="button" onClick={() => setEditInfo(null)} className="flex-1 h-11 rounded-lg border border-gray-200 bg-white text-gray-700 text-sm font-semibold">Cancel</button>
+              <button className="flex-1 h-11 rounded-lg bg-primary-600 text-white text-sm font-semibold">Save Changes</button>
+            </div>
+          </form>
+        </div>
+      )}
 
       {/* edit medical note modal (p124) */}
       {noteEdit !== null && (

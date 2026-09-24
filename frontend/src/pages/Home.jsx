@@ -21,6 +21,7 @@ export default function Home() {
   const [appts, setAppts] = useState(null)
   const [settings, setSettings] = useState(null)
   const [err, setErr] = useState('')
+  const [welcome, setWelcome] = useState(() => profile?.role === 'doctor' && !localStorage.getItem('dv_doc_welcomed'))
 
   useEffect(() => {
     getClinicSettings().then(setSettings).catch(() => {})
@@ -28,7 +29,9 @@ export default function Home() {
     else if (patientRecord?.id) listMyAppointments(patientRecord.id).then(setAppts).catch(() => {})
   }, [isStaff])
 
-  const today = new Date().toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' })
+  const now = new Date()
+  const today = now.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' })
+  const greetingWord = now.getHours() < 12 ? 'Good morning' : now.getHours() < 18 ? 'Good afternoon' : 'Good evening'
   const hoursLine = settings
     ? `Clinic hours today: ${fmtTime12(settings.open_time)} – ${fmtTime12(settings.close_time)}`
     : 'Clinic hours today: 8:00 AM – 5:00 PM'
@@ -57,8 +60,10 @@ export default function Home() {
   return (
     <div className="px-4 py-4 space-y-4">
       <div>
-        <h1 className="text-xl font-bold text-gray-900">{today}</h1>
-        <p className="text-xs text-gray-500">{isStaff ? hoursLine : `Welcome, ${(profile?.full_name || '').split(' ')[0]} — your dental care portal`}</p>
+        <h1 className="text-xl font-bold text-gray-900">
+          {isStaff ? today : `${greetingWord}, ${(profile?.full_name || '').split(' ')[0]}`}
+        </h1>
+        <p className="text-xs text-gray-500">{isStaff ? hoursLine : 'Welcome back to your dental care portal'}</p>
       </div>
 
       {isStaff && (
@@ -216,6 +221,17 @@ export default function Home() {
         </>
       )}
 
+      {/* first-time dentist welcome (p48) */}
+      {welcome && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center px-6">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-sm text-center">
+            <h2 className="text-lg font-bold text-gray-900">Welcome, Doc {(profile?.full_name || '').split(' ')[0]}!</h2>
+            <p className="text-sm text-gray-500 mt-2">We're glad to have you here. Manage your appointments and connect with your patients with ease.</p>
+            <button onClick={() => { localStorage.setItem('dv_doc_welcomed', '1'); setWelcome(false) }}
+                    className="w-full h-11 mt-4 rounded-lg bg-primary-600 text-white text-sm font-semibold">Continue</button>
+          </div>
+        </div>
+      )}
       {err && <p className="text-xs text-red-500">{err}</p>}
     </div>
   )

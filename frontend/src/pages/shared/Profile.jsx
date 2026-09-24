@@ -1,11 +1,17 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/RoleContext'
+import { listMyAppointments } from '../../lib/api'
 import { signOut } from '../../lib/api'
 
 export default function Profile() {
   const { session, profile, patientRecord, logout } = useAuth()
   const navigate = useNavigate()
+  const [visits, setVisits] = useState([])
+  useEffect(() => {
+    if (patientRecord?.id) listMyAppointments(patientRecord.id)
+      .then((a) => setVisits((a ?? []).filter((x) => x.status === 'completed'))).catch(() => {})
+  }, [patientRecord?.id])
   const [phone, setPhone] = useState(patientRecord?.phone || '')
   const [address, setAddress] = useState(patientRecord?.address || '')
   const [saved, setSaved] = useState(false)
@@ -30,10 +36,10 @@ export default function Profile() {
   }
 
   const rows = [
-    ['Full name', profile.full_name],
+    ['Birthdate', patientRecord?.birthdate ? new Date(patientRecord.birthdate).toLocaleDateString('en-PH', { month: 'long', day: 'numeric', year: 'numeric' }) : '—'],
+    ['Mobile', patientRecord?.phone || '—'],
+    ['Emergency contact', patientRecord?.emergency_contact || '—'],
     ['Email', session.user.email],
-    ['Patient ID', patientRecord ? `PAT-${patientRecord.id.slice(0, 8).toUpperCase()}` : '—'],
-    ['Role', 'Patient'],
   ]
 
   return (
@@ -91,6 +97,32 @@ export default function Profile() {
           )}
           {saved && <p className="text-xs text-green-600">Saved ✓</p>}
           {err && <p className="text-xs text-red-500">{err}</p>}
+        </div>
+      </section>
+
+      {/* confidentiality notice (p38) */}
+      <div className="bg-white border border-gray-200 rounded-lg p-3.5 flex gap-2.5">
+        <svg viewBox="0 0 24 24" className="w-5 h-5 text-primary-600 flex-none mt-0.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><path d="M14 2v6h6" /></svg>
+        <div>
+          <div className="text-sm font-semibold text-gray-900">Clinical records are confidential</div>
+          <p className="text-[11px] text-gray-500 mt-0.5">Treatment notes and attachments are managed by your dentist and are not shown on the patient portal. You may ask for your records in message.</p>
+        </div>
+      </div>
+
+      {/* visit history (p38) */}
+      <section>
+        <h2 className="text-[11px] font-bold uppercase tracking-wide text-gray-500 mb-1.5">Visit history</h2>
+        <div className="bg-white border border-gray-200 rounded-lg divide-y divide-gray-100">
+          {visits.length === 0 && <div className="px-3.5 py-3 text-sm text-gray-400">No completed visits yet.</div>}
+          {visits.map((v) => (
+            <div key={v.id} className="px-3.5 py-2.5">
+              <div className="text-sm font-semibold text-gray-900">{v.services?.name ?? 'Service'}</div>
+              <div className="text-xs text-gray-500 mt-0.5">
+                {new Date(v.scheduled_at ?? v.requested_date).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}
+                {v.scheduled_at ? ` · ${new Date(v.scheduled_at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}` : ''} · ₱{Number(v.price ?? 0).toLocaleString()} paid
+              </div>
+            </div>
+          ))}
         </div>
       </section>
 
