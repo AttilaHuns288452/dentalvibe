@@ -66,7 +66,7 @@ export default function Payment() {
           <svg viewBox="0 0 24 24" className="w-8 h-8" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m5 12 5 5L20 7" /></svg>
         </div>
         <h1 className="text-lg font-bold text-gray-900 mt-3">Appointment Approved</h1>
-        <p className="text-xs text-gray-500 mt-1">Payment recorded — your slot is secured and the appointment is confirmed.</p>
+        <p className="text-xs text-gray-500 mt-1">Appointment fee recorded — your slot is secured. Treatment charges are billed at the clinic.</p>
         <button onClick={() => navigate('/appointments')} className="mt-4 h-10 px-4 rounded-lg bg-primary-600 text-white text-sm font-semibold">My Appointments</button>
       </div>
     )
@@ -76,7 +76,7 @@ export default function Payment() {
     <div className="px-4 py-4 space-y-4">
       <div>
         <h1 className="text-xl font-bold text-gray-900">Payment</h1>
-        <p className="text-xs text-gray-500">Pay and confirm — instantly</p>
+        <p className="text-xs text-gray-500">Appointment fee — pay to reserve your slot</p>
       </div>
 
       <div className="bg-white border border-gray-200 rounded-lg p-4">

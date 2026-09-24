@@ -11,7 +11,7 @@ function TabIcon({ name, active }) {
   )
 }
 
-export default function Navbar({ pendingCount = 0 }) {
+export default function Navbar({ unreadCount = 0 }) {
   const { profile } = useAuth()
   const role = profile?.role
   const path = useLocation().pathname
@@ -48,7 +48,7 @@ export default function Navbar({ pendingCount = 0 }) {
           <button onClick={() => navigate(roleBase + '/notifications')} aria-label="Notifications"
                   className="relative w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center flex-none">
             <svg viewBox="0 0 24 24" className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d={ICONS.bell} /></svg>
-            {pendingCount > 0 && role !== 'patient' && <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 rounded-full bg-primary-600 text-white text-[9px] font-bold flex items-center justify-center px-1">{pendingCount}</span>}
+            {unreadCount > 0 && role !== 'patient' && <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 rounded-full bg-primary-600 text-white text-[9px] font-bold flex items-center justify-center px-1">{unreadCount}</span>}
           </button>
           <button onClick={() => navigate(roleBase + '/settings')} aria-label="Settings"
                   className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center flex-none">

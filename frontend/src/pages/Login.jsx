@@ -14,6 +14,7 @@ export default function Login() {
   const [password, setPassword] = useState('')
   const [err, setErr] = useState('')
   const [busy, setBusy] = useState(false)
+  const [showPw, setShowPw] = useState(false)
 
   const submit = async (e) => {
     e.preventDefault()
@@ -54,8 +55,14 @@ export default function Login() {
             </label>
             <label className="block">
               <span className="text-xs font-medium text-gray-500">Password</span>
-              <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required
-                     className="mt-1 w-full h-11 border border-gray-200 rounded-lg px-3 text-sm" placeholder="••••••••" />
+              <span className="relative block">
+                <input type={showPw ? 'text' : 'password'} value={password} onChange={(e) => setPassword(e.target.value)} required
+                       className="mt-1 w-full h-11 border border-gray-200 rounded-lg px-3 pr-11 text-sm" placeholder="••••••••" />
+                <button type="button" onClick={() => setShowPw(!showPw)} aria-label={showPw ? 'Hide password' : 'Show password'}
+                        className="absolute right-1 top-1/2 -translate-y-1/2 w-9 h-9 text-gray-400 text-xs font-semibold">
+                  {showPw ? 'Hide' : 'Show'}
+                </button>
+              </span>
             </label>
             {err && <p className="text-xs text-red-500">{err}</p>}
             <button disabled={busy} className="w-full h-11 rounded-lg bg-primary-600 text-white text-sm font-semibold disabled:opacity-60">
@@ -82,6 +89,7 @@ function RegisterWizard({ onDone, onSwitch }) {
   const [f, setF] = useState({ first: '', last: '', address: '', birthdate: '', sex: '', medical_note: '', emergency_contact: '', phone: '', email: '', password: '' })
   const [err, setErr] = useState('')
   const [busy, setBusy] = useState(false)
+  const [showPw, setShowPw] = useState(false)
   const [done, setDone] = useState(false)
   const set = (k) => (e) => setF((v) => ({ ...v, [k]: e.target.value }))
 
@@ -191,7 +199,11 @@ function RegisterWizard({ onDone, onSwitch }) {
             <label className="block"><span className="text-xs font-medium text-gray-500">Email address</span>
               <input type="email" value={f.email} onChange={set('email')} required className="mt-1 w-full h-11 border border-gray-200 rounded-lg px-3 text-sm" /></label>
             <label className="block"><span className="text-xs font-medium text-gray-500">Password</span>
-              <input type="password" value={f.password} onChange={set('password')} required className="mt-1 w-full h-11 border border-gray-200 rounded-lg px-3 text-sm" /></label>
+              <span className="relative block">
+                <input type={showPw ? 'text' : 'password'} value={f.password} onChange={set('password')} required className="mt-1 w-full h-11 border border-gray-200 rounded-lg px-3 pr-11 text-sm" />
+                <button type="button" onClick={() => setShowPw(!showPw)} aria-label={showPw ? 'Hide password' : 'Show password'}
+                        className="absolute right-1 top-1/2 -translate-y-1/2 w-9 h-9 text-gray-400 text-xs font-semibold">{showPw ? 'Hide' : 'Show'}</button>
+              </span></label>
             {/* p80 password rules */}
             <ul className="text-[11px] space-y-1">
               <li className={pwRules.len ? 'text-green-600' : 'text-gray-400'}>{pwRules.len ? '✓' : '·'} Password must be at least 8 characters</li>

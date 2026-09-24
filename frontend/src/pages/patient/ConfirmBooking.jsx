@@ -25,7 +25,7 @@ export default function ConfirmBooking() {
           <svg viewBox="0 0 24 24" className="w-8 h-8" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 13l4 4L19 7" /></svg>
         </div>
         <h1 className="text-lg font-bold text-gray-900 mt-3">Confirm Your Appointment</h1>
-        <p className="text-xs text-gray-500 mt-1">Secure your appointment by completing the payment for your selected service.</p>
+        <p className="text-xs text-gray-500 mt-1">Pay the appointment fee to reserve your slot — treatment charges are billed at the clinic.</p>
       </div>
 
       <div className="bg-white border border-gray-200 rounded-lg p-4 flex items-center gap-3">
@@ -50,7 +50,7 @@ export default function ConfirmBooking() {
       </div>
 
       <div className="bg-white border border-gray-200 rounded-lg p-4">
-        <div className="text-sm font-bold text-gray-900 mb-2">Total payment</div>
+        <div className="text-sm font-bold text-gray-900 mb-2">Appointment fee</div>
         <div className="flex justify-between text-sm py-1.5 border-t border-gray-100">
           <span className="text-gray-600">Appointment fee</span><span className="font-bold text-gray-900">{peso(appt.price ?? 0)}</span>
         </div>

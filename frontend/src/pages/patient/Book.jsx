@@ -17,7 +17,7 @@ function DateGrid({ date, setDate }) {
   const days = new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate()
   const cells = [...Array(firstDay).fill(null), ...Array.from({ length: days }, (_, i) => i + 1)]
   const iso = (d) => `${month.getFullYear()}-${String(month.getMonth() + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`
-  const past = (d) => new Date(`${iso(d)}T00:00:00`) < today
+  const past = (d) => new Date(`${iso(d)}T00:00:00`) < today || new Date(`${iso(d)}T00:00:00`).getDay() === 0 // Sun closed
   const atEdge = (dir) => dir < 0
     ? month <= new Date(today.getFullYear(), today.getMonth(), 1)
     : month >= new Date(today.getFullYear(), today.getMonth() + 2, 1)
@@ -66,7 +66,8 @@ export default function Book() {
   const navigate = useNavigate()
   const [services, setServices] = useState([])
   const [prices, setPrices] = useState({})
-  const [serviceId, setServiceId] = useState('')
+  const [picked, setPicked] = useState([]) // multi-service (p36: 'Select 1 or more')
+  const [q, setQ] = useState('')
   const [date, setDate] = useState('')
   const [time, setTime] = useState('')
   const [taken, setTaken] = useState([])
@@ -103,22 +104,26 @@ export default function Book() {
 
   const takenStr = taken.map((d) => `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`)
 
+  const chosen = services.filter((s) => picked.includes(s.id))
+  const total = chosen.reduce((sum, s) => sum + (prices[s.id] ?? s.price), 0)
+
   const submit = async (e) => {
     e.preventDefault()
     setErr('')
     if (!patientRecord?.id) return setErr('No patient record linked to this account.')
-    if (!serviceId || !date || !time) return setErr('Pick a service, a date, and a time.')
+    if (!picked.length || !date || !time) return setErr('Pick at least one service, a date, and a time.')
     setBusy(true)
     try {
       const appt = await bookAppointment({
         patientId: patientRecord.id,
-        serviceId,
+        serviceId: picked[0],
+        serviceIds: picked,
         requestedDate: date,
         scheduledAt: new Date(`${date}T${time}:00`).toISOString(),
         notes,
-        price: prices[serviceId] ?? services.find((s) => s.id === serviceId)?.price,
+        price: total,
       })
-      navigate('/book/confirm', { state: { appointment: { ...appt, services: { name: services.find((s) => s.id === serviceId)?.name } } } })
+      navigate('/book/confirm', { state: { appointment: { ...appt, price: total, services: { name: chosen.map((s) => s.name).join(' + ') } } } })
     } catch (ex) {
       setErr(/ux_appt_paid_slot/.test(ex.message) ? 'That slot was just taken — pick another time.'
         : /ux_appt_patient_date/.test(ex.message) ? 'You already have a booking that day.'
@@ -139,14 +144,23 @@ export default function Book() {
       <form onSubmit={submit} className="space-y-4">
         <section>
           <h2 className="text-[11px] font-bold uppercase tracking-wide text-gray-500 mb-1.5">Select dental service</h2>
+          <div className="relative mb-2">
+            <svg viewBox="0 0 24 24" className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
+            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search services…"
+                   className="w-full h-10 border border-gray-200 rounded-lg pl-9 pr-3 text-sm bg-white" />
+          </div>
           <div className="space-y-2">
-            {services.map((s) => {
+            {services.filter((s) => s.name.toLowerCase().includes(q.toLowerCase())).map((s) => {
               const shown = prices[s.id] ?? s.price
               const custom = shown !== s.price
+              const on = picked.includes(s.id)
               return (
-                <button type="button" key={s.id} onClick={() => setServiceId(s.id)}
-                        className={'w-full text-left bg-white border rounded-lg px-3.5 py-2.5 flex items-center gap-3 ' + (serviceId === s.id ? 'border-primary-600 bg-primary-50' : 'border-gray-200')}>
-                  <span className={'w-4 h-4 rounded-full border-2 flex-none ' + (serviceId === s.id ? 'border-primary-600 bg-primary-600' : 'border-gray-300')} />
+                <button type="button" key={s.id} onClick={() => setPicked((p) => (on ? p.filter((x) => x !== s.id) : [...p, s.id]))}
+                        aria-pressed={on}
+                        className={'w-full text-left bg-white border rounded-lg px-3.5 py-2.5 flex items-center gap-3 ' + (on ? 'border-primary-600 bg-primary-50' : 'border-gray-200')}>
+                  <span className={'w-5 h-5 rounded border-2 flex-none flex items-center justify-center ' + (on ? 'border-primary-600 bg-primary-600 text-white' : 'border-gray-300')}>
+                    {on && <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M5 13l4 4L19 7" /></svg>}
+                  </span>
                   <span className="flex-1 min-w-0">
                     <span className="block text-sm font-semibold text-gray-900">{s.name}</span>
                     <span className="block text-xs text-gray-500">
@@ -161,6 +175,27 @@ export default function Book() {
             {!services.length && !err && <div className="bg-white border border-gray-200 rounded-lg px-3.5 py-3 text-sm text-gray-400">Loading services…</div>}
           </div>
         </section>
+
+        <p className="text-[11px] text-gray-500 bg-primary-50 border border-primary-100 rounded-lg px-3 py-2">
+          The appointment fee reserves your slot — it is <b>not</b> your full treatment bill. Any treatment is charged at the clinic.
+        </p>
+
+        {chosen.length > 0 && (
+          <section>
+            <h2 className="text-[11px] font-bold uppercase tracking-wide text-gray-500 mb-1.5">Selected services</h2>
+            <div className="bg-white border border-gray-200 rounded-lg divide-y divide-gray-100">
+              {chosen.map((s) => (
+                <div key={s.id} className="flex justify-between px-3.5 py-2 text-sm">
+                  <span className="font-semibold text-gray-900">{s.name}</span>
+                  <span className="text-gray-600">{peso(prices[s.id] ?? s.price)}</span>
+                </div>
+              ))}
+              <div className="flex justify-between px-3.5 py-2 text-sm font-bold">
+                <span>Total appointment fee</span><span className="text-primary-700">{peso(total)}</span>
+              </div>
+            </div>
+          </section>
+        )}
 
         <DateGrid date={date} setDate={setDate} />
 
@@ -192,7 +227,7 @@ export default function Book() {
 
         {err && <p className="text-xs text-red-500">{err}</p>}
         <button disabled={busy} className="w-full h-12 rounded-lg bg-primary-600 text-white font-semibold disabled:opacity-60">
-          {busy ? 'Submitting…' : 'Continue to Payment'}
+          {busy ? 'Submitting…' : `Continue to Payment${total ? ' · ' + peso(total) : ''}`}
         </button>
       </form>
     </div>

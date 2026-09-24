@@ -1,99 +1,65 @@
-# DentalVibe — Dental Clinic App
+# D.A.R. Dental Clinic — Appointment & Record System
 
-Full-stack dental clinic management app for our SF capstone: appointments, patients, income, staff, with a **Patient**, **Doctor**, and **Doctor Owner** portal in one PWA.
+Full-stack dental clinic management PWA (capstone): booking with QR payment, patient records (EHR), calendar, messaging, staff management, and income analytics — one app, three roles (Patient · Doctor · Owner).
 
-🔗 **Live (Vercel):** https://dentalvibe.vercel.app
-
-> Every push to `main` auto-deploys. Give Vercel ~1–2 min after merging.
+🔗 **Live:** https://dentalvibe.vercel.app · every push to `main` auto-deploys (Vercel takes ~1–2 min).
 
 ## Stack
 
-- **Frontend:** React 18 + Vite 6 + Tailwind CSS 3
-- **Backend:** Express (Node)
-- **Database/Auth:** Supabase
+- **Frontend:** React 18 + Vite 6 + Tailwind CSS 3 (mobile-first 390×844, installable PWA)
+- **Backend:** Supabase (Postgres + Auth + Storage) — all business rules enforced in the database (RLS, triggers, RPCs)
 
-## Run it on your machine
-
-You need **Node.js 18+** (check with `node -v`).
+## Run locally
 
 ```bash
-# 1. clone
 git clone https://github.com/AttilaHuns288452/dentalvibe.git
-cd Dental-Clinic
-
-# 2. frontend
-cd frontend
+cd dentalvibe/frontend
 npm install
-
-# 3. Supabase keys (one-time) — see "Supabase keys" below
-cp .env.example .env.local
-# then paste the keys into .env.local (ask Attila for the values)
-
-# 4. start
-npm run dev
+cp .env.example .env.local   # paste the Supabase URL + anon key (ask Attila)
+npm run dev                   # http://localhost:5173
 ```
 
-Open **http://localhost:5173**. That's it — the backend is only needed for API features later (`cd backend && npm install && npm run dev` → port 3000).
+`.env.local` is gitignored. Its two values are **publishable browser keys** — the site ships them to every visitor; data is protected by Row Level Security. Never commit `service_role` keys.
 
-## Supabase keys
+## Demo accounts (password `password123`)
 
-`frontend/.env.local` is **gitignored** — never commit it. It needs two values:
+| Role | Email |
+|---|---|
+| Patient | `maria@dentalvibe.ph` (also juan/andrea/liza/carlo @dentalvibe.ph) |
+| Doctor | `doctor@dentalvibe.ph` |
+| Owner | `owner@dentalvibe.ph` |
 
-```
-VITE_SUPABASE_URL=https://wfmtkmfevdqbhtpqamic.supabase.co
-VITE_SUPABASE_ANON_KEY=sb_publishable_FXP8LIDjDFZ5yN53jy2F7w_xVcIokw_
-```
+**QA tools:** open `https://dentalvibe.vercel.app/?dev=1` — a DEV pill gives one-tap role logins and a **mock GCash payment** button (runs the real payment RPC so it lands in Owner → Income Analytics). `src/lib/dev.js` is the one file to strip for a real clinic launch.
 
-Both are **publishable browser values** — safe to expose (the site ships them to every visitor), data is protected by Row Level Security. If these ever stop working, grab fresh ones: [supabase.com](https://supabase.com) → project **DentalVibe** → ⚙️ Project Settings → **API**.
+## Product rules (enforced in the DB, not just the UI)
 
-## Trying the app
+- Booking: pick services → date → time → **appointment fee (deposit) via QR** → the slot is secured and the appointment is **confirmed instantly**. The fee reserves the slot — treatment is billed at the clinic.
+- A paid appointment holds its exact slot (unique index); double bookings are rejected.
+- Patients can edit only their contact info + booking notes, or cancel a pending booking. Identity/clinical fields are clinic-managed (staff-only `medical_note`, private attachments).
+- Income Analytics = paid appointments + walk-in ledger entries − expenses.
 
-At the top there's an amber **dev role bar** (temporary, removed when real auth lands):
-
-- **Login as User** → Patient portal (5-tab bottom nav)
-- **Login as Doctor** → Dentist portal (4-tab nav)
-- **Login as Doctor Owner** → Owner portal (Home · Calendar · Manage · Patients · Income · Staff)
-
-All screens show placeholder pages for now; the navbar, routing, and role switching are the working foundation.
-
-## Pushing your work
-
-We keep `main` deployable — always branch + PR:
+## QA / tests (in `frontend/`)
 
 ```bash
-git checkout -b your-name/what-you-did
-# ...make changes...
-git add -A && git commit -m "frontend: short description"
-git push -u origin your-name/what-you-did
+node qa_all.mjs      # role navbar + CRUD + chat + prices + income (31 checks)
+node prod_e2e.mjs    # payment gate, auto-confirm, RLS (19 checks)
+node journey_qa.mjs  # full patient+doctor+owner journeys (42 checks)
+node live_demo.mjs   # 3-role live business scenario (21 checks)
+node verify_fixes.mjs# security attack battery (24 probes)
+node shots_v3.mjs    # re-capture screenshots/
 ```
 
-Then open a Pull Request on GitHub and have someone review it. **Never push straight to `main`.**
+## Contributing
 
-Before opening a PR, make sure it builds:
+Keep `main` deployable — branch + PR (`your-name/what-you-did`), run `npm run build` before opening.
 
-```bash
-cd frontend && npm run build
-```
-
-## Project structure (frontend)
+## Structure (frontend/src)
 
 ```
-frontend/src/
-├── App.jsx              # shell: role provider + dev switcher + navbar + hash router
-├── context/RoleContext.jsx    # current role (patient/doctor/owner) — auth later plugs in here
-├── navigation/
-│   ├── navConfig.jsx    # per-role bottom-tab items (edit menus here)
-│   ├── Navbar.jsx       # top app bar + bottom tab bar + chat bubble
-│   ├── RoleSwitcher.jsx # DEV-ONLY login buttons — delete when Supabase auth lands
-│   └── useHashPath.js   # tiny hash router hook
-├── pages/Placeholder.jsx # "coming soon" screen used by every route for now
-└── supabaseClient.js    # Supabase client (reads the VITE_SUPABASE_* env vars)
+App.jsx                  shell: auth gate + routing + dev panel
+context/RoleContext.jsx  session/role/unread-count/deactivated gate
+navigation/              navConfig.jsx (per-role tabs) + Navbar
+lib/                     api.js (all Supabase calls) · format.js · dev.js
+pages/                   patient/ doctor/ owner/ shared/
+supabase/migrations/     schema + RLS + triggers (source of truth for business rules)
 ```
-
-## Backend
-
-```
-cd backend && npm install && npm run dev   # localhost:3000
-```
-
-Health check: http://localhost:3000/api/health

@@ -100,12 +100,12 @@ function AddPatient({ onClose, onSaved }) {
   const save = async (e) => {
     e.preventDefault()
     setErr('')
-    if (!f.full_name.trim()) return setErr('Full name is required.')
+    if (!(f.first ?? '').trim() || !(f.last ?? '').trim()) return setErr('First and last name are required.')
     setBusy(true)
     // import lazily to avoid circular deps
     const { supabase } = await import('../../lib/api')
     const { error } = await supabase.from('patients').insert({
-      full_name: f.full_name.trim(), birthdate: f.birthdate || null, sex: f.sex || null,
+      full_name: `${(f.first ?? '').trim()} ${(f.last ?? '').trim()}`.trim().trim(), birthdate: f.birthdate || null, sex: f.sex || null,
       phone: f.phone || null, email: f.email || null, emergency_contact: f.emergency_contact || null,
       medical_note: f.medical_note || null,
     })
@@ -115,7 +115,7 @@ function AddPatient({ onClose, onSaved }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/40 flex items-end justify-center" onClick={onClose}>
+    <div role="dialog" aria-modal="true" className="fixed inset-0 z-50 bg-black/40 flex items-end justify-center" onClick={onClose}>
       <form onSubmit={save} onClick={(e) => e.stopPropagation()}
             className="bg-gray-50 w-full max-w-md rounded-t-2xl max-h-[92vh] overflow-y-auto p-4 space-y-3">
         <div className="flex items-center justify-between">

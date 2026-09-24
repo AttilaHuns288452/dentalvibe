@@ -63,6 +63,18 @@ export default function PatientEHR() {
     setNoteEdit(null)
   }
 
+  const viewAtt = async (x) => {
+    if (!x.path) return
+    const { data } = await supabase.storage.from('ehr-files').createSignedUrl(x.path, 60)
+    if (data?.signedUrl) window.open(data.signedUrl, '_blank')
+  }
+  const delAtt = async (x) => {
+    if (!confirm('Delete this attachment?')) return
+    if (x.path) await supabase.storage.from('ehr-files').remove([x.path])
+    await supabase.from('ehr_attachments').delete().eq('id', x.id)
+    setAtts((a) => a.filter((y) => y.id !== x.id))
+  }
+
   const exportEHR = () => {
     printReport(`EHR — ${p.full_name} (${p.patient_code ?? '—'})`, exportLines())
   }
@@ -172,6 +184,10 @@ export default function PatientEHR() {
                 <span className="block text-sm font-semibold text-gray-900 truncate">{x.filename}</span>
                 <span className="block text-xs text-gray-500">{x.category} · {fmt(x.created_at)} · {x.file_size ?? '—'}</span>
               </span>
+              <span className="flex gap-2 flex-none">
+                <button onClick={() => viewAtt(x)} className="h-8 px-2.5 rounded-md border border-gray-200 bg-white text-[11px] font-semibold text-primary-700">View</button>
+                <button onClick={() => delAtt(x)} className="h-8 px-2.5 rounded-md border border-red-100 bg-white text-[11px] font-semibold text-red-500">Delete</button>
+              </span>
             </div>
           ))}
         </div>
@@ -183,7 +199,7 @@ export default function PatientEHR() {
 
       {/* edit patient info modal (p82/85) */}
       {editInfo && (
-        <div className="fixed inset-0 z-50 bg-black/40 flex items-end justify-center" onClick={() => setEditInfo(null)}>
+        <div role="dialog" aria-modal="true" className="fixed inset-0 z-50 bg-black/40 flex items-end justify-center" onClick={() => setEditInfo(null)}>
           <form onSubmit={(e) => { e.preventDefault(); saveInfo() }} onClick={(e) => e.stopPropagation()}
                 className="bg-gray-50 w-full max-w-md rounded-t-2xl max-h-[92vh] overflow-y-auto p-4 space-y-3">
             <div className="flex items-center justify-between">
@@ -265,6 +281,7 @@ function AddAttachment({ patient, onClose, onSaved }) {
     const f = e.target.files?.[0]
     if (!f) return
     if (f.size > 10 * 1024 * 1024) return setErr('Max file size is 10 MB.')
+    if (!/\.(png|jpe?g|pdf|webp)$/i.test(f.name)) return setErr('Supported: JPG, PNG, WEBP, PDF.')
     setErr('')
     setFile(f)
   }
@@ -272,17 +289,27 @@ function AddAttachment({ patient, onClose, onSaved }) {
   const upload = async () => {
     if (!file) return setErr('Choose a file first.')
     setBusy(true)
-    const { error } = await supabase.from('ehr_attachments').insert({
-      patient_id: patient.id, category: cat, filename: file.name,
-      file_size: (file.size / 1048576).toFixed(1) + ' MB', note: note || null, uploaded_by: profile?.id ?? null,
-    })
-    setBusy(false)
-    if (error) return setErr(error.message)
-    onSaved()
+    setErr('')
+    try {
+      // real file → private bucket (staff-only RLS on storage.objects)
+      const path = `${patient.id}/${Date.now()}-${file.name.replace(/[^\w.\-]/g, '_')}`
+      const { error: upErr } = await supabase.storage.from('ehr-files').upload(path, file, { upsert: false })
+      if (upErr) throw upErr
+      const { error } = await supabase.from('ehr_attachments').insert({
+        patient_id: patient.id, category: cat, filename: file.name, path,
+        file_size: (file.size / 1048576).toFixed(1) + ' MB', note: note || null, uploaded_by: profile?.id ?? null,
+      })
+      if (error) throw error
+      onSaved()
+    } catch (ex) {
+      setErr(ex.message)
+    } finally {
+      setBusy(false)
+    }
   }
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/40 flex items-end justify-center" onClick={onClose}>
+    <div role="dialog" aria-modal="true" className="fixed inset-0 z-50 bg-black/40 flex items-end justify-center" onClick={onClose}>
       <form onSubmit={(e) => { e.preventDefault(); upload() }} onClick={(e) => e.stopPropagation()}
             className="bg-gray-50 w-full max-w-md rounded-t-2xl max-h-[92vh] overflow-y-auto p-4 space-y-3">
         <div className="flex items-center justify-between">

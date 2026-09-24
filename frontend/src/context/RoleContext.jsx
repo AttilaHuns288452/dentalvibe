@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState } from 'react'
-import { getSession, getProfile, getMyPatientRecord, listAppointments, signOut, supabase } from '../lib/api'
+import { getSession, getProfile, getMyPatientRecord, signOut, supabase } from '../lib/api'
 
 // Real Supabase session. Role comes from profiles table (set at signup).
 // Staff accounts are provisioned by the clinic owner, not public signup.
@@ -16,7 +16,7 @@ export function RoleProvider({ children }) {
   const [session, setSession] = useState(null)
   const [profile, setProfile] = useState(null)
   const [patientRecord, setPatientRecord] = useState(null)
-  const [pendingCount, setPendingCount] = useState(0)
+  const [unreadCount, setUnreadCount] = useState(0)
   const [loading, setLoading] = useState(true)
   const [deactivated, setDeactivated] = useState(false)
 
@@ -26,7 +26,7 @@ export function RoleProvider({ children }) {
     if (!s?.user) {
       setProfile(null)
       setPatientRecord(null)
-      setPendingCount(0)
+      setUnreadCount(0)
       return
     }
     // profile first — never null it because a secondary fetch hiccuped
@@ -46,19 +46,15 @@ export function RoleProvider({ children }) {
     }
     try {
       if (p?.role === 'patient') {
-        const rec = await getMyPatientRecord(s.user.id)
-        setPatientRecord(rec)
-        if (rec?.id) {
-          const mine = await listMyAppointments(rec.id)
-          setPendingCount(mine.filter((a) => a.status === 'pending').length)
-        }
+        setPatientRecord(await getMyPatientRecord(s.user.id))
       } else {
         setPatientRecord(null)
-        const all = await listAppointments()
-        setPendingCount(all.filter((a) => a.status === 'pending').length)
       }
+      // bell badge = real unread notifications (RLS: own rows), one count query
+      const { count } = await supabase.from('notifications').select('id', { count: 'exact', head: true }).eq('read', false)
+      setUnreadCount(count ?? 0)
     } catch {
-      setPendingCount(0) // secondary data failed — app still usable
+      setUnreadCount(0) // secondary data failed — app still usable
     }
   }
 
@@ -71,11 +67,11 @@ export function RoleProvider({ children }) {
     setSession(null)
     setProfile(null)
     setPatientRecord(null)
-    setPendingCount(0)
+    setUnreadCount(0)
   }
 
   return (
-    <AuthContext.Provider value={{ session, profile, patientRecord, pendingCount, loading, deactivated, refresh: hydrate, logout }}>
+    <AuthContext.Provider value={{ session, profile, patientRecord, unreadCount, loading, deactivated, refresh: hydrate, logout }}>
       {children}
     </AuthContext.Provider>
   )

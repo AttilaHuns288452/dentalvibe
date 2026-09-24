@@ -179,8 +179,18 @@ export default function QrPayment() {
           <span>Total payment</span><span>{peso(amount)}</span>
         </div>
         <div className="text-[11px] text-gray-400 mt-1">Ref: {ref} · {svc}</div>
+        <p className="text-[11px] text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2 mt-2">
+          This is your <b>appointment fee</b> — it reserves the slot. Treatment charges are billed separately at the clinic.
+        </p>
+        {secs === 0 && (
+          <p className="text-xs font-semibold text-red-500 mt-2">QR expired — generate a new one to continue.</p>
+        )}
 
-        <button onClick={download} className="w-full h-11 mt-4 rounded-lg bg-gray-100 text-gray-800 text-sm font-semibold">Download QR image</button>
+        {secs === 0 ? (
+          <button onClick={() => setSecs(15 * 60)} className="w-full h-11 mt-4 rounded-lg bg-primary-600 text-white text-sm font-semibold">Generate new QR</button>
+        ) : (
+          <button onClick={download} className="w-full h-11 mt-4 rounded-lg bg-gray-100 text-gray-800 text-sm font-semibold">Download QR image</button>
+        )}
         <button onClick={() => navigate('/pay', { state: { appointment: appt } })} className="w-full h-11 mt-2 rounded-lg bg-primary-600 text-white text-sm font-semibold">
           I've paid — upload proof
         </button>
