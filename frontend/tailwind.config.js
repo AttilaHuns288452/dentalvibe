@@ -11,6 +11,8 @@ export default {
           50: '#e6f4f3',   // accent-soft
           100: '#ccfbf1',
           200: '#99e2d8',
+          300: '#5eead4',
+          400: '#2dd4bf',
           500: '#14b8a6',
           600: '#0d9488',  // accent
           700: '#0f766e',  // accent-dark

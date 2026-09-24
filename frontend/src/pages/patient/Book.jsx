@@ -136,7 +136,7 @@ export default function Book() {
                 <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search services…"
                        className="w-full h-10 border border-gray-200 rounded-lg pl-9 pr-3 text-sm bg-white placeholder:text-gray-500" />
               </div>
-              <div className="space-y-2">
+              <div className="space-y-2 pb-2">
                 {services.filter((s) => s.name.toLowerCase().includes(q.toLowerCase())).map((s) => {
                   const shown = prices[s.id] ?? s.price
                   const custom = shown !== s.price
