@@ -22,6 +22,7 @@ export default function MyAppointments() {
   const [appts, setAppts] = useState(null)
   const [err, setErr] = useState('')
   const [tab, setTab] = useState('All')
+  const [openId, setOpenId] = useState(null)
   const [q, setQ] = useState('')
   const navigate = useNavigate()
 
@@ -80,11 +81,18 @@ export default function MyAppointments() {
       <div className="space-y-2">
         {(filtered ?? []).map((a) => (
           <div key={a.id} className="bg-white border border-gray-200 rounded-lg px-3.5 py-3">
-            <div className="flex items-center gap-2">
+            <button type="button" onClick={() => setOpenId(openId === a.id ? null : a.id)} className="w-full flex items-center gap-2 text-left">
               <div className="flex-1 min-w-0 text-sm font-semibold text-gray-900">{a.services?.name || 'Appointment'}</div>
               <StatusPill status={a.status} />
-              <svg viewBox="0 0 24 24" className="w-4 h-4 text-gray-400 flex-none" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 6 6 6-6 6" /></svg>
-            </div>
+              <svg viewBox="0 0 24 24" className={'w-4 h-4 text-gray-400 flex-none transition-transform ' + (openId === a.id ? 'rotate-90' : '')} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 6 6 6-6 6" /></svg>
+            </button>
+            {openId === a.id && (
+              <div className="mt-2 pt-2 border-t border-gray-100 text-xs text-gray-600 space-y-1">
+                <div className="flex justify-between"><span className="text-gray-400">Reference</span><span className="font-semibold">{a.id.slice(0, 8).toUpperCase()}</span></div>
+                <div className="flex justify-between"><span className="text-gray-400">Service fee</span><span className="font-semibold">{peso(a.price ?? a.services?.price)}</span></div>
+                {a.notes && <div className="italic text-gray-500">"{a.notes}"</div>}
+              </div>
+            )}
             <div className="text-xs text-gray-500 mt-1">
               {a.requested_date || (a.scheduled_at ? new Date(a.scheduled_at).toLocaleDateString() : 'Date to be assigned')}
               {a.scheduled_at ? ` · ${new Date(a.scheduled_at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}` : ''}
@@ -116,7 +124,6 @@ export default function MyAppointments() {
                 Attach receipt
               </button>
             )}
-            {a.notes && <div className="text-xs text-gray-400 mt-1 italic">"{a.notes}"</div>}
           </div>
         ))}
 

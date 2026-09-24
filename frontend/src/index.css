@@ -5,4 +5,38 @@
 body {
   @apply bg-gray-50 text-gray-900 antialiased;
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* global interaction polish — one rule covers every button in the app */
+button {
+  touch-action: manipulation; /* kills the 300ms double-tap delay on mobile */
+  transition: transform 0.1s ease, background-color 0.15s ease, color 0.15s ease, opacity 0.15s ease, border-color 0.15s ease;
+}
+button:active:not(:disabled) {
+  transform: scale(0.97); /* press feedback everywhere, at once */
+}
+
+/* keyboard accessibility */
+:focus-visible {
+  outline: 2px solid #0d9488;
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* modals/overlays ease in instead of popping */
+div.fixed.inset-0.z-50 {
+  animation: dv-fade 0.15s ease;
+}
+@keyframes dv-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
 }

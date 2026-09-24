@@ -31,7 +31,7 @@ export default function Navbar({ pendingCount = 0 }) {
   return (
     <>
       <header className="bg-white border-b border-gray-200">
-        <div className="max-w-md mx-auto px-4 h-14 flex items-center gap-3">
+        <div className="max-w-md mx-auto px-4 h-14 flex items-center gap-3 pt-[env(safe-area-inset-top)]">
           <a onClick={() => navigate(roleBase || '/')} className="cursor-pointer w-9 h-9 rounded-lg bg-primary-600 text-white flex items-center justify-center flex-none">
             <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M12 2.5C9.4 2.5 7.5 4.6 7.5 7.2c0 1.7.5 3.1 1.1 4.6.5 1.2 1 2.5 1.3 3.9.2 1 .4 1.9.4 2.4 0 1.4.8 2.4 1.7 2.4s1.7-1 1.7-2.4c0-.5.2-1.4.4-2.4.3-1.4.8-2.7 1.3-3.9.6-1.5 1.1-2.9 1.1-4.6C16.5 4.6 14.6 2.5 12 2.5z" />
@@ -58,7 +58,7 @@ export default function Navbar({ pendingCount = 0 }) {
         </div>
       </header>
 
-      <nav className="fixed bottom-0 inset-x-0 bg-white border-t border-gray-200 z-40">
+      <nav className="fixed bottom-0 inset-x-0 bg-white border-t border-gray-200 z-40 pb-[max(0px,env(safe-area-inset-bottom))]">
         <div className="max-w-md mx-auto flex">
           {links.map((l) => (
             <button key={l.path} onClick={() => navigate(l.path)}

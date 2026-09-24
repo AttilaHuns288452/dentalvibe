@@ -27,10 +27,10 @@ function DateGrid({ date, setDate }) {
         <h2 className="text-[11px] font-bold uppercase tracking-wide text-gray-500">Preferred date</h2>
         <div className="flex items-center gap-2">
           <button type="button" aria-label="Previous month" disabled={atEdge(-1)} onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() - 1, 1))}
-                  className="w-7 h-7 rounded border border-gray-200 bg-white text-gray-500 disabled:opacity-40">‹</button>
+                  className="w-9 h-9 rounded-lg border border-gray-200 bg-white text-gray-600 disabled:opacity-40">‹</button>
           <span className="text-sm font-bold text-gray-900 w-36 text-center">{monthName}</span>
           <button type="button" aria-label="Next month" disabled={atEdge(1)} onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() + 1, 1))}
-                  className="w-7 h-7 rounded border border-gray-200 bg-white text-gray-500 disabled:opacity-40">›</button>
+                  className="w-9 h-9 rounded-lg border border-gray-200 bg-white text-gray-600 disabled:opacity-40">›</button>
         </div>
       </div>
       <div className="bg-white border border-gray-200 rounded-lg p-2">
@@ -41,12 +41,13 @@ function DateGrid({ date, setDate }) {
           {cells.map((d, i) => {
             if (!d) return <span key={'e' + i} />
             const sel = date === iso(d)
+            const isToday = iso(d) === new Date().toISOString().slice(0, 10)
             return (
               <button type="button" key={d} disabled={past(d)} onClick={() => setDate(iso(d))}
                       className={'h-9 rounded-lg text-sm font-semibold ' +
                         (past(d) ? 'text-gray-300'
                           : sel ? 'bg-primary-600 text-white'
-                          : 'text-gray-700 hover:bg-primary-50')}>
+                          : 'text-gray-700 hover:bg-primary-50 ' + (isToday ? 'ring-1 ring-primary-400' : ''))}>
                 {d}
               </button>
             )
