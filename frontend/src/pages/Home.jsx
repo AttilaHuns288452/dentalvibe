@@ -110,7 +110,7 @@ export default function Home() {
                 <div key={a.id} className="flex justify-between items-center px-3.5 py-2.5 text-sm">
                   <span className="text-gray-500 text-xs">{new Date(a.scheduled_at).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })}</span>
                   <span className="font-medium text-gray-900 truncate flex-1 text-right pr-2">{a.patients?.full_name} · {a.services?.name}</span>
-                  <span className={'text-[10px] font-bold px-1.5 py-0.5 rounded flex-none ' + (STATUS_PILL[a.status])}>approved</span>
+                  <span className={'text-[10px] font-bold px-1.5 py-0.5 rounded flex-none ' + (STATUS_PILL[a.status])}>Confirmed</span>
                 </div>
               ))}
             </div>

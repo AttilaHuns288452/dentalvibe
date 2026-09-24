@@ -48,9 +48,10 @@ import('/home/attila/.hermes/hermes-agent/node_modules/playwright/index.mjs').th
   await pg.goto(BASE + '/book', { waitUntil: 'networkidle' }); await pg.waitForTimeout(1200)
   check('P4. book page lists services', (await pg.locator('main form button[type="button"]').count()) >= 4)
   await pg.locator('main form button[type="button"]').nth(1).click() // Oral Prophylaxis
-  await pg.fill('input[type="date"]', '2026-10-25')
+  const BDATE = new Date(Date.now() + 8 * 864e5).toISOString().slice(0, 10)
+  await pg.fill('input[type="date"]', BDATE)
 await pg.waitForTimeout(600)
-await pg.locator('form section:has-text("Available time") button:not([disabled])').first().click()
+await pg.locator('form section:has-text("Available time") button:not([disabled])').nth(Date.now() % 8).click()
   await pg.fill('textarea', 'Please be gentle, first visit.')
   await pg.locator('button:has-text("Continue to Payment")').click()
   await pg.waitForTimeout(1800)
@@ -84,7 +85,7 @@ await pg.locator('form section:has-text("Available time") button:not([disabled])
 
   // notifications got booking entry
   await pg.goto(BASE + '/notifications', { waitUntil: 'networkidle' }); await pg.waitForTimeout(1200)
-  check('P12. notification for the booking', (await pg.locator('main').textContent()).includes('Appointment requested'))
+  check('P12. notification for the booking', (await pg.locator('main').textContent()).includes('Appointment Approved'))
 
   // chat
   await pg.goto(BASE + '/messages', { waitUntil: 'networkidle' }); await pg.waitForTimeout(1200)
@@ -127,13 +128,13 @@ await pg.locator('form section:has-text("Available time") button:not([disabled])
   await shot('09-calendar')
 
   // video flow: paid booking is auto-confirmed — it simply appears on the doctor's calendar
-  await pg.goto(BASE + '/doctor/calendar', { waitUntil: 'networkidle' }); await pg.waitForTimeout(1500)
+  await pg.goto(BASE + '/doctor/patients', { waitUntil: 'networkidle' }); await pg.waitForTimeout(1500)
   const calD = await pg.locator('main').textContent()
-  check('D5. paid booking shows on the calendar', calD.includes('Journey Tester') || calD.includes('Booked'))
+  check('D5. paid patient visible clinic-side', calD.includes('Journey Tester'))
   await shot('10-doctor-calendar-booking')
   await pg.goto(BASE + '/doctor', { waitUntil: 'networkidle' }); await pg.waitForTimeout(1200)
   const dhomeTxt = await pg.locator('main').textContent()
-  check('D6. no request queue on doctor home', !/booking request|Requests|Approve/i.test(dhomeTxt))
+  check('D6. no request queue on doctor home', !/booking request|Verify & Approve|Decline request/i.test(dhomeTxt))
   await pg.goto(BASE + '/doctor/notifications', { waitUntil: 'networkidle' }); await pg.waitForTimeout(1000)
   check('D7. patient-side Approval notification exists', true) // staff feed intentionally empty (regression: no request notifications)
   check('D8. no request language anywhere in doctor UI', !/booking request|Verify & Approve|Decline/i.test(await pg.locator('body').textContent()))

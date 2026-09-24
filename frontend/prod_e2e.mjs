@@ -39,9 +39,10 @@ await pg.goto('http://localhost:4176/book', { waitUntil: 'networkidle' })
 await pg.waitForTimeout(1200)
 const svcTxt = await pg.locator('main form button[type="button"]').first().textContent()
 await pg.locator('main form button[type="button"]').first().click()
-await pg.fill('input[type="date"]', '2026-10-12')
+const BDATE = new Date(Date.now() + 7 * 864e5).toISOString().slice(0, 10)
+await pg.fill('input[type="date"]', BDATE)
 await pg.waitForTimeout(600)
-await pg.locator('form section:has-text("Available time") button:not([disabled])').first().click()
+await pg.locator('form section:has-text("Available time") button:not([disabled])').nth(Date.now() % 8).click()
 await pg.locator('button:has-text("Continue to Payment")').click()
 await pg.waitForTimeout(1800)
 check('4. confirm step after booking', (await pg.locator('main h1').textContent()).includes('Confirm Your Appointment'))
@@ -88,11 +89,15 @@ check('9. owner home has no request queue', !/booking request|Requests queue/i.t
 check('10. bell shows no request notifications', !(await pg.locator('header button[aria-label="Notifications"]').count()) || true)
 
 // DB truth: payment = instant confirmation (regression: no approval workflow)
+const sbs = createClient(env.VITE_SUPABASE_URL, env.VITE_SUPABASE_ANON_KEY)
+await sbs.auth.signInWithPassword({ email: em, password: 'Password123' })
 const { data: paidRow } = await sbs.from('appointments').select('status, payment_status').order('created_at', { ascending: false }).limit(1)
 check('12. auto-confirmed after payment', paidRow[0]?.status === 'approved' && paidRow[0]?.payment_status === 'verified')
 check('13. paid appointment counts as income source', paidRow[0]?.payment_status === 'verified')
 check('11. no Verifying state exists', true)
 
+await pg.goto('http://localhost:4176/owner/income', { waitUntil: 'networkidle' })
+await pg.waitForTimeout(1200)
 check('15. income renders', (await pg.locator('main .text-3xl').textContent()).startsWith('₱'))
 
 // ---- SECURITY: patient blocked from staff data ----
@@ -102,17 +107,19 @@ await sbs2.auth.signInWithPassword({ email: em, password: 'Password123' })
 const { data: steal } = await sbs2.from('patients').select('*')
 check('16. patient cannot read other patients (RLS)', (steal ?? []).length === 1)
 const { data: stealAppts } = await sbs2.from('appointments').select('*')
-check('17. patient cannot read clinic appointments', (stealAppts ?? []).every((a) => a.requested_date === '2026-10-12'))
+check('17. patient cannot read clinic appointments', (stealAppts ?? []).every((a) => a.requested_date === BDATE))
 
 // ---- EDGE: approve without payment blocked (server-side) ----
 // book unpaid as fresh patient via API, then try approve as doctor
 const { data: pats } = await sbs2.from('patients').select('id').limit(1)
 const { data: svcs } = await sbs2.from('services').select('id').limit(1)
-const { data: appt2 } = await sbs2.from('appointments').insert({ patient_id: pats[0].id, service_id: svcs[0].id, requested_date: '2026-10-13', price: 500, status: 'pending' }).select().single()
-await sbs2.auth.signOut()
-await sbs2.auth.signInWithPassword({ email: 'doctor@dentalvibe.ph', password: 'password123' })
+const { data: appt2 } = await sbs2.from('appointments').insert({ patient_id: pats[0].id, service_id: svcs[0].id, requested_date: '2030-01-15', price: 500, status: 'pending' }).select().single()
 const { error: gerr } = await sbs2.from('appointments').update({ status: 'approved', payment_status: 'verified' }).eq('id', appt2.id)
 check('18. unpaid stays unconfirmed (patient cannot self-confirm)', !!gerr)
+await sbs2.auth.signOut()
+await sbs2.auth.signInWithPassword({ email: 'doctor@dentalvibe.ph', password: 'password123' })
+const { error: derr } = await sbs2.from('appointments').update({ status: 'approved' }).eq('id', appt2.id)
+check('18b. approve without payment rejected', !!derr)
 await sbs2.from('appointments').delete().eq('id', appt2.id) // cleanup
 
 console.log(`\n=== PROD E2E: ${pass} passed, ${fail} failed ===`)
