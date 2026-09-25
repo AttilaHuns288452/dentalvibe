@@ -1,15 +1,18 @@
 import Skel from '../../components/Skel'
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { listPatients, listPriceExceptions, upsertPriceException, deletePriceException, peso } from '../../lib/api'
+import { listPatients, listPriceExceptions, upsertPriceException, deletePriceException, getService, peso } from '../../lib/api'
 
 // Per-patient custom prices — the group-chat-member-picker flow (Figma frame 73).
 
 export default function OwnerServicePrices() {
   const [params] = useSearchParams()
   const serviceId = params.get('service')
-  const serviceName = params.get('name') || 'Service'
-  const base = Number(params.get('base') || 0)
+  // name/base come from the service row, not the URL — query params go stale after
+  // an edit in Manage and would seed new exceptions at the old price
+  const [svc, setSvc] = useState(null)
+  const serviceName = svc?.name || params.get('name') || 'Service'
+  const base = svc ? Number(svc.price) : Number(params.get('base') || 0)
 
   const [patients, setPatients] = useState(null)
   const [exceptions, setExceptions] = useState([]) // {patient_id, price, name}
@@ -19,31 +22,45 @@ export default function OwnerServicePrices() {
 
   useEffect(() => {
     if (!serviceId) return
+    getService(serviceId).then(setSvc).catch(() => {})
     listPatients().then(setPatients).catch((e) => setErr(e.message))
     listPriceExceptions(serviceId).then(setExceptions).catch(() => {})
   }, [serviceId])
 
   const exceptionFor = (pid) => exceptions.find((x) => x.patient_id === pid)
 
-  const toggle = async (p, draftPrice) => {
+  const toggle = async (p) => {
     const existing = exceptionFor(p.id)
-    if (existing) {
-      await deletePriceException(serviceId, p.id)
-      setExceptions((x) => x.filter((e) => e.patient_id !== p.id))
-    } else {
-      const price = Number(draftPrice) || base
-      await upsertPriceException(serviceId, p.id, price)
-      setExceptions((x) => [...x, { patient_id: p.id, price, name: p.full_name }])
+    try {
+      if (existing) {
+        await deletePriceException(serviceId, p.id)
+        setExceptions((x) => x.filter((e) => e.patient_id !== p.id))
+      } else {
+        await upsertPriceException(serviceId, p.id, base)
+        setExceptions((x) => [...x, { patient_id: p.id, price: base, name: p.full_name }])
+      }
+      setErr('')
+    } catch (e) {
+      setErr(e.message) // writes used to fail silently — the row just didn't change
     }
   }
 
-  const setPrice = async (p, value) => {
+  const setPrice = async (p, value, inputEl) => {
     const price = Number(value)
-    if (!price || price <= 0) return
-    await upsertPriceException(serviceId, p.id, price)
-    setExceptions((x) => x.map((e) => (e.patient_id === p.id ? { ...e, price } : e)))
-    setSaved(true)
-    setTimeout(() => setSaved(false), 1500)
+    if (!(price > 0)) {
+      setErr('Custom price must be above zero.')
+      if (inputEl) inputEl.value = exceptionFor(p.id)?.price ?? '' // un-show the unsaved value
+      return
+    }
+    try {
+      await upsertPriceException(serviceId, p.id, price)
+      setExceptions((x) => x.map((e) => (e.patient_id === p.id ? { ...e, price } : e)))
+      setErr('')
+      setSaved(true)
+      setTimeout(() => setSaved(false), 1500)
+    } catch (e) {
+      setErr(e.message)
+    }
   }
 
   if (!serviceId) return <p className="px-4 py-10 text-sm text-gray-500">Open this screen from a service in Manage.</p>
@@ -87,7 +104,7 @@ export default function OwnerServicePrices() {
                 <span className="block text-[11px] text-gray-500">{p.email || '—'}</span>
               </span>
               {on ? (
-                <input type="number" defaultValue={exc.price} onBlur={(e) => setPrice(p, e.target.value)} aria-label="Custom price"
+                <input type="number" defaultValue={exc.price} onBlur={(e) => setPrice(p, e.target.value, e.target)} aria-label="Custom price"
                        className="w-20 h-9 border border-primary-600 rounded-lg px-2 text-sm font-bold text-right bg-white" />
               ) : (
                 <span className="text-xs text-gray-500 w-20 text-right">{peso(base)}</span>

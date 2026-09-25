@@ -3,8 +3,8 @@ import Skel from '../../components/Skel'
 import { useStickyState , useRevalidateOnVisible } from '../../lib/hooks'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/RoleContext'
-import { listMyAppointments, setAppointmentStatus, peso } from '../../lib/api'
-import { fmtTime12 } from '../../lib/format'
+import { listMyAppointments, setAppointmentStatus, peso, getClinicSettings } from '../../lib/api'
+import { fmtTime12, fmtDays } from '../../lib/format'
 
 const STATUS_PILL = {
   pending: 'bg-amber-100 text-amber-700',
@@ -21,6 +21,8 @@ const PAY_LABEL = { unpaid: 'Payment required', pending: 'Payment pending', paid
 const PAY_PILL = { unpaid: 'bg-gray-100 text-gray-500', pending: 'bg-amber-100 text-amber-700', paid: 'bg-green-100 text-green-700' }
 
 export default function MyAppointments() {
+  const [clinic, setClinic] = useState(null)
+  useEffect(() => { getClinicSettings().then(setClinic).catch(() => {}); }, [])
   const { patientRecord, refresh } = useAuth()
   const [appts, setAppts] = useState(null)
   const [err, setErr] = useState('')
@@ -124,12 +126,6 @@ export default function MyAppointments() {
             {a.status === 'approved' && a.payment_status === 'paid' && (
               <span className="inline-block mt-2 text-[11px] font-bold px-2 py-0.5 rounded bg-green-50 text-green-700">Paid ✓ · slot secured</span>
             )}
-            {(a.status === 'completed' || (a.payment_status === 'paid' && isPast(a))) && (
-              <button onClick={() => navigate('/receipt', { state: { appointment: a } })}
-                      className="mt-2 min-h-[44px] px-4 rounded-lg border border-primary-200 text-primary-700 text-xs font-semibold bg-white">
-                Attach receipt
-              </button>
-            )}
           </div>
         ))}
 
@@ -137,10 +133,10 @@ export default function MyAppointments() {
         <div className="bg-white border border-gray-200 rounded-lg p-4 mt-4">
           <div className="text-[11px] font-bold uppercase tracking-wide text-gray-500 mb-2">Clinic information</div>
           <div className="flex justify-between text-sm py-1.5 border-t border-gray-100">
-            <span className="text-gray-500">Hours</span><span className="font-semibold text-gray-900">Mon - Sat · 8 AM – 5 PM</span>
+            <span className="text-gray-500">Hours</span><span className="font-semibold text-gray-900">{fmtDays(clinic?.open_days)} · {clinic ? fmtTime12(clinic.open_time) + ' – ' + fmtTime12(clinic.close_time) : '10 AM – 5 PM'}</span>
           </div>
           <div className="flex justify-between text-sm py-1.5 border-t border-gray-100">
-            <span className="text-gray-500">Contact</span><span className="font-semibold text-primary-700">dr.joson@dardenal.ph</span>
+            <span className="text-gray-500">Contact</span><span className="font-semibold text-primary-700">{clinic?.clinic_email ?? ''}</span>
           </div>
         </div>
       </div>

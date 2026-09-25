@@ -48,8 +48,8 @@ const tab = async (label) => {
 
 // seed pending requests (idempotent)
 {
-  const { createClient } = await import('file:///home/attila/Documents/Projects/dentalvibe/frontend/node_modules/@supabase/supabase-js/dist/index.cjs')
-  const env = Object.fromEntries(fs.readFileSync('/home/attila/Documents/Projects/dentalvibe/frontend/.env.local', 'utf8').trim().split('\n').map((l) => l.split('=')))
+  const { createClient } = await import('@supabase/supabase-js')
+  const env = Object.fromEntries(fs.readFileSync(new URL('./.env.local', import.meta.url), 'utf8').trim().split('\n').map((l) => l.split('=')))
   const sb = createClient(env.VITE_SUPABASE_URL, env.VITE_SUPABASE_ANON_KEY)
   await sb.auth.signInWithPassword({ email: 'owner@dentalvibe.ph', password: 'password123' })
   const day = (o) => { const d = new Date(); d.setDate(d.getDate() + o); return d.toISOString().slice(0, 10) }
@@ -181,8 +181,8 @@ check('logout works', (await pg.locator('input[type="email"]').count()) === 1)
 
 // self-cleanup: remove the QA patient row + its notifications
 try {
-  const env = Object.fromEntries(fs.readFileSync('/home/attila/Documents/Projects/dentalvibe/frontend/.env.local', 'utf8').trim().split('\n').map((l) => l.split('=')))
-  const { createClient } = await import('file:///home/attila/Documents/Projects/dentalvibe/frontend/node_modules/@supabase/supabase-js/dist/index.cjs')
+  const env = Object.fromEntries(fs.readFileSync(new URL('./.env.local', import.meta.url), 'utf8').trim().split('\n').map((l) => l.split('=')))
+  const { createClient } = await import('@supabase/supabase-js')
   const sbs = createClient(env.VITE_SUPABASE_URL, env.VITE_SUPABASE_ANON_KEY)
   await sbs.auth.signInWithPassword({ email: 'owner@dentalvibe.ph', password: 'password123' })
   const { data: jp } = await sbs.from('patients').select('id, user_id, full_name').eq('full_name', 'QA Final')

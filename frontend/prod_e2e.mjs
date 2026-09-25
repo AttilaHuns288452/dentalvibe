@@ -1,7 +1,7 @@
 import { cleanTestFuture } from './pretest_clean.mjs'
 // PRODUCTION E2E: patient books → pays → owner approves (gated) → completes → income
 import { chromium } from './qa_playwright.mjs'
-import { createClient } from 'file:///home/attila/Documents/Projects/dentalvibe/frontend/node_modules/@supabase/supabase-js/dist/index.cjs'
+import { createClient } from '@supabase/supabase-js'
 import fs from 'fs'
 const pickDate = async (pg, daysAhead) => {
   const target = new Date(Date.now() + daysAhead * 864e5)
@@ -16,7 +16,7 @@ const pickDate = async (pg, daysAhead) => {
   }
   await pg.getByRole('button', { name: String(target.getDate()), exact: true }).click()
 }
-const env = Object.fromEntries(fs.readFileSync('/home/attila/Documents/Projects/dentalvibe/frontend/.env.local', 'utf8').trim().split('\n').map((l) => l.split('=')))
+const env = Object.fromEntries(fs.readFileSync(new URL('./.env.local', import.meta.url), 'utf8').trim().split('\n').map((l) => l.split('=')))
 
 await cleanTestFuture(['Prod Patient'])
 const b = await chromium.launch()

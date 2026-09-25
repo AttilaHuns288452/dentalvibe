@@ -4,7 +4,7 @@ import { createClient } from '@supabase/supabase-js'
 import fs from 'fs'
 
 const env = Object.fromEntries(
-  fs.readFileSync('/home/attila/Documents/Projects/dentalvibe/frontend/.env.local', 'utf8').trim().split('\n').map((l) => l.split('=')),
+  fs.readFileSync(new URL('./.env.local', import.meta.url), 'utf8').trim().split('\n').map((l) => l.split('=')),
 )
 const sb = createClient(env.VITE_SUPABASE_URL, env.VITE_SUPABASE_ANON_KEY)
 const email = process.argv[2]

@@ -3,10 +3,11 @@
 // usage: cd frontend && node shots_responsive.mjs [--vp=390x844] [--role=patient]
 import { chromium } from './qa_playwright.mjs'
 import fs from 'fs'
+import { fileURLToPath } from 'node:url'
 
 const BASE = process.env.QA_BASE || 'http://localhost:4176'
 const VPS = [[360, 800], [390, 844], [412, 915], [768, 1024], [1024, 768], [1440, 900]]
-const OUT = '/home/attila/Documents/Projects/dentalvibe/screenshots/responsive'
+const OUT = fileURLToPath(new URL('../screenshots/responsive/', import.meta.url))
 fs.mkdirSync(OUT, { recursive: true })
 
 const ROUTES = {
@@ -111,5 +112,5 @@ function desktopOrMobile(w) { return w >= 768 ? 'desktop' : 'mobile' }
 
 const counts = findings.reduce((a, f) => (a[f.sev] = (a[f.sev] || 0) + 1, a), {})
 console.log(`\n===== RESPONSIVE AUDIT: ${findings.length} findings ${JSON.stringify(counts)} =====`)
-fs.writeFileSync('/home/attila/Documents/Projects/dentalvibe/audit_responsive.json', JSON.stringify(findings, null, 2))
+fs.writeFileSync(fileURLToPath(new URL('../audit_responsive.json', import.meta.url)), JSON.stringify(findings, null, 2))
 await b.close()

@@ -3,7 +3,7 @@ import { useRevalidateOnVisible } from '../../lib/hooks'
 import { useEffect, useState } from 'react'
 import { listAppointments, setAppointmentStatus, getClinicSettings } from '../../lib/api'
 import { fmtTime12 } from '../../lib/format'
-import { slotStartsFor } from '../../lib/availability'
+import { slotStartsFor, manilaDayKey, manilaHM, addDaysISO, TZ } from '../../lib/availability'
 
 // Calendar Day view — Figma frame 29: Day/Week/Month seg control, formatted date
 // heading, hour rows with color-coded appointment blocks (time · name · service).
@@ -15,16 +15,21 @@ const STATUS_PILL = {
   cancelled: 'bg-red-100 text-red-600 border-l-red-500',
 }
 
-// Manila wall-clock 'HH:MM' for an instant — Intl only, no UTC-offset arithmetic.
-const manilaHM = (d) => new Intl.DateTimeFormat('en-GB', {
-  timeZone: 'Asia/Manila', hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
-}).format(d)
+// Manila calendar day key for an appointment — scheduled_at is an instant (timestamptz),
+// requested_date is a plain date. Never slice the ISO string: its date part is UTC.
+const apptDay = (a) => (a.scheduled_at ? manilaDayKey(new Date(a.scheduled_at)) : (a.requested_date || '').slice(0, 10))
+
+// 30-min grid row ('HH:MM') an appointment's Manila start time falls into.
+const slotOf = (a) => {
+  const t = manilaHM(new Date(a.scheduled_at))
+  return t.slice(0, 3) + (t.slice(3) < '30' ? '00' : '30')
+}
 
 export default function DoctorCalendar() {
   const [appts, setAppts] = useState(null)
   const [settings, setSettings] = useState(null)
   const [view, setView] = useState('Day')
-  const [day, setDay] = useState(new Date().toISOString().slice(0, 10))
+  const [day, setDay] = useState(() => manilaDayKey(new Date())) // Manila "today", not UTC
   // default to a day that has appointments (demo-friendly); fallback to today
   const [err, setErr] = useState('')
 
@@ -35,18 +40,17 @@ export default function DoctorCalendar() {
   useEffect(() => { load() }, [])
   useEffect(() => {
     if (!appts?.length) return
-    const today = new Date().toISOString().slice(0, 10)
-    const upcoming = (appts || []).map((a) => (a.scheduled_at || a.requested_date || '').slice(0, 10)).filter((d) => d >= today).sort()[0]
-    const any = (appts || []).map((a) => (a.scheduled_at || a.requested_date || '').slice(0, 10)).sort()[0]
-    setDay(upcoming || any || today)
+    const today = manilaDayKey(new Date())
+    const keys = (appts || []).map(apptDay).filter(Boolean).sort()
+    setDay(keys.find((d) => d >= today) || keys[0] || today)
   }, [appts])
   useRevalidateOnVisible(load)
 
   const dayAppts = (appts ?? [])
-    .filter((a) => (a.scheduled_at || a.requested_date || '').slice(0, 10) === day && a.status !== 'cancelled')
+    .filter((a) => apptDay(a) === day && a.status !== 'cancelled')
     .sort((a, b) => (a.scheduled_at || '').localeCompare(b.scheduled_at || ''))
 
-  const heading = new Date(day + 'T12:00:00').toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' })
+  const heading = new Date(day + 'T12:00:00Z').toLocaleDateString([], { timeZone: TZ, weekday: 'long', month: 'long', day: 'numeric' })
   // day grid derives from clinic_settings via the same availability model patient booking uses —
   // the two roles can never disagree. Full 30-min open-hours grid, no busy ranges.
   const slots = settings ? slotStartsFor(settings, day, 30, []) : []
@@ -76,11 +80,11 @@ export default function DoctorCalendar() {
       </div>
 
       <div className="flex items-center gap-2">
-        <button type="button" aria-label="Previous day" onClick={() => { const d = new Date(day + 'T12:00:00'); d.setDate(d.getDate() - 1); setDay(d.toISOString().slice(0, 10)) }}
+        <button type="button" aria-label="Previous day" onClick={() => setDay(addDaysISO(day, -1))}
                 className="w-9 h-9 rounded-lg border border-gray-200 bg-white text-gray-600">‹</button>
         <input type="date" value={day} onChange={(e) => setDay(e.target.value)}
              className="h-9 px-2.5 rounded-lg border border-gray-200 bg-white text-xs font-semibold text-gray-600" />
-        <button type="button" aria-label="Next day" onClick={() => { const d = new Date(day + 'T12:00:00'); d.setDate(d.getDate() + 1); setDay(d.toISOString().slice(0, 10)) }}
+        <button type="button" aria-label="Next day" onClick={() => setDay(addDaysISO(day, 1))}
                 className="w-9 h-9 rounded-lg border border-gray-200 bg-white text-gray-600">›</button>
       </div>
 
@@ -92,13 +96,13 @@ export default function DoctorCalendar() {
       {/* hour grid with blocks (Figma day view) */}
       {view === 'Day' && (
         <div className="space-y-1.5">
-          {/* appointments without a scheduled time (pending/unscheduled) render first */}
-          {dayAppts.filter((a) => !a.scheduled_at).map((a) => (
+          {/* unscheduled (no time) and off-grid appointments render first */}
+          {dayAppts.filter((a) => !a.scheduled_at || !slots.includes(slotOf(a))).map((a) => (
             <div key={a.id} className="flex gap-2 items-stretch">
-              <div className="w-16 text-xs font-bold text-gray-400 flex items-center flex-none">TBA</div>
+              <div className="w-16 text-xs font-bold text-gray-400 flex items-center flex-none">{a.scheduled_at ? fmtTime12(manilaHM(new Date(a.scheduled_at))) : 'TBA'}</div>
               <div className={'flex-1 bg-white border border-gray-200 border-l-4 rounded-lg px-3 py-2 ' + (STATUS_PILL[a.status] || 'border-l-gray-400')}>
                 <div className="flex items-center gap-2">
-                  <span className="text-xs font-bold text-gray-900">Unscheduled</span>
+                  <span className="text-xs font-bold text-gray-900">{a.scheduled_at ? 'Off-hours' : 'Unscheduled'}</span>
                   <span className={'text-[10px] font-bold px-1.5 py-0.5 rounded capitalize ' + (STATUS_PILL[a.status] || '')}>{a.status}</span>
                 </div>
                 <div className="text-sm font-semibold text-gray-900">{a.patients?.full_name}</div>
@@ -107,14 +111,14 @@ export default function DoctorCalendar() {
             </div>
           ))}
           {slots.map((h) => {
-            const block = dayAppts.find((a) => a.scheduled_at && manilaHM(new Date(a.scheduled_at)).slice(0, 2) === h.slice(0, 2))
+            const block = dayAppts.find((a) => a.scheduled_at && slotOf(a) === h)
             return (
               <div key={h} className="flex gap-2 items-stretch">
                 <div className="w-16 text-xs font-bold text-gray-900 flex items-center flex-none">{fmtTime12(h).replace(':00', '')}</div>
                 {block ? (
                   <div className={'flex-1 bg-white border border-gray-200 border-l-4 rounded-lg px-3 py-2 ' + (STATUS_PILL[block.status] || 'border-l-gray-400')}>
                     <div className="flex items-center gap-2">
-                      <span className="text-xs font-bold text-gray-900">{block.scheduled_at ? new Date(block.scheduled_at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : 'TBA'}</span>
+                      <span className="text-xs font-bold text-gray-900">{block.scheduled_at ? fmtTime12(manilaHM(new Date(block.scheduled_at))) : 'TBA'}</span>
                       <span className={'text-[10px] font-bold px-1.5 py-0.5 rounded capitalize ' + (STATUS_PILL[block.status] || '')}>{block.status}</span>
                     </div>
                     <div className="text-sm font-semibold text-gray-900">{block.patients?.full_name}</div>
@@ -142,14 +146,13 @@ export default function DoctorCalendar() {
       {view === 'Week' && (
         <div className="space-y-2">
           {[0, 1, 2, 3, 4, 5, 6].map((o) => {
-            const d = new Date(day + 'T12:00:00'); d.setDate(d.getDate() + o)
-            const ds = d.toISOString().slice(0, 10)
-            const items = (appts ?? []).filter((a) => (a.scheduled_at || a.requested_date || '').slice(0, 10) === ds && a.status !== 'cancelled')
+            const ds = addDaysISO(day, o)
+            const items = (appts ?? []).filter((a) => apptDay(a) === ds && a.status !== 'cancelled')
             return (
               <div key={ds} className="bg-white border border-gray-200 rounded-lg px-3.5 py-2.5">
-                <div className="text-xs font-bold text-gray-900">{d.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })} <span className="text-gray-500 font-medium">· {items.length} booked</span></div>
+                <div className="text-xs font-bold text-gray-900">{new Date(ds + 'T12:00:00Z').toLocaleDateString([], { timeZone: TZ, weekday: 'short', month: 'short', day: 'numeric' })} <span className="text-gray-500 font-medium">· {items.length} booked</span></div>
                 {items.slice(0, 2).map((a) => (
-                  <div key={a.id} className="text-xs text-gray-500 mt-1">{a.patients?.full_name} · {a.services?.name} {a.scheduled_at ? '· ' + fmtTime12(a.scheduled_at.slice(11, 16)) : ''}</div>
+                  <div key={a.id} className="text-xs text-gray-500 mt-1">{a.patients?.full_name} · {a.services?.name} {a.scheduled_at ? '· ' + fmtTime12(manilaHM(new Date(a.scheduled_at))) : ''}</div>
                 ))}
               </div>
             )
@@ -158,9 +161,11 @@ export default function DoctorCalendar() {
       )}
 
       {view === 'Month' && (() => {
-        const first = new Date(day + 'T12:00:00'); first.setDate(1)
-        const startDow = first.getDay()
-        const daysInMonth = new Date(first.getFullYear(), first.getMonth() + 1, 0).getDate()
+        const firstKey = day.slice(0, 8) + '01'
+        const first = new Date(firstKey + 'T12:00:00Z')
+        const startDow = first.getUTCDay()
+        const daysInMonth = new Date(Date.UTC(first.getUTCFullYear(), first.getUTCMonth() + 1, 0)).getUTCDate()
+        const todayKey = manilaDayKey(new Date())
         const cells = []
         for (let i = 0; i < startDow; i++) cells.push(null)
         for (let dnum = 1; dnum <= daysInMonth; dnum++) cells.push(dnum)
@@ -172,9 +177,9 @@ export default function DoctorCalendar() {
             <div className="grid grid-cols-7 gap-1">
               {cells.map((dnum, i) => {
                 if (!dnum) return <div key={'e' + i} />
-                const ds = `${first.getFullYear()}-${String(first.getMonth() + 1).padStart(2, '0')}-${String(dnum).padStart(2, '0')}`
-                const items = (appts ?? []).filter((a) => (a.scheduled_at || a.requested_date || '').slice(0, 10) === ds && a.status !== 'cancelled')
-                const isToday = ds === new Date().toISOString().slice(0, 10)
+                const ds = firstKey.slice(0, 8) + String(dnum).padStart(2, '0')
+                const items = (appts ?? []).filter((a) => apptDay(a) === ds && a.status !== 'cancelled')
+                const isToday = ds === todayKey
                 return (
                   <button key={ds} onClick={() => { setDay(ds); setView('Day') }} className={'min-h-14 rounded-lg border p-1 text-left ' + (isToday ? 'border-blue-400 bg-blue-50' : 'border-gray-200 bg-white')}>
                     <div className="text-[10px] font-bold text-gray-900">{dnum}</div>
@@ -192,11 +197,14 @@ export default function DoctorCalendar() {
       <div className="bg-gray-50 border border-gray-200 rounded-lg p-3.5 divide-y divide-gray-200 text-sm">
         <div className="flex justify-between py-1">
           <span className="text-gray-600">Today</span>
-          <span className="font-semibold text-gray-900">{appts?.filter((a) => (a.scheduled_at || a.requested_date || '').slice(0, 10) === new Date().toISOString().slice(0, 10) && a.status !== 'cancelled').length ?? 0} booked</span>
+          <span className="font-semibold text-gray-900">{appts?.filter((a) => apptDay(a) === manilaDayKey(new Date()) && a.status !== 'cancelled').length ?? 0} booked</span>
         </div>
         <div className="flex justify-between py-1">
           <span className="text-gray-600">This week</span>
-          <span className="font-semibold text-gray-900">{appts?.filter((a) => { const d = new Date(a.scheduled_at || a.requested_date); const n = new Date(); return a.status !== 'cancelled' && d >= new Date(n.getFullYear(), n.getMonth(), n.getDate()) && d < new Date(n.getFullYear(), n.getMonth(), n.getDate() + 7) }).length ?? 0} booked</span>
+          <span className="font-semibold text-gray-900">{(() => {
+            const t0 = manilaDayKey(new Date()); const t7 = addDaysISO(t0, 7)
+            return appts?.filter((a) => { const d = apptDay(a); return a.status !== 'cancelled' && d >= t0 && d < t7 }).length ?? 0
+          })()} booked</span>
         </div>
       </div>
       <div className="h-4" />

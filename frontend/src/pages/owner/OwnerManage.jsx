@@ -21,10 +21,10 @@ export default function OwnerManage() {
 
   useEffect(() => {
     getClinicSettings().then(setSettings).catch((e) => setErr(e.message))
-    listServices().then(setServices).catch(() => {})
+    listServices(true).then(setServices).catch(() => {}) // full catalog incl. inactive (toggle below)
   }, [])
 
-  const reloadServices = () => listServices().then(setServices).catch(() => {})
+  const reloadServices = () => listServices(true).then(setServices).catch(() => {})
 
   const saveImpl = async () => {
     try {

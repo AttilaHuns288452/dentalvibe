@@ -126,8 +126,6 @@ function Routes() {
       return <PatientShell name="Payment" />
     case '/pay/qr':
       return <PatientShell name="QrPayment" />
-    case '/receipt':
-      return <PatientShell name="Receipt" />
     case '/reset':
       return <ResetPassword />
     case '/reset-confirm':

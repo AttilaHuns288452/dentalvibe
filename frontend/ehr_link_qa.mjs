@@ -4,7 +4,7 @@
 // 3. new browser tab with same URL shows the record
 // 4. browser Back/Forward keep working (no crash, correct screens)
 // 5. patient (maria) opening another patient's /ehr/<id> sees no clinical data
-import { chromium } from '/home/attila/.hermes/hermes-agent/node_modules/playwright/index.mjs'
+import { chromium } from './qa_playwright.mjs'
 
 const BASE = process.env.QA_BASE || 'http://localhost:4176'
 let pass = 0, fail = 0

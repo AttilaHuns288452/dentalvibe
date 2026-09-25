@@ -1,6 +1,7 @@
-import('/home/attila/.hermes/hermes-agent/node_modules/playwright/index.mjs').then(async ({ chromium }) => {
+import('./frontend/qa_playwright.mjs').then(async ({ chromium }) => {
   const BASE = 'https://dentalvibe.vercel.app'
-  const OUT = process.env.OUT || '/home/attila/Documents/Projects/dentalvibe/screenshots'
+  const { fileURLToPath } = await import('node:url')
+  const OUT = process.env.OUT || fileURLToPath(new URL('./screenshots/', import.meta.url))
   const b = await chromium.launch()
   const ctx = await b.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 })
   const pg = await ctx.newPage()

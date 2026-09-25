@@ -78,9 +78,19 @@ export async function getMyPatientRecord(userId) {
 }
 
 // ---- catalog / settings (public read) ----
-export async function listServices() {
-  const { data, error } = await supabase.from('services').select('*').order('price')
+// booking catalog = active services only (the DB rejects inactive ones anyway);
+// owner manage passes includeInactive to see/toggle the full catalog
+export async function listServices(includeInactive = false) {
+  let q = supabase.from('services').select('*').order('price')
+  if (!includeInactive) q = q.eq('active', true)
+  const { data, error } = await q
   return must(data, error) ?? []
+}
+
+export async function getService(id) {
+  const { data, error } = await supabase.from('services').select('*').eq('id', id).maybeSingle()
+  if (error) throw error
+  return data
 }
 
 export async function getClinicSettings() {
@@ -91,6 +101,11 @@ export async function getClinicSettings() {
 export async function updateClinicSettings(patch) {
   const { error } = await supabase.from('clinic_settings').update(patch).eq('id', 1)
   if (error) throw error
+  // propagate a rename into the cached name + every mounted useClinicName
+  if (patch.clinic_name !== undefined) {
+    _clinicName = patch.clinic_name || 'D.A.R. Dental Clinic'
+    window.dispatchEvent(new Event('dv-clinic-name'))
+  }
 }
 
 // ---- services (owner) ----

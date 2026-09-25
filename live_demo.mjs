@@ -1,8 +1,7 @@
 // LIVE DEMO ACCEPTANCE (§8/§23): UI-only mutations, 3 role sessions, DB readback as the roles see it.
-import('/home/attila/.hermes/hermes-agent/node_modules/playwright/index.mjs').then(async ({ chromium }) => {
+import('./frontend/qa_playwright.mjs').then(async ({ chromium, createClient }) => {
   const fs = await import('fs')
-  const { createClient } = await import('/home/attila/Documents/Projects/dentalvibe/frontend/node_modules/@supabase/supabase-js/dist/index.mjs')
-  const ANON = fs.readFileSync('/home/attila/Documents/Projects/dentalvibe/frontend/.env.local', 'utf8').match(/ANON_KEY=(.*)/)[1].trim()
+  const ANON = fs.readFileSync(new URL('./frontend/.env.local', import.meta.url), 'utf8').match(/ANON_KEY=(.*)/)[1].trim()
   const SB = 'https://wfmtkmfevdqbhtpqamic.supabase.co'
   const BASE = 'https://dentalvibe.vercel.app'
   const R = []

@@ -2,7 +2,7 @@
 // Owner changes hours via the Manage UI → patient booking slots and the doctor calendar rows must
 // both follow; original settings are restored at the end. No data is created (no bookings).
 // Run (from frontend/): node scheduling_qa.mjs   (QA_BASE defaults to http://localhost:4176)
-import { chromium } from '/home/attila/.hermes/hermes-agent/node_modules/playwright/index.mjs'
+import { chromium } from './qa_playwright.mjs'
 import { createClient } from '@supabase/supabase-js'
 import fs from 'fs'
 

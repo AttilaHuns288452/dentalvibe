@@ -1,9 +1,10 @@
 // Before/after spacing screenshots. usage: node shots_spacing.mjs
 import { chromium } from './qa_playwright.mjs'
 import fs from 'fs'
+import { fileURLToPath } from 'node:url'
 
 const BASE = 'http://localhost:4176'
-const OUT = '/home/attila/Documents/Projects/dentalvibe/screenshots'
+const OUT = fileURLToPath(new URL('../screenshots/', import.meta.url))
 fs.mkdirSync(OUT, { recursive: true })
 
 const b = await chromium.launch()

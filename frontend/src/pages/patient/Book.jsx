@@ -4,7 +4,7 @@ import { useStickyState } from '../../lib/hooks'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/RoleContext'
 import { listServices, bookAppointment, peso, supabase, getClinicSettings } from '../../lib/api'
-import { isOpenOn, slotStartsFor } from '../../lib/availability'
+import { isOpenOn, slotStartsFor, manilaDayKey, manilaToInstant } from '../../lib/availability'
 
 // Booking — two focused steps (p36 → p87→121):
 //   1 · Services (search, multi-select, fee notice)   2 · Date & time (calendar grid, fit-checked slots, notes)
@@ -51,8 +51,9 @@ export default function Book() {
     setBusyRanges([])
     setTime('')
     if (!date) return
-    const from = new Date(`${date}T00:00:00`)
-    const to = new Date(from.getTime() + 864e5)
+    // busy window is the Manila calendar day (the patient's chosen date), not the browser's
+    const from = manilaToInstant(date, '00:00')
+    const to = new Date(from.getTime() + 864e5) // Manila has no DST: a day is exactly 24h
     supabase.from('appointments')
       .select('scheduled_at, duration_minutes')
       .in('payment_status', ['pending', 'paid']).neq('status', 'cancelled')
@@ -84,7 +85,7 @@ export default function Book() {
         serviceId: picked[0],
         serviceIds: picked,
         requestedDate: date,
-        scheduledAt: new Date(`${date}T${time}:00`).toISOString(),
+        scheduledAt: manilaToInstant(date, time).toISOString(), // slot label is Manila wall time
         durationMinutes: visitMins,
         notes,
         price: total,
@@ -245,17 +246,18 @@ export default function Book() {
 // Month-grid date picker (Figma p87: Monday-first month header + day grid)
 // Closed days come from clinic_settings via isOpenOn — the old hardcoded Sunday rule is gone.
 function DateGrid({ date, setDate, settings }) {
-  const today = new Date(); today.setHours(0, 0, 0, 0)
-  const [month, setMonth] = useState(() => new Date(today.getFullYear(), today.getMonth(), 1))
+  const todayISO = manilaDayKey(new Date()) // Manila "today", not the browser's
+  const [tY, tM] = todayISO.split('-').map(Number)
+  const [month, setMonth] = useState(() => new Date(tY, tM - 1, 1))
   const monthName = month.toLocaleDateString('en-PH', { month: 'long', year: 'numeric' })
   const firstDay = (month.getDay() + 6) % 7 // Monday-first (p87)
   const days = new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate()
   const cells = [...Array(firstDay).fill(null), ...Array.from({ length: days }, (_, i) => i + 1)]
   const iso = (d) => `${month.getFullYear()}-${String(month.getMonth() + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`
-  const past = (d) => new Date(`${iso(d)}T00:00:00`) < today || (settings ? !isOpenOn(settings, iso(d)) : false)
+  const past = (d) => iso(d) < todayISO || (settings ? !isOpenOn(settings, iso(d)) : false)
   const atEdge = (dir) => dir < 0
-    ? month <= new Date(today.getFullYear(), today.getMonth(), 1)
-    : month >= new Date(today.getFullYear(), today.getMonth() + 2, 1)
+    ? month <= new Date(tY, tM - 1, 1)
+    : month >= new Date(tY, tM + 1, 1)
   return (
     <section>
       <div className="flex items-center justify-between mb-1.5">
@@ -276,7 +278,7 @@ function DateGrid({ date, setDate, settings }) {
           {cells.map((d, i) => {
             if (!d) return <span key={'e' + i} />
             const sel = date === iso(d)
-            const t0 = new Date(); const isToday = iso(d) === `${t0.getFullYear()}-${String(t0.getMonth() + 1).padStart(2, '0')}-${String(t0.getDate()).padStart(2, '0')}`
+            const isToday = iso(d) === todayISO
             return (
               <button type="button" key={d} disabled={past(d)} onClick={() => setDate(iso(d))}
                       className={'h-11 rounded-lg text-sm font-semibold ' +

@@ -3,7 +3,7 @@
 // Timezone: Asia/Manila. All wall-clock conversion goes through Intl.DateTimeFormat —
 // never (getUTCHours() + 8) arithmetic.
 
-const TZ = 'Asia/Manila'
+export const TZ = 'Asia/Manila'
 const minsOf = (hhmm) => {
   const [h, m] = hhmm.split(':').map(Number)
   return h * 60 + m
@@ -17,6 +17,29 @@ const manilaParts = (date) => Object.fromEntries(
     hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
   }).formatToParts(date).map((p) => [p.type, p.value]),
 )
+
+// Manila calendar day key ('YYYY-MM-DD') for an instant
+export const manilaDayKey = (date) => {
+  const p = manilaParts(date)
+  return `${p.year}-${p.month}-${p.day}`
+}
+
+// Manila wall-clock 'HH:MM' for an instant
+export const manilaHM = (date) => {
+  const p = manilaParts(date)
+  return `${p.hour}:${p.minute}`
+}
+
+// Date-key arithmetic (pure calendar, no clock) — noon-UTC anchor keeps the day stable.
+export const addDaysISO = (dateISO, n) => {
+  const d = new Date(`${dateISO}T12:00:00Z`)
+  d.setUTCDate(d.getUTCDate() + n)
+  return d.toISOString().slice(0, 10)
+}
+
+// Manila wall time ('YYYY-MM-DD' + 'HH:MM') → Date instant. Asia/Manila is fixed
+// UTC+8 (PH has no DST), so the offset suffix is exact.
+export const manilaToInstant = (dateISO, hhmm) => new Date(`${dateISO}T${hhmm}:00+08:00`)
 
 // Is the clinic open on calendar date `dateISO` ('YYYY-MM-DD')? Driven by settings.open_days
 // ({Mon,Tue,...}). Noon-UTC anchor keeps the Manila weekday stable (PH has no DST).

@@ -48,9 +48,14 @@ export function useSubmit(fn) {
   return [run, busy]
 }
 
-// clinic display name, fetched once and cached (see lib/api clinicName)
+// clinic display name, cached (see lib/api clinicName) — re-reads on rename
 export function useClinicName() {
   const [name, setName] = useState('D.A.R. Dental Clinic')
-  useEffect(() => { clinicName().then(setName) }, [])
+  useEffect(() => {
+    const load = () => clinicName().then(setName)
+    load()
+    window.addEventListener('dv-clinic-name', load) // updateClinicSettings dispatches on rename
+    return () => window.removeEventListener('dv-clinic-name', load)
+  }, [])
   return name
 }

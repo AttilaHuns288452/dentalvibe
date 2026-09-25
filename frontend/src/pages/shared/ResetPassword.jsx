@@ -1,9 +1,12 @@
-import { useState } from 'react'
-import { supabase } from '../../lib/api'
+import { useEffect, useState } from 'react'
+import { supabase, getClinicSettings } from '../../lib/api'
+import { fmtTime12, fmtDays } from '../../lib/format'
 
 // Reset Password (p53): email → reset link. Supabase sends the email; user
-// returns via the link which lands them on /#/reset with the recovery session.
+// returns via the link which lands them on /reset-confirm with the recovery session.
 export default function ResetPassword() {
+  const [clinic, setClinic] = useState(null)
+  useEffect(() => { getClinicSettings().then(setClinic).catch(() => {}); }, [])
   const [email, setEmail] = useState('')
   const [sent, setSent] = useState(false)
   const [err, setErr] = useState('')
@@ -15,7 +18,7 @@ export default function ResetPassword() {
     if (!/^\S+@\S+\.\S+$/.test(email)) return setErr('Enter a valid email address.')
     setBusy(true)
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: window.location.origin + '/#/reset-confirm',
+      redirectTo: window.location.origin + '/reset-confirm', // routed path — hash routes are gone
     })
     setBusy(false)
     if (error) return setErr(error.message)
@@ -52,10 +55,10 @@ export default function ResetPassword() {
       )}
       <div className="mt-8 bg-white border border-gray-200 rounded-lg p-3.5 text-xs text-gray-600 space-y-1">
         <div className="font-semibold text-gray-900">Still need help?</div>
-        <div>Clinic email · dr.joson@dardenal.ph</div>
-        <div>Hours · Mon – Sat · 8 AM – 5 PM</div>
+        <div>Clinic email · {clinic?.clinic_email ?? ''}</div>
+        <div>Hours · {fmtDays(clinic?.open_days)} · {clinic ? fmtTime12(clinic.open_time) + ' – ' + fmtTime12(clinic.close_time) : '10 AM – 5 PM'}</div>
       </div>
-      <a href="#/" className="block text-center text-xs font-semibold text-primary-700 mt-4">Back to Sign In</a>
+      <a href="/" className="block text-center text-xs font-semibold text-primary-700 mt-4">Back to Sign In</a>
     </div>
   )
 }
@@ -95,7 +98,7 @@ export function ResetConfirm() {
         </div>
         <h1 className="text-lg font-bold text-gray-900 mt-3">Password updated</h1>
         <p className="text-xs text-gray-500 mt-1">You'll be signed in with the new password next time.</p>
-        <a href="#/" className="inline-block mt-4 h-10 px-6 leading-10 rounded-lg bg-primary-600 text-white text-sm font-semibold">Back to Sign In</a>
+        <a href="/" className="inline-block mt-4 h-10 px-6 leading-10 rounded-lg bg-primary-600 text-white text-sm font-semibold">Back to Sign In</a>
       </div>
     )
   }

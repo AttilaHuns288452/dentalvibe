@@ -30,3 +30,9 @@ export function printReport(title, lines) {
   w.focus()
   w.print()
 }
+
+// open_days array -> 'Mon – Sat' when contiguous, else the full list
+export const fmtDays = (arr) => {
+  if (!Array.isArray(arr) || !arr.length) return 'Mon – Sat'
+  return arr.length > 2 ? `${arr[0]} – ${arr[arr.length - 1]}` : arr.join(', ')
+}
