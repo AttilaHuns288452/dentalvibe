@@ -133,6 +133,29 @@ if (svcx && mariaRow && p2) {
   await svc.auth.admin.deleteUser(au2.user.id)
 } else check('C. pricing prerequisites (service + both patients)', false, JSON.stringify({ svcx: !!svcx, maria: !!mariaRow, p2: !!p2 }))
 
+// ═══ E. WALK-IN CLAIM — one human, one record (§21 duplicate prevention) ═══
+const EEMAIL = 'qaclaim' + TS + '@dentalvibe.ph'
+const { data: walkin } = await svc.from('patients').insert({ full_name: 'QA Walkin ' + TS, email: EEMAIL, phone: '+63 911 000 0000', medical_note: 'clinic-entered history' }).select().maybeSingle()
+const { data: reg } = await svc.auth.admin.createUser({ email: EEMAIL, password: 'Password123', email_confirm: true, user_metadata: { full_name: 'QA Walkin ' + TS } })
+await new Promise((r) => setTimeout(r, 800))
+const { data: rows } = await svc.from('patients').select('id, user_id, full_name, phone, medical_note, patient_code').eq('email', EEMAIL)
+check('E1. signup CLAIMS the walk-in record (exactly one row)', (rows ?? []).length === 1, 'rows=' + (rows ?? []).length)
+check('E2. account linked to the record', rows?.[0]?.user_id === reg?.user?.id, rows?.[0]?.user_id ?? 'none')
+check('E3. clinic data preserved (phone + note + code)', rows?.[0]?.phone === '+63 911 000 0000' && rows?.[0]?.medical_note === 'clinic-entered history' && rows?.[0]?.patient_code === walkin?.patient_code, JSON.stringify(rows?.[0] ?? {}).slice(0, 120))
+// schema backstop: a direct duplicate insert is impossible
+const dup = await svc.from('patients').insert({ full_name: 'Dup ' + TS, email: EEMAIL })
+check('E4. unique index blocks duplicates at the schema level', !!dup.error && /ux_patients_email/.test(dup.error.message), dup.error?.code ?? 'INSERTED!')
+// fresh email still creates a fresh row
+const { data: fresh } = await svc.auth.admin.createUser({ email: 'qafresh' + TS + '@dentalvibe.ph', password: 'Password123', email_confirm: true, user_metadata: { full_name: 'QA Fresh ' + TS } })
+const { data: freshRow } = await svc.from('patients').select('id').eq('user_id', fresh.user.id).maybeSingle()
+check('E5. fresh registration still creates its own record', !!freshRow)
+// cleanup
+await svc.from('patients').delete().eq('email', EEMAIL)
+await svc.from('patients').delete().eq('user_id', fresh.user.id)
+await svc.from('profiles').delete().in('id', [reg.user.id, fresh.user.id])
+await svc.auth.admin.deleteUser(reg.user.id)
+await svc.auth.admin.deleteUser(fresh.user.id)
+
 // ═══ D. MULTI-TAB (§26) ═══
 const tabA = await ctx.newPage()
 const tabB = await ctx.newPage()

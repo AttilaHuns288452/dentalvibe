@@ -113,7 +113,7 @@ function AddPatient({ onClose, onSaved }) {
       medical_note: f.medical_note || null,
     })
     setBusy(false)
-    if (error) return setErr(error.message)
+    if (error) return setErr(/ux_patients_email/.test(error.message) ? 'A patient with this email already exists.' : error.message)
     onSaved()
   }
 
