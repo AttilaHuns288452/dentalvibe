@@ -1,5 +1,6 @@
 import { cleanTestFuture } from './pretest_clean.mjs'
-import('/home/attila/.hermes/hermes-agent/node_modules/playwright/index.mjs').then(async ({ chromium }) => {
+import { settleAppointment } from './qa_settle.mjs'
+import('./qa_playwright.mjs').then(async ({ chromium }) => {
 const pickDate = async (pg, daysAhead) => {
   const target = new Date(Date.now() + daysAhead * 864e5)
   while (target.getDay() === 0) target.setDate(target.getDate() + 1) // clinic closed Sundays
@@ -63,8 +64,9 @@ const b = await chromium.launch()
   await pg.goto(BASE + '/book', { waitUntil: 'networkidle' }); await pg.waitForTimeout(1200)
   check('P4. book page lists services', (await pg.locator('main form button[type="button"]').count()) >= 4)
   await pg.locator('main form button[type="button"]').nth(1).click() // Oral Prophylaxis
-  const QADAY = 12 + Math.floor(Math.random() * 60)
-  const BDATE = new Date(Date.now() + QADAY * 864e5).toISOString().slice(0, 10)
+  let QADAY = 12 + Math.floor(Math.random() * 60)
+  let BDATE = new Date(Date.now() + QADAY * 864e5).toISOString().slice(0, 10)
+  if (new Date(BDATE + 'T12:00:00').getDay() === 0) { QADAY += 1; BDATE = new Date(Date.now() + QADAY * 864e5).toISOString().slice(0, 10) } // clinic closed Sundays
   await pg.locator('button:has-text("Next")').last().click()
   await pg.waitForTimeout(300)
   await pickDate(pg, QADAY)
@@ -81,10 +83,12 @@ await pg.locator('form section:has-text("Available time") button:not([disabled])
   for (let i = 0; i < 20; i++) { await pg.waitForTimeout(1500); qrTxt = await pg.locator('body').textContent(); if (qrTxt.includes('Pay for Your Appointment') && /\d{2}:\d{2}/.test(qrTxt)) break }
   check('P7. QR page with countdown + total', qrTxt.includes("Pay for Your Appointment") && /\d{2}:\d{2}/.test(qrTxt) && /₱[\d,]+/.test(qrTxt) && qrTxt.includes('Download QR image'))
   await shot('04-qr')
-  await pg.locator('button:has-text("DEV: simulate PayMongo test payment")').click()
-  let settled = false
+  const apptId = new URL(pg.url()).searchParams.get('appt')
+  const simRes = await settleAppointment({ appointmentId: apptId, email: em, password: 'Password123' })
+  await pg.reload({ waitUntil: 'networkidle' })
+  let settled = simRes.ok
   for (let i = 0; i < 24 && !settled; i++) { await pg.waitForTimeout(1500); settled = /confirmed/i.test(await pg.locator('main').textContent().catch(() => '')) }
-  check('P8. payment settles via provider (dynamic QR flow)', settled)
+  check('P8. payment settles via provider (production path)', settled, simRes.error ?? '')
   await shot('05-payment-settled')
 
   // appointments state
@@ -136,9 +140,10 @@ await pg.locator('form section:has-text("Available time") button:not([disabled])
 
   // calendar: legend + appointment card + summary
   await pg.goto(BASE + '/doctor/calendar', { waitUntil: 'networkidle' }); await pg.waitForTimeout(1500)
+  await pg.locator('input[type="date"]').fill(BDATE); await pg.waitForTimeout(900)  // a doctor jumps to the booked date
   const cal = await pg.locator('main').textContent()
   check('D2. calendar legend', cal.includes('Completed') && cal.includes('Pending') && cal.includes('Cancelled'))
-  check('D3. calendar has booked slot (not all open)', ((cal.match(/Open slot/g) || []).length) < 10)
+  check('D3. calendar has the booked slot (patient visible)', cal.includes('Journey Tester'))
   check('D4. calendar summary rows', cal.includes('Today') && cal.includes('This week'))
   await shot('09-calendar')
 

@@ -1,6 +1,7 @@
 import { cleanTestFuture } from './pretest_clean.mjs'
 // Full QA sweep — every role, route, function. usage: node qa_all.mjs (serve :4176)
-import { chromium } from '/home/attila/.hermes/hermes-agent/node_modules/playwright/index.mjs'
+import { chromium } from './qa_playwright.mjs'
+import { settleAppointment } from './qa_settle.mjs'
 import fs from 'fs'
 
 const pickDate = async (pg, daysAhead) => {
@@ -143,8 +144,9 @@ check('patient: 5 tabs w/ Book', (t => t.includes('Book') && !t.includes('Manage
 await pg.goto(BASE + '/book', { waitUntil: 'networkidle' });
 await pg.locator('main button[aria-pressed]').first().waitFor({ state: 'visible', timeout: 15000 })
 await pg.locator('main form button[type="button"]').first().click()
-const QADAY = 12 + Math.floor(Math.random() * 60)
-const BDATE = new Date(Date.now() + QADAY * 864e5).toISOString().slice(0, 10)
+let QADAY = 12 + Math.floor(Math.random() * 60)
+let BDATE = new Date(Date.now() + QADAY * 864e5).toISOString().slice(0, 10)
+if (new Date(BDATE + 'T12:00:00').getDay() === 0) { QADAY += 1; BDATE = new Date(Date.now() + QADAY * 864e5).toISOString().slice(0, 10) } // clinic closed Sundays
 await pg.locator('button:has-text("Next")').last().click()
   await pg.waitForTimeout(300)
   await pickDate(pg, QADAY)
@@ -155,8 +157,10 @@ await pg.waitForTimeout(1400)
 check('patient: booking → confirm step', (await pg.locator('main h1').textContent()).includes('Confirm Your Appointment'))
 await pg.locator('button:has-text("Pay Now")').click(); await pg.waitForTimeout(6000)
 check('patient: QR payment page', /\d{2}:\d{2}/.test(await pg.locator('main').textContent()))
-await pg.locator('button:has-text("DEV: simulate PayMongo test payment")').click()
-let confirmed = false
+const _apptId = new URL(pg.url()).searchParams.get('appt')
+const _sim = await settleAppointment({ appointmentId: _apptId, email: em, password: 'Password123' })
+await pg.reload({ waitUntil: 'networkidle' })
+let confirmed = _sim.ok
 for (let i = 0; i < 24 && !confirmed; i++) { await pg.waitForTimeout(1500); confirmed = /confirmed/i.test(await pg.locator('main').textContent().catch(() => '')) }
 if (!confirmed) console.log('DEBUG-QR-FAIL', (await pg.locator('body').textContent()).slice(0, 500).replace(/\s+/g, ' '))
 check('patient: payment confirms via provider settle', confirmed)

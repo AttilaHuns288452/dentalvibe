@@ -3,6 +3,7 @@ import { useRevalidateOnVisible } from '../../lib/hooks'
 import { useEffect, useState } from 'react'
 import { listAppointments, setAppointmentStatus, getClinicSettings } from '../../lib/api'
 import { fmtTime12 } from '../../lib/format'
+import { slotStartsFor } from '../../lib/availability'
 
 // Calendar Day view — Figma frame 29: Day/Week/Month seg control, formatted date
 // heading, hour rows with color-coded appointment blocks (time · name · service).
@@ -14,16 +15,10 @@ const STATUS_PILL = {
   cancelled: 'bg-red-100 text-red-600 border-l-red-500',
 }
 
-// hour slots from settings, fallback 10AM–5PM
-// ponytail: date keys slice the ISO string; safe because all slots are 10:00–16:30 (UTC date == local date).
-// If evening slots are ever added, switch every day-key to a local-date formatter.
-function hoursFor(open, close) {
-  const [oh] = (open || '10:00').split(':').map(Number)
-  const [ch] = (close || '17:00').split(':').map(Number)
-  const out = []
-  for (let h = oh; h <= ch; h++) out.push(`${String(h).padStart(2, '0')}:00`)
-  return out
-}
+// Manila wall-clock 'HH:MM' for an instant — Intl only, no UTC-offset arithmetic.
+const manilaHM = (d) => new Intl.DateTimeFormat('en-GB', {
+  timeZone: 'Asia/Manila', hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+}).format(d)
 
 export default function DoctorCalendar() {
   const [appts, setAppts] = useState(null)
@@ -52,9 +47,9 @@ export default function DoctorCalendar() {
     .sort((a, b) => (a.scheduled_at || '').localeCompare(b.scheduled_at || ''))
 
   const heading = new Date(day + 'T12:00:00').toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' })
-  const slots = hoursFor(settings?.open_time, settings?.close_time)
-  // local-hour keys — scheduled_at is UTC; slice(11,13) matched UTC hours (bug)
-  const booked = new Set(dayAppts.map((a) => a.scheduled_at ? String(new Date(a.scheduled_at).getHours()).padStart(2, '0') : null))
+  // day grid derives from clinic_settings via the same availability model patient booking uses —
+  // the two roles can never disagree. Full 30-min open-hours grid, no busy ranges.
+  const slots = settings ? slotStartsFor(settings, day, 30, []) : []
 
   return (
     <div className="px-4 py-4 space-y-4">
@@ -112,7 +107,7 @@ export default function DoctorCalendar() {
             </div>
           ))}
           {slots.map((h) => {
-            const block = dayAppts.find((a) => a.scheduled_at && String((new Date(a.scheduled_at).getUTCHours() + 8) % 24).padStart(2, '0') === h.slice(0, 2))
+            const block = dayAppts.find((a) => a.scheduled_at && manilaHM(new Date(a.scheduled_at)).slice(0, 2) === h.slice(0, 2))
             return (
               <div key={h} className="flex gap-2 items-stretch">
                 <div className="w-16 text-xs font-bold text-gray-900 flex items-center flex-none">{fmtTime12(h).replace(':00', '')}</div>
@@ -124,7 +119,7 @@ export default function DoctorCalendar() {
                     </div>
                     <div className="text-sm font-semibold text-gray-900">{block.patients?.full_name}</div>
                     <div className="text-xs text-gray-500 flex items-center justify-between">
-                      <span>{block.services?.name}</span>
+                      <span>{block.services?.name} · {block.duration_minutes || 30} min</span>
                       {block.status === 'approved' && (
                         <button onClick={async () => {
                           try {
@@ -162,11 +157,36 @@ export default function DoctorCalendar() {
         </div>
       )}
 
-      {view === 'Month' && (
-        <div className="bg-white border border-gray-200 rounded-lg p-4">
-          <div className="text-sm text-gray-500">{dayAppts.length} appointments on {heading}. Use Week view to browse the month.</div>
-        </div>
-      )}
+      {view === 'Month' && (() => {
+        const first = new Date(day + 'T12:00:00'); first.setDate(1)
+        const startDow = first.getDay()
+        const daysInMonth = new Date(first.getFullYear(), first.getMonth() + 1, 0).getDate()
+        const cells = []
+        for (let i = 0; i < startDow; i++) cells.push(null)
+        for (let dnum = 1; dnum <= daysInMonth; dnum++) cells.push(dnum)
+        return (
+          <div>
+            <div className="grid grid-cols-7 gap-1 text-[10px] font-bold text-gray-400 text-center mb-1">
+              {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => <div key={i}>{d}</div>)}
+            </div>
+            <div className="grid grid-cols-7 gap-1">
+              {cells.map((dnum, i) => {
+                if (!dnum) return <div key={'e' + i} />
+                const ds = `${first.getFullYear()}-${String(first.getMonth() + 1).padStart(2, '0')}-${String(dnum).padStart(2, '0')}`
+                const items = (appts ?? []).filter((a) => (a.scheduled_at || a.requested_date || '').slice(0, 10) === ds && a.status !== 'cancelled')
+                const isToday = ds === new Date().toISOString().slice(0, 10)
+                return (
+                  <button key={ds} onClick={() => { setDay(ds); setView('Day') }} className={'min-h-14 rounded-lg border p-1 text-left ' + (isToday ? 'border-blue-400 bg-blue-50' : 'border-gray-200 bg-white')}>
+                    <div className="text-[10px] font-bold text-gray-900">{dnum}</div>
+                    {items.length > 0 && <div className="text-[9px] font-semibold text-gray-700">{items.length} booked</div>}
+                    {items.slice(0, 1).map((a) => <div key={a.id} className="text-[9px] text-gray-500 truncate">{a.patients?.full_name}</div>)}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        )
+      })()}
 
       {/* summary card (Figma p42) */}
       <div className="bg-gray-50 border border-gray-200 rounded-lg p-3.5 divide-y divide-gray-200 text-sm">

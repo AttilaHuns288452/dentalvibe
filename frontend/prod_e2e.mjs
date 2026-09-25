@@ -1,6 +1,6 @@
 import { cleanTestFuture } from './pretest_clean.mjs'
 // PRODUCTION E2E: patient books → pays → owner approves (gated) → completes → income
-import { chromium } from '/home/attila/.hermes/hermes-agent/node_modules/playwright/index.mjs'
+import { chromium } from './qa_playwright.mjs'
 import { createClient } from 'file:///home/attila/Documents/Projects/dentalvibe/frontend/node_modules/@supabase/supabase-js/dist/index.cjs'
 import fs from 'fs'
 const pickDate = async (pg, daysAhead) => {
@@ -130,15 +130,17 @@ check('17. patient cannot read clinic appointments', (stealAppts ?? []).every((a
 // ---- EDGE: approve without payment blocked (server-side) ----
 // book unpaid as fresh patient via API, then try approve as doctor
 const { data: pats } = await sbs2.from('patients').select('id').limit(1)
-const { data: svcs } = await sbs2.from('services').select('id').limit(1)
-const { data: appt2 } = await sbs2.from('appointments').insert({ patient_id: pats[0].id, service_id: svcs[0].id, requested_date: '2030-01-15', price: 500, status: 'pending' }).select().single()
-const { error: gerr } = await sbs2.from('appointments').update({ status: 'approved', payment_status: 'paid' }).eq('id', appt2.id)
+const { data: svcs } = await sbs2.from('services').select('id, price').limit(1)
+const _day = new Date(Date.now() + (120 + Math.floor(Math.random() * 150)) * 864e5).toISOString().slice(0, 10) // unique per run (ux_appt_patient_date)
+const { data: appt2, error: insErr } = await sbs2.from('appointments').insert({ patient_id: pats[0].id, service_id: svcs[0].id, requested_date: _day, price: svcs[0].price, status: 'pending' }).select().single()
+if (insErr) console.log('DEBUG-PROD-INSERT', insErr.message)
+const { error: gerr } = appt2 ? await sbs2.from('appointments').update({ status: 'approved', payment_status: 'paid' }).eq('id', appt2.id) : { error: new Error('no appointment') }
 check('18. unpaid stays unconfirmed (patient cannot self-confirm)', !!gerr)
 await sbs2.auth.signOut()
 await sbs2.auth.signInWithPassword({ email: 'doctor@dentalvibe.ph', password: 'password123' })
-const { error: derr } = await sbs2.from('appointments').update({ status: 'approved' }).eq('id', appt2.id)
+const { error: derr } = appt2 ? await sbs2.from('appointments').update({ status: 'approved' }).eq('id', appt2.id) : { error: new Error('no appointment') }
 check('18b. approve without payment rejected', !!derr)
-await sbs2.from('appointments').delete().eq('id', appt2.id) // cleanup
+if (appt2) await sbs2.from('appointments').delete().eq('id', appt2.id) // cleanup
 
 console.log(`\n=== PROD E2E: ${pass} passed, ${fail} failed ===`)
 console.log('page errors:', pageErrors.length ? pageErrors : 'NONE')

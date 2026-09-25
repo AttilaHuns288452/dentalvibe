@@ -107,7 +107,7 @@ export default function OwnerManage() {
         {adding && <AddServiceForm onDone={() => { setAdding(false); reloadServices() }} />}
 
         <div className="space-y-2">
-          {services.map((s) => <ServiceCard key={s.id} service={s} navigate={navigate} onDeleted={reloadServices} />)}
+          {services.map((s) => <ServiceCard key={s.id} service={s} navigate={navigate} onDeleted={reloadServices} onChanged={reloadServices} />)}
           {!services.length && <div className="bg-white border border-gray-200 rounded-lg px-3.5 py-3 text-sm text-gray-500">No services yet — add one above.</div>}
         </div>
       </section>
@@ -236,9 +236,12 @@ function AddServiceForm({ onDone }) {
   )
 }
 
-function ServiceCard({ service, navigate, onDeleted }) {
+function ServiceCard({ service, navigate, onDeleted, onChanged }) {
   const [excCount, setExcCount] = useState(null)
   const [confirmDel, setConfirmDel] = useState(false)
+  const [edit, setEdit] = useState(null) // {name, price, mins}
+  const [err, setErr] = useState('')
+  const [busy, setBusy] = useState(false)
 
   useEffect(() => {
     listPriceExceptions(service.id).then((x) => setExcCount(x.length)).catch(() => setExcCount(0))
@@ -249,8 +252,45 @@ function ServiceCard({ service, navigate, onDeleted }) {
     onDeleted()
   }
 
+  const save = async () => {
+    if (!edit.name.trim() || !(Number(edit.price) > 0)) return setErr('Name and a price above zero are required.')
+    setBusy(true); setErr('')
+    const { error } = await supabase.from('services').update({
+      name: edit.name.trim(), price: Number(edit.price), duration_minutes: Number(edit.mins) || 30,
+    }).eq('id', service.id)
+    setBusy(false)
+    if (error) return setErr(error.message)
+    setEdit(null); onChanged()
+  }
+
+  const toggleActive = async () => {
+    setBusy(true)
+    const { error } = await supabase.from('services').update({ active: !service.active }).eq('id', service.id)
+    setBusy(false)
+    if (error) return setErr(error.message)
+    onChanged()
+  }
+
+  if (edit) return (
+    <div className="bg-primary-50 border border-primary-100 rounded-lg px-3.5 py-2.5 space-y-2.5">
+      <input value={edit.name} onChange={(e) => setEdit({ ...edit, name: e.target.value })}
+             className="w-full h-10 border border-gray-200 rounded-lg px-3 text-sm bg-white" />
+      <div className="flex gap-2">
+        <input type="number" min="0" value={edit.price} onChange={(e) => setEdit({ ...edit, price: e.target.value })}
+               className="flex-1 h-10 border border-gray-200 rounded-lg px-3 text-sm bg-white" />
+        <input type="number" min="5" step="5" value={edit.mins} onChange={(e) => setEdit({ ...edit, mins: e.target.value })}
+               className="w-24 h-10 border border-gray-200 rounded-lg px-3 text-sm bg-white" />
+      </div>
+      {err && <p className="text-xs text-red-500">{err}</p>}
+      <div className="flex gap-2">
+        <button disabled={busy} onClick={() => setEdit(null)} className="flex-1 h-9 rounded-lg border border-gray-200 bg-white text-gray-700 text-xs font-semibold">Cancel</button>
+        <button disabled={busy} onClick={save} className="flex-1 h-9 rounded-lg bg-primary-600 text-white text-xs font-semibold disabled:opacity-60">Save</button>
+      </div>
+    </div>
+  )
+
   return (
-    <div className="bg-white border border-gray-200 rounded-lg px-3.5 py-2.5 flex items-center gap-3">
+    <div className={'bg-white border border-gray-200 rounded-lg px-3.5 py-2.5 flex items-center gap-3 ' + (service.active === false ? 'opacity-60' : '')}>
       <button onClick={() => navigate(`/owner/manage/prices?service=${service.id}&name=${encodeURIComponent(service.name)}&base=${service.price}`)}
               className="flex-1 min-w-0 flex items-center gap-3 text-left">
         <span className="flex-1 min-w-0">
@@ -264,16 +304,27 @@ function ServiceCard({ service, navigate, onDeleted }) {
         <span className="text-sm font-bold text-gray-900">{peso(service.price)}</span>
         <svg viewBox="0 0 24 24" className="w-4 h-4 text-gray-500 flex-none" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 6 6 6-6 6" /></svg>
       </button>
-      {confirmDel ? (
-        <span className="flex gap-1 flex-none">
-          <button onClick={remove} className="text-[11px] font-bold text-red-500 border border-red-200 rounded px-3 min-h-[44px]">Yes</button>
-          <button onClick={() => setConfirmDel(false)} className="text-[11px] text-gray-500 border border-gray-200 rounded px-3 min-h-[44px]">No</button>
-        </span>
-      ) : (
-        <button onClick={() => setConfirmDel(true)} aria-label="Delete service" className="text-gray-300 hover:text-red-400 flex-none">
-          <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" /></svg>
+      <span className="flex gap-1 flex-none items-center">
+        <button disabled={busy} onClick={toggleActive} aria-label={service.active === false ? 'Activate service' : 'Deactivate service'}
+                className={'h-10 px-2.5 rounded-lg border text-[11px] font-bold ' + (service.active === false ? 'border-gray-200 text-gray-400' : 'border-green-200 bg-green-50 text-green-700')}>
+          {service.active === false ? 'Inactive' : 'Active'}
         </button>
-      )}
+        <button disabled={busy} onClick={() => setEdit({ name: service.name, price: service.price, mins: service.duration_minutes ?? 30 })}
+                aria-label="Edit service" className="w-9 h-10 rounded-lg border border-gray-200 text-gray-500 flex items-center justify-center">
+          <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5z" /></svg>
+        </button>
+        {confirmDel ? (
+          <span className="flex gap-1 flex-none">
+            <button onClick={remove} className="text-[11px] font-bold text-red-500 border border-red-200 rounded px-3 min-h-[44px]">Yes</button>
+            <button onClick={() => setConfirmDel(false)} className="text-[11px] text-gray-500 border border-gray-200 rounded px-3 min-h-[44px]">No</button>
+          </span>
+        ) : (
+          <button onClick={() => setConfirmDel(true)} aria-label="Delete service" className="text-gray-300 hover:text-red-400 flex-none">
+            <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" /></svg>
+          </button>
+        )}
+      </span>
+      {err && <p className="text-xs text-red-500 w-full">{err}</p>}
     </div>
   )
 }

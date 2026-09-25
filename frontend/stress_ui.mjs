@@ -1,4 +1,4 @@
-import('/home/attila/.hermes/hermes-agent/node_modules/playwright/index.mjs').then(async ({ chromium }) => {
+import('./qa_playwright.mjs').then(async ({ chromium }) => {
   const BASE = 'https://dentalvibe.vercel.app'
   const b = await chromium.launch()
   const R = []

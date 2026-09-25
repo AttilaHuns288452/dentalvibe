@@ -1,7 +1,7 @@
 // Responsive visual QA matrix — every route x 6 viewports x 3 roles.
 // Screenshots = RGB PNGs into screenshots/responsive/ + programmatic audit lines.
 // usage: cd frontend && node shots_responsive.mjs [--vp=390x844] [--role=patient]
-import { chromium } from '/home/attila/.hermes/hermes-agent/node_modules/playwright/index.mjs'
+import { chromium } from './qa_playwright.mjs'
 import fs from 'fs'
 
 const BASE = process.env.QA_BASE || 'http://localhost:4176'

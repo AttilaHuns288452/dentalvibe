@@ -18,7 +18,9 @@ const age = (dob) => {
 const fmt = (d) => new Date(d).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })
 
 export default function PatientEHR() {
-  const id = useLocation().state?.patientId
+  const loc = useLocation()
+  // deep link first (/ehr/<uuid> survives refresh & new tabs), nav state as fallback
+  const id = loc.pathname.startsWith('/ehr/') ? decodeURIComponent(loc.pathname.slice(5)) : loc.state?.patientId
   const navigate = useNavigate()
   const { profile } = useAuth()
   const [p, setP] = useState(null)
@@ -51,6 +53,9 @@ export default function PatientEHR() {
     }))
   }
   useEffect(() => { load() }, [id])
+  useRevalidateOnVisible(load) // returning to the tab refreshes patient, attachments, history
+  // entries reached via nav state get a shareable /ehr/<id> URL (refresh & new-tab safe)
+  useEffect(() => { if (id && !loc.pathname.startsWith('/ehr/')) navigate(`/ehr/${id}`, { replace: true }) }, [id])
 
   const delAttImpl = async (x) => {
     if (!confirm('Delete this attachment?')) return
@@ -332,7 +337,10 @@ function AddAttachment({ patient, onClose, onSaved }) {
         patient_id: patient.id, category: cat.name, category_id: cat.id, filename: file.name, path,
         file_size: (file.size / 1048576).toFixed(1) + ' MB', note: note || null, uploaded_by: profile?.id ?? null,
       })
-      if (error) throw error
+      if (error) {
+        await supabase.storage.from('ehr-files').remove([path]) // rollback: no orphaned clinical files
+        throw error
+      }
       onSaved()
     } catch (ex) {
       setErr(ex.message)

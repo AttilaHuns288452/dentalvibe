@@ -1,5 +1,5 @@
 // Before/after spacing screenshots. usage: node shots_spacing.mjs
-import { chromium } from '/home/attila/.hermes/hermes-agent/node_modules/playwright/index.mjs'
+import { chromium } from './qa_playwright.mjs'
 import fs from 'fs'
 
 const BASE = 'http://localhost:4176'

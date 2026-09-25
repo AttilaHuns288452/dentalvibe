@@ -1,6 +1,7 @@
 // Browser validity matrix (#43-56): A-L cases + payment idempotency + #56 standard.
 // usage: cd frontend && SB_SECRET=... node nav_matrix.mjs   (serve :4176)
-import { chromium } from '/home/attila/.hermes/hermes-agent/node_modules/playwright/index.mjs'
+import { chromium } from './qa_playwright.mjs'
+import { settleAppointment } from './qa_settle.mjs'
 import { createClient } from '@supabase/supabase-js'
 import fs from 'fs'
 
@@ -137,9 +138,10 @@ await cleanTestRows()
   await pg.locator('button:has-text("Continue to Payment")').click()
   await pg.waitForTimeout(1200)
   await pg.locator('button:has-text("Pay Now")').click()
-  const devBtn = pg.locator('button:has-text("DEV: simulate PayMongo test payment")')
-  await devBtn.waitFor({ state: 'visible', timeout: 30000 })
-  await devBtn.click()
+  const _apptId = new URL(pg.url()).searchParams.get('appt')
+  const _sim = await settleAppointment({ appointmentId: _apptId })
+  console.log('DEBUG-NAV-SETTLE', JSON.stringify(_sim))
+  await pg.reload({ waitUntil: 'networkidle' })
   let t1 = ''
   for (let i = 0; i < 24; i++) { await pg.waitForTimeout(1500); t1 = await txt(pg); if (/Approved|Confirmed/i.test(t1)) break }
   check('E1. payment success state renders', /Approved|Confirmed/i.test(t1))

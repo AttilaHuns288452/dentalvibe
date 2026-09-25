@@ -21,7 +21,7 @@ npm run dev                   # http://localhost:5173
 
 `.env.local` is gitignored. Its two values are **publishable browser keys** — the site ships them to every visitor; data is protected by Row Level Security. Never commit `service_role` keys.
 
-## Demo accounts (password `password123`)
+## Demo accounts
 
 | Role | Email |
 |---|---|
@@ -29,7 +29,20 @@ npm run dev                   # http://localhost:5173
 | Doctor | `doctor@dentalvibe.ph` |
 | Owner | `owner@dentalvibe.ph` |
 
-**QA tools:** open `https://dentalvibe.vercel.app/?dev=1` — a DEV pill gives one-tap role logins and a **simulated PayMongo test payment** button (runs the real payment pipeline — create → provider settle — so it lands in Owner → Income Analytics). `src/lib/dev.js` is the one file to strip for a real clinic launch.
+Credentials are seeded by `seed.mjs` and kept out of this README — ask Attila.
+
+**Dev tools never ship to production.** `src/lib/dev.js` + `DevPanel` are build-flag gated (`VITE_ENABLE_DEV_TOOLS=1`, set only in `.env.development`): a production build contains neither the demo logins nor the mock payment (verified by bundle grep in CI-style runs). QA settles payments the production way — provider confirmation via `paymongo-check` — no dev UI involved.
+
+**QA** (from `frontend/`, against `npm run dev` or a preview; suites create unique temporary rows and clean up):
+
+```shell
+npm run qa           # qa_all + journey_qa
+npm run qa:e2e       # prod_e2e + nav_matrix + fidelity_e2e
+npm run qa:security  # pay_security
+npm run qa:cross-role # cross_role_qa
+```
+
+Also: `ehr_qa`, `ehr_link_qa`, `scheduling_qa`, `pay_lifecycle_qa`; root-level `pay_smoke` / `pay_sandbox` / `pay_race` need `SB_SECRET`. `qa_playwright.mjs` resolves Playwright locally with one documented fallback.
 
 ## Product rules (enforced in the DB, not just the UI)
 

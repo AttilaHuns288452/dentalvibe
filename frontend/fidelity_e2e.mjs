@@ -1,5 +1,5 @@
 import { cleanTestPatients } from './pretest_clean.mjs'
-import('/home/attila/.hermes/hermes-agent/node_modules/playwright/index.mjs').then(async ({ chromium }) => {
+import('./qa_playwright.mjs').then(async ({ chromium }) => {
   await cleanTestPatients()
   const b = await chromium.launch()
   const pg = await b.newPage({ viewport: { width: 390, height: 844 } })

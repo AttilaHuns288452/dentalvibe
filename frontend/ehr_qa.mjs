@@ -3,7 +3,7 @@
 // 2. Owner → Manage → Record Categories CRUD + deactivate
 // 3. Doctor EHR upload: active categories only, category+note stored, LATEST badge
 // 4. History: deactivated category's old records stay visible
-import { chromium } from '/home/attila/.hermes/hermes-agent/node_modules/playwright/index.mjs'
+import { chromium } from './qa_playwright.mjs'
 import { createClient } from '@supabase/supabase-js'
 import fs from 'fs'
 

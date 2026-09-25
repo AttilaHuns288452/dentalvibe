@@ -3,15 +3,14 @@ import Skel from '../../components/Skel'
 import { useStickyState } from '../../lib/hooks'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/RoleContext'
-import { listServices, bookAppointment, peso, supabase } from '../../lib/api'
+import { listServices, bookAppointment, peso, supabase, getClinicSettings } from '../../lib/api'
+import { isOpenOn, slotStartsFor } from '../../lib/availability'
 
 // Booking — two focused steps (p36 → p87→121):
 //   1 · Services (search, multi-select, fee notice)   2 · Date & time (calendar grid, fit-checked slots, notes)
-// A paid appointment holds its slot; slot starts that don't fit the visit length are unavailable.
+// A pending or paid appointment holds its slot; slot starts that don't fit the visit length are unavailable.
+// Hours, open days, and slot starts all come from clinic_settings via lib/availability.js — no hardcoded slots.
 
-const SLOTS = ['10:00', '10:30', '11:00', '11:30',
-  '13:00', '13:30', '14:00', '14:30', '15:00', '15:30', '16:00', '16:30'] // clinic hours 10:00–17:00
-const SLOT_SET = new Set(SLOTS)
 const fmtSlot = (t) => t.replace(/^(\d+):(\d+)$/, (_, h, m) => `${((+h + 11) % 12) + 1}:${m} ${+h < 12 ? 'AM' : 'PM'}`)
 
 export default function Book() {
@@ -20,6 +19,7 @@ export default function Book() {
   const location = useLocation()
   const [services, setServices] = useState([])
   const [prices, setPrices] = useState({})
+  const [settings, setSettings] = useState(null) // clinic_settings — the only source of hours & open days
   // draft survives Back/Forward/refresh (#44/#53); step lives in the URL so history is truthful (#43)
   const [picked, setPicked] = useStickyState('dv_book_picked', [])
   const [q, setQ] = useState('')
@@ -34,17 +34,19 @@ export default function Book() {
     // one catalog query + one exception query (was N+1: an exception query per service)
     Promise.all([
       listServices(),
+      getClinicSettings(),
       patientRecord?.id
         ? supabase.from('service_prices').select('service_id, price').eq('patient_id', patientRecord.id)
         : { data: [] },
-    ]).then(async ([svcs, exc]) => {
+    ]).then(([svcs, st, exc]) => {
       setServices(svcs)
+      setSettings(st)
       const overrides = Object.fromEntries((exc.data ?? []).map((x) => [x.service_id, x.price]))
       setPrices(Object.fromEntries(svcs.map((s) => [s.id, overrides[s.id] ?? s.price])))
     }).catch((e) => setErr(e.message))
   }, [patientRecord?.id])
 
-  // paid visits for the chosen day (the only things that hold the chair)
+  // pending or paid visits for the chosen day (either holds the chair — pending payment = slot reservation)
   useEffect(() => {
     setBusyRanges([])
     setTime('')
@@ -53,7 +55,7 @@ export default function Book() {
     const to = new Date(from.getTime() + 864e5)
     supabase.from('appointments')
       .select('scheduled_at, duration_minutes')
-      .eq('payment_status', 'paid').neq('status', 'cancelled')
+      .in('payment_status', ['pending', 'paid']).neq('status', 'cancelled')
       .gte('scheduled_at', from.toISOString()).lt('scheduled_at', to.toISOString())
       .then(({ data }) => setBusyRanges((data ?? []).map((r) => ({ start: new Date(r.scheduled_at), mins: r.duration_minutes ?? 30 }))))
   }, [date])
@@ -63,25 +65,12 @@ export default function Book() {
   const chosen = services.filter((s) => picked.includes(s.id))
   const total = chosen.reduce((sum, s) => sum + (prices[s.id] ?? s.price), 0)
   const visitMins = chosen.reduce((sum, s) => sum + (s.duration_minutes ?? 30), 0)
-  const need = Math.max(1, Math.ceil(visitMins / 30))
 
-  // a start fits when every 30-min half-hour it needs exists as a slot and none is held
-  const fits = (t) => {
-    const [h, m] = t.split(':').map(Number)
-    for (let k = 0; k < need; k++) {
-      const hh = h + Math.floor((m + k * 30) / 60)
-      const mm = (m + k * 30) % 60
-      const seg = `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`
-      if (!SLOT_SET.has(seg)) return false
-      const segStart = new Date(`${date}T${seg}:00`)
-      const segEnd = new Date(segStart.getTime() + 30 * 60000)
-      for (const b of busyRanges) {
-        const bEnd = new Date(b.start.getTime() + b.mins * 60000)
-        if (segStart < bEnd && b.start < segEnd) return false
-      }
-    }
-    return true
-  }
+  // slot starts derive from clinic_settings (30-min intervals); each start must fit the whole visit
+  const slots = useMemo(
+    () => (settings && date ? slotStartsFor(settings, date, visitMins, busyRanges) : []),
+    [settings, date, visitMins, busyRanges],
+  )
 
   const submit = async (e) => {
     e.preventDefault()
@@ -191,7 +180,7 @@ export default function Book() {
               </div>
             </section>
 
-            <DateGrid date={date} setDate={setDate} />
+            <DateGrid date={date} setDate={setDate} settings={settings} />
 
             {date && (
               <section>
@@ -199,18 +188,19 @@ export default function Book() {
                   Available time {visitMins > 30 && <span className="text-gray-500 normal-case font-normal">· needs {visitMins} min</span>}
                 </h2>
                 <div className="grid grid-cols-4 gap-2">
-                  {SLOTS.map((t) => {
-                    const ok = fits(t)
-                    return (t === '13:00' ? <div key="lunch" className="col-span-4 text-[10px] text-gray-500 text-center py-0.5">— Lunch break · 12:00–1:00 —</div> : null) || (
-                      <button type="button" key={t} disabled={!ok} onClick={() => setTime(t)}
-                              className={'h-10 rounded-lg border text-xs font-semibold ' +
-                                (!ok ? 'border-gray-100 bg-gray-50 text-gray-300'
-                                  : time === t ? 'border-primary-600 bg-primary-50 text-primary-700'
-                                  : 'border-gray-200 bg-white text-gray-700 hover:border-primary-300')}>
-                        {fmtSlot(t)}
-                      </button>
-                    )
-                  })}
+                  {slots.map((t) => (
+                    <button type="button" key={t} onClick={() => setTime(t)}
+                            className={'h-10 rounded-lg border text-xs font-semibold ' +
+                              (time === t ? 'border-primary-600 bg-primary-50 text-primary-700'
+                                : 'border-gray-200 bg-white text-gray-700 hover:border-primary-300')}>
+                      {fmtSlot(t)}
+                    </button>
+                  ))}
+                  {date && settings && !slots.length && (
+                    <div className="col-span-4 text-xs text-gray-500 text-center py-2">
+                      {isOpenOn(settings, date) ? 'No available time — visit does not fit before closing.' : 'Clinic is closed on this day.'}
+                    </div>
+                  )}
                 </div>
               </section>
             )}
@@ -253,7 +243,8 @@ export default function Book() {
 }
 
 // Month-grid date picker (Figma p87: Monday-first month header + day grid)
-function DateGrid({ date, setDate }) {
+// Closed days come from clinic_settings via isOpenOn — the old hardcoded Sunday rule is gone.
+function DateGrid({ date, setDate, settings }) {
   const today = new Date(); today.setHours(0, 0, 0, 0)
   const [month, setMonth] = useState(() => new Date(today.getFullYear(), today.getMonth(), 1))
   const monthName = month.toLocaleDateString('en-PH', { month: 'long', year: 'numeric' })
@@ -261,7 +252,7 @@ function DateGrid({ date, setDate }) {
   const days = new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate()
   const cells = [...Array(firstDay).fill(null), ...Array.from({ length: days }, (_, i) => i + 1)]
   const iso = (d) => `${month.getFullYear()}-${String(month.getMonth() + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`
-  const past = (d) => new Date(`${iso(d)}T00:00:00`) < today || new Date(`${iso(d)}T00:00:00`).getDay() === 0 // Sun closed
+  const past = (d) => new Date(`${iso(d)}T00:00:00`) < today || (settings ? !isOpenOn(settings, iso(d)) : false)
   const atEdge = (dir) => dir < 0
     ? month <= new Date(today.getFullYear(), today.getMonth(), 1)
     : month >= new Date(today.getFullYear(), today.getMonth() + 2, 1)

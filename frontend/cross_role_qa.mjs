@@ -5,7 +5,7 @@
 //    historical transactions never change when prices change
 // D. Multi-tab: patient + owner sessions coexist without flipping
 // Run (from frontend/): SB_SECRET=<service key> QA_BASE=https://dentalvibe.vercel.app node cross_role_qa.mjs
-import { chromium } from '/home/attila/.hermes/hermes-agent/node_modules/playwright/index.mjs'
+import { chromium } from './qa_playwright.mjs'
 import { createClient } from '@supabase/supabase-js'
 import fs from 'fs'
 

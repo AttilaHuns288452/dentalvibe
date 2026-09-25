@@ -1,6 +1,6 @@
 // Per-role stress battery — patient / doctor / owner hammered at speed, plus cross-role interference.
 // usage: cd frontend && SB_SECRET=... node stress_roles.mjs   (serve :4176)
-import { chromium } from '/home/attila/.hermes/hermes-agent/node_modules/playwright/index.mjs'
+import { chromium } from './qa_playwright.mjs'
 import { createClient } from '@supabase/supabase-js'
 import fs from 'fs'
 import { cleanTestFuture, cleanTestPatients } from './pretest_clean.mjs'

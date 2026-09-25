@@ -48,51 +48,92 @@ function Routes() {
   const roleBase = role === ROLES.PATIENT ? '' : '/' + role
 
   const inScope = role === ROLES.PATIENT
-    ? !path.startsWith('/doctor') && !path.startsWith('/owner') || path.startsWith('/reset')
-    : path === '/' || path.startsWith(roleBase) || path.startsWith('/reset')
+    ? !path.startsWith('/doctor') && !path.startsWith('/owner') && !path.startsWith('/ehr/') || path.startsWith('/reset')
+    : path === '/' || path.startsWith(roleBase) || path.startsWith('/ehr/') || path.startsWith('/reset')
 
   if (!inScope) return <Navigate to={HOME[role]} replace />
 
+  // /ehr/<uuid> deep link — shared prefix, role gated by inScope above
+  if (path.startsWith('/ehr/')) return <PatientEHR />
   switch (path) {
-    case '/': return <Home />
-    case '/book': return <PatientShell name="Book" />
-    case '/book/confirm': return <PatientShell name="ConfirmBooking" />
-    case '/book/success': return <PatientShell name="BookSuccess" />
-    case '/appointments': return <PatientShell name="MyAppointments" />
-    case '/messages': return <Chat />
-    case '/profile': return <Profile />
-    case '/profile/edit': return <PatientShell name="EditProfile" />
-    case '/security': return <AccountSecurity />
-    case '/settings': return <Settings />
-    case '/notifications': return <Notifications roleBase="" />
-    case '/doctor': return <Home />
-    case '/doctor/calendar': return <DoctorCalendar />
-    case '/doctor/patients': return <DoctorPatients />
-    case '/doctor/patients/ehr': return <PatientEHR />
-    case '/doctor/messages': return <DoctorShell name="StaffMessages" />
-    case '/doctor/notifications': return <Notifications roleBase="/doctor" />
-    case '/doctor/security': return <AccountSecurity />
-    case '/doctor/settings': return <Settings />
-    case '/owner': return <Home />
-    case '/owner/calendar': return <DoctorCalendar />
-    case '/owner/patients': return <OwnerPatients />
-    case '/owner/patients/ehr': return <PatientEHR />
-    case '/owner/messages': return <DoctorShell name="StaffMessages" />
-    case '/owner/notifications': return <Notifications roleBase="/owner" />
-    case '/owner/security': return <AccountSecurity />
-    case '/owner/settings': return <Settings />
-    case '/owner/manage': return <OwnerShell name="OwnerManage" />
-    case '/owner/manage/prices': return <OwnerShell name="OwnerServicePrices" />
-    case '/owner/income': return <OwnerShell name="IncomeHub" />
-    case '/owner/income/legacy': return <OwnerShell name="OwnerIncome" />
-    case '/owner/staff': return <OwnerShell name="OwnerStaff" />
-    case '/owner/staff/dentist': return <DentistRecord />
-    case '/pay': return <PatientShell name="Payment" />
-    case '/pay/qr': return <PatientShell name="QrPayment" />
-    case '/receipt': return <PatientShell name="Receipt" />
-    case '/reset': return <ResetPassword />
-    case '/reset-confirm': return <ResetConfirm />
-    default: return <Placeholder path={path} />
+    case '/':
+      return <Home />
+    case '/book':
+      return <PatientShell name="Book" />
+    case '/book/confirm':
+      return <PatientShell name="ConfirmBooking" />
+    case '/book/success':
+      return <PatientShell name="BookSuccess" />
+    case '/appointments':
+      return <PatientShell name="MyAppointments" />
+    case '/messages':
+      return <Chat />
+    case '/profile':
+      return <Profile />
+    case '/profile/edit':
+      return <PatientShell name="EditProfile" />
+    case '/security':
+      return <AccountSecurity />
+    case '/settings':
+      return <Settings />
+    case '/notifications':
+      return <Notifications roleBase="" />
+    case '/doctor':
+      return <Home />
+    case '/doctor/calendar':
+      return <DoctorCalendar />
+    case '/doctor/patients':
+      return <DoctorPatients />
+    case '/doctor/patients/ehr':
+      return <PatientEHR />
+    case '/doctor/messages':
+      return <DoctorShell name="StaffMessages" />
+    case '/doctor/notifications':
+      return <Notifications roleBase="/doctor" />
+    case '/doctor/security':
+      return <AccountSecurity />
+    case '/doctor/settings':
+      return <Settings />
+    case '/owner':
+      return <Home />
+    case '/owner/calendar':
+      return <DoctorCalendar />
+    case '/owner/patients':
+      return <OwnerPatients />
+    case '/owner/patients/ehr':
+      return <PatientEHR />
+    case '/owner/messages':
+      return <DoctorShell name="StaffMessages" />
+    case '/owner/notifications':
+      return <Notifications roleBase="/owner" />
+    case '/owner/security':
+      return <AccountSecurity />
+    case '/owner/settings':
+      return <Settings />
+    case '/owner/manage':
+      return <OwnerShell name="OwnerManage" />
+    case '/owner/manage/prices':
+      return <OwnerShell name="OwnerServicePrices" />
+    case '/owner/income':
+      return <OwnerShell name="IncomeHub" />
+    case '/owner/income/legacy':
+      return <OwnerShell name="OwnerIncome" />
+    case '/owner/staff':
+      return <OwnerShell name="OwnerStaff" />
+    case '/owner/staff/dentist':
+      return <DentistRecord />
+    case '/pay':
+      return <PatientShell name="Payment" />
+    case '/pay/qr':
+      return <PatientShell name="QrPayment" />
+    case '/receipt':
+      return <PatientShell name="Receipt" />
+    case '/reset':
+      return <ResetPassword />
+    case '/reset-confirm':
+      return <ResetConfirm />
+    default:
+      return <Placeholder path={path} />
   }
 }
 

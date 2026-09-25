@@ -1,12 +1,12 @@
 import { useState } from 'react'
 import { supabase } from '../lib/api'
-import { isDev, DEV_ACCOUNTS, DEV_PW, devLogout } from '../lib/dev'
+import { isDev, DEV_ACCOUNTS, DEV_PW, devLogout, DEV_TOOLS } from '../lib/dev'
 
-// Dev QA panel — one-tap role switching. Hidden unless ?dev=1 (see lib/dev.js).
+// Dev QA panel — one-tap role switching. Compiled out unless VITE_ENABLE_DEV_TOOLS=1.
 export default function DevPanel() {
   const [open, setOpen] = useState(false)
   const [busy, setBusy] = useState('')
-  if (!isDev()) return null
+  if (!DEV_TOOLS || !isDev()) return null
 
   const loginAs = async (acc) => {
     setBusy(acc.role)
