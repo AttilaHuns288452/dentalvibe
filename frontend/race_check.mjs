@@ -34,18 +34,19 @@ for (let r = 0; r < ROUNDS; r++) {
   }
   const A = await book(pids.maria, '02:00')   // 10:00–11:00 PH (60 min)
   const B = await book(pids.juan, '02:30')    // 10:30 start — overlaps A's interval
-  // fire BOTH payment RPCs concurrently — the race window
+  // fire BOTH payment creates concurrently — the race window
+  // (slot reservation happens under the per-day advisory lock inside create)
   const [pa, pb] = await Promise.allSettled([
-    maria.rpc('fn_submit_payment_proof', { p_appointment: A, p_image: `race-${r}-a.png` }),
-    juan.rpc('fn_submit_payment_proof', { p_appointment: B, p_image: `race-${r}-b.png` }),
+    maria.functions.invoke('paymongo-create', { body: { appointment_id: A } }),
+    juan.functions.invoke('paymongo-create', { body: { appointment_id: B } }),
   ])
   const okA = pa.status === 'fulfilled' && !pa.value.error
   const okB = pb.status === 'fulfilled' && !pb.value.error
   if (okA && okB) double++
   console.log(`round ${r + 1}: A=${okA ? 'verified' : 'blocked'} B=${okB ? 'verified' : 'blocked'}${okA && okB ? '  <-- DOUBLE-VERIFIED' : ''}`)
-  for (const id of [A, B]) { await svc.from('payment_proofs').delete().eq('appointment_id', id); await svc.from('appointments').delete().eq('id', id) }
+  for (const id of [A, B]) { await svc.from('payments').delete().eq('appointment_id', id); await svc.from('appointments').delete().eq('id', id) }
 }
-await svc.from('payment_proofs').delete().like('image', 'race-%')
+
 console.log(double > 0
   ? `RACE OPEN (${double}/${ROUNDS} rounds double-verified) — lock NOT in place`
   : `LOCKED (0/${ROUNDS} double-verified — exactly one pay wins every round)`)

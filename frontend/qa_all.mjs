@@ -6,11 +6,11 @@ import fs from 'fs'
 const pickDate = async (pg, daysAhead) => {
   const target = new Date(Date.now() + daysAhead * 864e5)
   while (target.getDay() === 0) target.setDate(target.getDate() + 1) // clinic closed Sundays
-  for (let i = 0; i < 3; i++) {
+  for (let i = 0; i < 10; i++) {
     const label = await pg.locator('section:has-text("Preferred date") span.text-sm.font-bold').first().textContent()
     const cur = new Date(label.trim() + ' 1')
     if (cur.getMonth() === target.getMonth() && cur.getFullYear() === target.getFullYear()) break
-    if (cur < target) await pg.locator('button[aria-label="Next month"]').click()
+    if (cur < target) { const nx = pg.locator('button[aria-label="Next month"]'); if (await nx.isDisabled().catch(() => true)) break; await nx.click() }
     else await pg.locator('button[aria-label="Previous month"]').click()
     await pg.waitForTimeout(250)
   }
@@ -29,9 +29,9 @@ let pass = 0, fail = 0
 let _role = 'owner'
 const check = (name, cond) => { cond ? pass++ : fail++; console.log((cond ? 'PASS' : 'FAIL'), name) }
 const login = async (email) => {
-  await pg.goto(BASE + '/', { waitUntil: 'domcontentloaded' })
+  await pg.goto(BASE + '/?dev=1', { waitUntil: 'domcontentloaded' })
   await pg.evaluate(() => { try { localStorage.clear(); sessionStorage.clear() } catch {} })
-  await pg.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await pg.goto(BASE + '/?dev=1', { waitUntil: 'networkidle' }) // re-seed dv_dev after the clear
   await pg.waitForTimeout(800)
   await pg.fill('input[type="email"]', email)
   await pg.fill('input[type="password"]', 'password123')
@@ -119,7 +119,7 @@ check('doctor: no Requests/Income/Staff tabs', !dtabs.includes('Requests') && !d
 
 // PATIENT (register fresh)
 await pg.evaluate(() => localStorage.clear())
-await pg.goto(BASE + '/', { waitUntil: 'networkidle' })
+await pg.goto(BASE + '/?dev=1', { waitUntil: 'networkidle' }) // re-seed dv_dev after the clear
 await pg.waitForTimeout(800)
 await pg.locator('button:has-text("Register")').click()
 _role = 'patient'
@@ -143,23 +143,26 @@ check('patient: 5 tabs w/ Book', (t => t.includes('Book') && !t.includes('Manage
 await pg.goto(BASE + '/book', { waitUntil: 'networkidle' });
 await pg.locator('main button[aria-pressed]').first().waitFor({ state: 'visible', timeout: 15000 })
 await pg.locator('main form button[type="button"]').first().click()
-const BDATE = new Date(Date.now() + 9 * 864e5).toISOString().slice(0, 10)
+const QADAY = 12 + Math.floor(Math.random() * 60)
+const BDATE = new Date(Date.now() + QADAY * 864e5).toISOString().slice(0, 10)
 await pg.locator('button:has-text("Next")').last().click()
   await pg.waitForTimeout(300)
-  await pickDate(pg, 9)
+  await pickDate(pg, QADAY)
 await pg.waitForTimeout(600)
 await pg.locator('form section:has-text("Available time") button:not([disabled])').nth(Date.now() % 8).click()
 await pg.locator('button:has-text("Continue to Payment")').click()
 await pg.waitForTimeout(1400)
 check('patient: booking → confirm step', (await pg.locator('main h1').textContent()).includes('Confirm Your Appointment'))
-await pg.locator('button:has-text("Pay Now")').click(); await pg.waitForTimeout(1200)
+await pg.locator('button:has-text("Pay Now")').click(); await pg.waitForTimeout(6000)
 check('patient: QR payment page', /\d{2}:\d{2}/.test(await pg.locator('main').textContent()))
-await pg.locator('button:has-text("paid — upload proof")').click(); await pg.waitForTimeout(1200)
-check('patient: payment page from QR', (await pg.locator('main h1').textContent()).includes('Payment'))
-await pg.locator('button:has-text("Skip for now")').click(); await pg.waitForTimeout(1200)
+await pg.locator('button:has-text("DEV: simulate PayMongo test payment")').click()
+let confirmed = false
+for (let i = 0; i < 24 && !confirmed; i++) { await pg.waitForTimeout(1500); confirmed = /confirmed/i.test(await pg.locator('main').textContent().catch(() => '')) }
+if (!confirmed) console.log('DEBUG-QR-FAIL', (await pg.locator('body').textContent()).slice(0, 500).replace(/\s+/g, ' '))
+check('patient: payment confirms via provider settle', confirmed)
 await pg.goto(BASE + '/appointments', { waitUntil: 'networkidle' })
 await pg.waitForTimeout(1200)
-check('patient: appointment listed w/ payment state', /Unpaid|Verifying/.test(await pg.locator('main').textContent()))
+check('patient: appointment listed w/ payment state', /Paid|Confirmed|Payment pending/i.test(await pg.locator('main').textContent()))
 await pg.goto(BASE + '/messages', { waitUntil: 'networkidle' })
 await pg.waitForTimeout(1200)
 await pg.fill('main form input', 'QA hello po')

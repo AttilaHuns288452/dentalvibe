@@ -82,11 +82,11 @@ export default function DoctorCalendar() {
 
       <div className="flex items-center gap-2">
         <button type="button" aria-label="Previous day" onClick={() => { const d = new Date(day + 'T12:00:00'); d.setDate(d.getDate() - 1); setDay(d.toISOString().slice(0, 10)) }}
-                className="w-9 h-9 rounded-lg border border-gray-200 bg-white text-gray-600"aria-label="Previous day">‹</button>
+                className="w-9 h-9 rounded-lg border border-gray-200 bg-white text-gray-600">‹</button>
         <input type="date" value={day} onChange={(e) => setDay(e.target.value)}
              className="h-9 px-2.5 rounded-lg border border-gray-200 bg-white text-xs font-semibold text-gray-600" />
         <button type="button" aria-label="Next day" onClick={() => { const d = new Date(day + 'T12:00:00'); d.setDate(d.getDate() + 1); setDay(d.toISOString().slice(0, 10)) }}
-                className="w-9 h-9 rounded-lg border border-gray-200 bg-white text-gray-600"aria-label="Next day">›</button>
+                className="w-9 h-9 rounded-lg border border-gray-200 bg-white text-gray-600">›</button>
       </div>
 
       {err && <p className="text-xs text-red-500">{err}</p>}

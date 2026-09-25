@@ -41,7 +41,7 @@ const pidM = (await svc.from('patients').select('id').eq('full_name', 'Maria San
 const sid = (await svc.from('services').select('id, price').limit(1)).data[0]
 
 // BUG-001 family
-let e = (await A.from('appointments').insert({ patient_id: pidA, service_id: sid.id, requested_date: '2030-01-01', price: sid.price, status: 'approved', payment_status: 'verified' })).error
+let e = (await A.from('appointments').insert({ patient_id: pidA, service_id: sid.id, requested_date: '2030-01-01', price: sid.price, status: 'approved', payment_status: 'paid' })).error
 t('001 spoofed self-confirmed insert blocked', !!e, e?.message ?? 'ACCEPTED')
 e = (await A.from('appointments').insert({ patient_id: pidA, service_id: sid.id, requested_date: '2030-01-02', price: 0, status: 'pending', payment_status: 'unpaid' })).error
 t('001 price-0 insert blocked', !!e, e?.message ?? 'ACCEPTED')
@@ -92,16 +92,21 @@ e = (await A.from('payment_proofs').insert({ appointment_id: okAp.id, image: 'zz
 t('008 direct proof insert blocked', !!e, e?.message?.slice(0, 45) ?? 'ACCEPTED')
 
 // BUG-009
-e = (await doc.from('appointments').update({ payment_status: 'verified' }).eq('id', okAp.id)).error
+e = (await doc.from('appointments').update({ payment_status: 'paid' }).eq('id', okAp.id)).error
 t('009 doctor payment flip blocked', !!e, e?.message?.slice(0, 45) ?? 'ACCEPTED')
 e = (await doc.from('appointments').update({ status: 'completed' }).eq('id', okAp.id)).error
 t('doctor status changes still work (notes/status)', !e || /payment/.test(e.message), e?.message?.slice(0, 45))
 
 // RPC still works end to end
 const { data: payAp } = await A.from('appointments').insert({ patient_id: pidA, service_id: sid.id, requested_date: '2030-03-03', scheduled_at: '2030-03-03T09:00:00Z', price: sid.price }).select().single()
-const r = await A.rpc('fn_submit_payment_proof', { p_appointment: payAp.id, p_image: 'data:image/png;base64,AAAA' })
+// new flow: create PayMongo payment (mock provider) -> simulate settled via provider check
+const cr = await A.functions.invoke('paymongo-create', { body: { appointment_id: payAp.id } })
+const cdata = cr.data ?? {}
+const sr = cdata.payment_id
+  ? await A.functions.invoke('paymongo-check', { body: { payment_id: cdata.payment_id, simulate: 'paid' } })
+  : { data: null, error: cr.error ?? { message: 'no payment_id' } }
 const after = (await A.from('appointments').select('status, payment_status').eq('id', payAp.id).single()).data
-t('payment -> instant confirm intact', !r.error && after?.status === 'approved', r.error?.message ?? JSON.stringify(after))
+t('payment -> confirm intact (provider-settled)', !cr.error && !sr.error && after?.status === 'approved' && after?.payment_status === 'paid', (cr.error?.message ?? sr.error?.message) ?? JSON.stringify(after))
 
 console.log(R.join('\n'))
 

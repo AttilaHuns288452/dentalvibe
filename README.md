@@ -29,11 +29,11 @@ npm run dev                   # http://localhost:5173
 | Doctor | `doctor@dentalvibe.ph` |
 | Owner | `owner@dentalvibe.ph` |
 
-**QA tools:** open `https://dentalvibe.vercel.app/?dev=1` — a DEV pill gives one-tap role logins and a **mock GCash payment** button (runs the real payment RPC so it lands in Owner → Income Analytics). `src/lib/dev.js` is the one file to strip for a real clinic launch.
+**QA tools:** open `https://dentalvibe.vercel.app/?dev=1` — a DEV pill gives one-tap role logins and a **simulated PayMongo test payment** button (runs the real payment pipeline — create → provider settle — so it lands in Owner → Income Analytics). `src/lib/dev.js` is the one file to strip for a real clinic launch.
 
 ## Product rules (enforced in the DB, not just the UI)
 
-- Booking: pick services → date → time → **appointment fee (deposit) via QR** → the slot is secured and the appointment is **confirmed instantly**. The fee reserves the slot — treatment is billed at the clinic.
+- Booking: pick services → date → time → **appointment fee (deposit) via PayMongo dynamic QR Ph** → patient scans with GCash/Maya/bank app → PayMongo webhook confirms → the appointment is **confirmed automatically**. The fee reserves the slot (pending payments hold it) — treatment is billed at the clinic. Payment is settled ONLY by the signed provider webhook/status read — never by a receipt screenshot. Secrets stay server-side (Supabase Edge Functions `paymongo-create` / `paymongo-webhook` / `paymongo-check`); without PayMongo keys the app runs a clearly-labeled **mock provider** with the identical state machine. Payment modes (`payment_provider_config.provider_mode`): **mock** (no keys, simulated settle) · **test** (PayMongo test keys — dynamic QR Ph + the documented `test_url` simulation) · **live** (real money, webhook-only settle). In-store QRPh (static merchant standee) is supported via `qr_style: 'instore'` + `merchant_qr_image` for the controlled ₱1 live smoke test.
 - A paid appointment holds its exact slot (unique index); double bookings are rejected.
 - Patients can edit only their contact info + booking notes, or cancel a pending booking. Identity/clinical fields are clinic-managed (staff-only `medical_note`, private attachments).
 - Income Analytics = paid appointments + walk-in ledger entries − expenses.

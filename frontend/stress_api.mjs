@@ -27,7 +27,7 @@ const pidM = (await svc.from('patients').select('id').eq('full_name', 'Maria San
 const sid = (await svc.from('services').select('id, price').limit(1).single()).data
 
 // ===== 1. APPOINTMENT INSERT ABUSE =====
-let e = (await A.from('appointments').insert({ patient_id: pidA, service_id: sid.id, requested_date: '2030-01-01', price: 0, status: 'approved', payment_status: 'verified', scheduled_at: '2030-01-01T09:00:00Z' })).error
+let e = (await A.from('appointments').insert({ patient_id: pidA, service_id: sid.id, requested_date: '2030-01-01', price: 0, status: 'approved', payment_status: 'paid', scheduled_at: '2030-01-01T09:00:00Z' })).error
 t('patient INSERT self-confirmed appointment (approved+paid+price 0)', !e, e?.message ?? 'ACCEPTED')
 let e2 = (await A.from('appointments').insert({ patient_id: pidB, service_id: sid.id, requested_date: '2030-01-02', price: 500 })).error
 t('patient INSERT appointment FOR patient B', !e2, e2?.message ?? 'ACCEPTED')
@@ -35,7 +35,7 @@ let e3 = (await A.from('appointments').insert({ patient_id: pidA, service_id: si
 t('patient INSERT negative price', !e3, e3?.message ?? 'ACCEPTED')
 let e4 = (await A.from('appointments').insert({ patient_id: pidA, service_id: '00000000-0000-0000-0000-000000000000', requested_date: '2030-01-04', price: 500 })).error
 t('patient INSERT invalid service FK', !e4, e4?.message ?? 'ACCEPTED')
-let e5 = (await A.from('appointments').insert({ patient_id: pidA, service_id: sid.id, requested_date: '2030-01-05', price: 500, status: 'completed', payment_status: 'verified' })).error
+let e5 = (await A.from('appointments').insert({ patient_id: pidA, service_id: sid.id, requested_date: '2030-01-05', price: 500, status: 'completed', payment_status: 'paid' })).error
 t('patient INSERT completed+paid (free income)', !e5, e5?.message ?? 'ACCEPTED')
 
 // ===== 2. APPOINTMENT UPDATE ABUSE =====
@@ -53,7 +53,7 @@ let u4 = (await A.from('appointments').update({ status: 'cancelled' }).eq('id', 
 t('patient CANCEL own booking (allowed by design)', !!u4, u4?.message ?? 'cancelled ok')
 // doctor completes unpaid appointment (bypassing payment?)
 const { data: ap2 } = await A.from('appointments').insert({ patient_id: pidA, service_id: sid.id, requested_date: '2030-03-01', scheduled_at: '2030-03-01T09:00:00Z', price: 500 }).select().single()
-const u5 = (await doc.from('appointments').update({ status: 'completed', payment_status: 'verified' }).eq('id', ap2.id)).error
+const u5 = (await doc.from('appointments').update({ status: 'completed', payment_status: 'paid' }).eq('id', ap2.id)).error
 t('doctor force-completes unpaid appointment (income bypass)', !u5, u5?.message ?? 'ACCEPTED')
 
 // ===== 3. CROSS-USER + TABLES =====
@@ -85,24 +85,28 @@ const [r1, r2] = await Promise.all([
 ])
 t('parallel double-booking same patient+date (race)', !(r1.error && r2.error), `r1=${r1.error?.message ?? 'ok'} r2=${r2.error?.message ?? 'ok'}`)
 
-// ===== 6. PAYMENT ABUSE =====
+// ===== 6. PAYMENT ABUSE (PayMongo surface: paymongo-create / paymongo-check) =====
 const { data: payAp } = await maria.from('appointments').insert({ patient_id: pidM, service_id: sid.id, requested_date: '2031-02-02', scheduled_at: '2031-02-02T09:00:00Z', price: 500 }).select().single()
-const big = 'x'.repeat(2100000)
-const p1 = await maria.rpc('fn_submit_payment_proof', { p_appointment: payAp.id, p_image: big })
-t('RPC >2MB proof rejected', !!p1.error, p1.error?.message?.slice(0, 40) ?? 'ACCEPTED')
-const p2 = await maria.rpc('fn_submit_payment_proof', { p_appointment: payAp.id, p_image: '' })
-t('RPC empty proof rejected', !!p2.error, p2.error?.message?.slice(0, 40) ?? 'ACCEPTED')
-const p3 = await maria.rpc('fn_submit_payment_proof', { p_appointment: payAp.id, p_image: 'data:image/png;base64,AAAA' })
-t('RPC valid proof confirms', !p3.error, p3.error?.message ?? 'ok')
-const p4 = await maria.rpc('fn_submit_payment_proof', { p_appointment: payAp.id, p_image: 'again' })
-t('RPC double-submit rejected', !!p4.error, p4.error?.message?.slice(0, 40) ?? 'ACCEPTED')
-const p5 = await A.rpc('fn_submit_payment_proof', { p_appointment: payAp.id, p_image: 'steal' })
-t('RPC on SOMEONE ELSE appointment rejected', !!p5.error, p5.error?.message?.slice(0, 40) ?? 'ACCEPTED')
+const fx = (c, name, body) => c.functions.invoke(name, { body })
+const p3 = await fx(maria, 'paymongo-create', { appointment_id: payAp.id })
+t('create payment OK (mock provider)', !p3.error && !!p3.data?.payment_id, p3.error?.message ?? JSON.stringify(p3.data)?.slice(0, 60))
+const p4 = await fx(maria, 'paymongo-create', { appointment_id: payAp.id })
+t('create is idempotent (no second intent)', !p4.error && p4.data?.payment_id === p3.data?.payment_id, p4.error?.message ?? `ids ${p3.data?.payment_id} vs ${p4.data?.payment_id}`)
+const p5 = await fx(A, 'paymongo-create', { appointment_id: payAp.id })
+t('create on SOMEONE ELSE appointment rejected', !!p5.error || !!p5.data?.error, p5.error?.message ?? p5.data?.error ?? 'ACCEPTED')
+const p6 = await fx(A, 'paymongo-check', { payment_id: p3.data?.payment_id, simulate: 'paid' })
+t('check on SOMEONE ELSE payment rejected', !!p6.error || p6.data?.error, p6.error?.message ?? p6.data?.error ?? 'ACCEPTED')
+const p7 = await fx(maria, 'paymongo-check', { payment_id: p3.data?.payment_id, simulate: 'paid' })
+t('legit settle works once', !p7.error && p7.data?.status === 'paid', p7.error?.message ?? JSON.stringify(p7.data))
+const p8 = await fx(maria, 'paymongo-check', { payment_id: p3.data?.payment_id, simulate: 'paid' })
+t('replay settle stays single', !p8.error && p8.data?.status === 'paid', p8.error?.message ?? JSON.stringify(p8.data))
+const { data: txAfter } = await svc.from('transactions').select('id').eq('payment_id', p3.data?.payment_id)
+t('exactly one ledger row per payment', txAfter?.length === 1, `count=${txAfter?.length}`)
 
 console.log(R.join('\n'))
 
 // ===== CLEANUP =====
-await svc.from('payment_proofs').delete().eq('appointment_id', payAp.id)
+await svc.from('transactions').delete().eq('payment_id', p3.data?.payment_id)
 await svc.from('appointments').delete().in('patient_id', [pidA, pidB, pidM].filter(Boolean))
 await svc.from('appointments').delete().is('patient_id', null)
 await svc.from('ehr_attachments').delete().eq('patient_id', pidM)

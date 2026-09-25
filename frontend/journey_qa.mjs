@@ -3,11 +3,11 @@ import('/home/attila/.hermes/hermes-agent/node_modules/playwright/index.mjs').th
 const pickDate = async (pg, daysAhead) => {
   const target = new Date(Date.now() + daysAhead * 864e5)
   while (target.getDay() === 0) target.setDate(target.getDate() + 1) // clinic closed Sundays
-  for (let i = 0; i < 3; i++) {
+  for (let i = 0; i < 10; i++) {
     const label = await pg.locator('section:has-text("Preferred date") span.text-sm.font-bold').first().textContent()
     const cur = new Date(label.trim() + ' 1')
     if (cur.getMonth() === target.getMonth() && cur.getFullYear() === target.getFullYear()) break
-    if (cur < target) await pg.locator('button[aria-label="Next month"]').click()
+    if (cur < target) { const nx = pg.locator('button[aria-label="Next month"]'); if (await nx.isDisabled().catch(() => true)) break; await nx.click() }
     else await pg.locator('button[aria-label="Previous month"]').click()
     await pg.waitForTimeout(250)
   }
@@ -34,7 +34,7 @@ const b = await chromium.launch()
 
   console.log('========== PATIENT JOURNEY ==========')
   // register
-  await pg.goto(BASE + '/', { waitUntil: 'networkidle' })
+  await pg.goto(BASE + '/?dev=1', { waitUntil: 'networkidle' })
   await pg.waitForTimeout(1200)
   await pg.locator('button:has-text("Register")').click()
   const em = `journey${Date.now()}@dentalvibe.ph`
@@ -63,10 +63,11 @@ const b = await chromium.launch()
   await pg.goto(BASE + '/book', { waitUntil: 'networkidle' }); await pg.waitForTimeout(1200)
   check('P4. book page lists services', (await pg.locator('main form button[type="button"]').count()) >= 4)
   await pg.locator('main form button[type="button"]').nth(1).click() // Oral Prophylaxis
-  const BDATE = new Date(Date.now() + 8 * 864e5).toISOString().slice(0, 10)
+  const QADAY = 12 + Math.floor(Math.random() * 60)
+  const BDATE = new Date(Date.now() + QADAY * 864e5).toISOString().slice(0, 10)
   await pg.locator('button:has-text("Next")').last().click()
   await pg.waitForTimeout(300)
-  await pickDate(pg, 8)
+  await pickDate(pg, QADAY)
 await pg.waitForTimeout(600)
 await pg.locator('form section:has-text("Available time") button:not([disabled])').nth(Date.now() % 8).click()
   await pg.fill('textarea', 'Please be gentle, first visit.')
@@ -76,18 +77,15 @@ await pg.locator('form section:has-text("Available time") button:not([disabled])
   await shot('03-confirm')
   check('P6. Confirm shows service + fee + Free admin', (await pg.locator('main').textContent()).includes('Appointment fee') && (await pg.locator('main').textContent()).includes('Free') && /₱[\d,]+/.test(await pg.locator('main').textContent()))
   await pg.locator('button:has-text("Pay Now")').click()
-  await pg.waitForTimeout(1400)
-  const qrTxt = await pg.locator('body').textContent()
-  check('P7. QR page with countdown + total', qrTxt.includes("You're Almost Done") && /\d{2}:\d{2}/.test(qrTxt) && /₱[\d,]+/.test(qrTxt) && qrTxt.includes('Download QR image'))
+  let qrTxt = ''
+  for (let i = 0; i < 20; i++) { await pg.waitForTimeout(1500); qrTxt = await pg.locator('body').textContent(); if (qrTxt.includes('Pay Appointment Fee') && /\d{2}:\d{2}/.test(qrTxt)) break }
+  check('P7. QR page with countdown + total', qrTxt.includes("Pay Appointment Fee") && /\d{2}:\d{2}/.test(qrTxt) && /₱[\d,]+/.test(qrTxt) && qrTxt.includes('Download QR image'))
   await shot('04-qr')
-  await pg.locator('button:has-text("paid — upload proof")').click()
-  await pg.waitForTimeout(1200)
-  const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64')
-  await pg.setInputFiles('#proofInput', { name: 'gcash-proof.png', mimeType: 'image/png', buffer: png })
-  await pg.locator('button:has-text("Confirm Payment")').click()
-  await pg.waitForTimeout(2000)
-  check('P8. payment confirms instantly', (await pg.locator('main h1').textContent().catch(() => '')).includes('Appointment confirmed'))
-  await shot('05-proof-submitted')
+  await pg.locator('button:has-text("DEV: simulate PayMongo test payment")').click()
+  let settled = false
+  for (let i = 0; i < 24 && !settled; i++) { await pg.waitForTimeout(1500); settled = /confirmed/i.test(await pg.locator('main').textContent().catch(() => '')) }
+  check('P8. payment settles via provider (dynamic QR flow)', settled)
+  await shot('05-payment-settled')
 
   // appointments state
   await pg.goto(BASE + '/appointments', { waitUntil: 'networkidle' }); await pg.waitForTimeout(1200)

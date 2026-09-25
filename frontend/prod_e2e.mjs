@@ -6,11 +6,11 @@ import fs from 'fs'
 const pickDate = async (pg, daysAhead) => {
   const target = new Date(Date.now() + daysAhead * 864e5)
   while (target.getDay() === 0) target.setDate(target.getDate() + 1) // clinic closed Sundays
-  for (let i = 0; i < 3; i++) {
+  for (let i = 0; i < 10; i++) {
     const label = await pg.locator('section:has-text("Preferred date") span.text-sm.font-bold').first().textContent()
     const cur = new Date(label.trim() + ' 1')
     if (cur.getMonth() === target.getMonth() && cur.getFullYear() === target.getFullYear()) break
-    if (cur < target) await pg.locator('button[aria-label="Next month"]').click()
+    if (cur < target) { const nx = pg.locator('button[aria-label="Next month"]'); if (await nx.isDisabled().catch(() => true)) break; await nx.click() }
     else await pg.locator('button[aria-label="Previous month"]').click()
     await pg.waitForTimeout(250)
   }
@@ -57,38 +57,38 @@ await pg.locator('main form button[type="button"]').first().click()
 const BDATE = new Date(Date.now() + 7 * 864e5).toISOString().slice(0, 10)
 await pg.locator('button:has-text("Next")').last().click()
   await pg.waitForTimeout(300)
-  await pickDate(pg, 7)
+  await pickDate(pg, 12 + Math.floor(Math.random() * 60))
 await pg.waitForTimeout(600)
 await pg.locator('form section:has-text("Available time") button:not([disabled])').nth(Date.now() % 8).click()
 await pg.locator('button:has-text("Continue to Payment")').click()
 await pg.waitForTimeout(1800)
 check('4. confirm step after booking', (await pg.locator('main h1').textContent()).includes('Confirm Your Appointment'))
 await pg.locator('button:has-text("Pay Now")').click()
-await pg.waitForTimeout(1200)
+await pg.waitForFunction(() => /Pay Appointment Fee/.test(document.body.textContent), null, { timeout: 30000 }).catch(() => {})
 check('4b. QR payment page with countdown', /\d{2}:\d{2}/.test(await pg.locator('main').textContent()))
-await pg.locator('button:has-text("paid — upload proof")').click()
-await pg.waitForTimeout(1200)
 check('5. payment shows service + price', (await pg.locator('main').textContent()).includes('₱'))
+check('5b. production page hides DEV chrome', !(await pg.locator('button:has-text("DEV: simulate")').count()))
 await pg.screenshot({ path: '/tmp/prod-payment.png' })
 
-// skip → appointments → pay later
-await pg.locator('button:has-text("Skip for now")').click()
-await pg.waitForTimeout(1200)
+// pay-later path: leave it unpaid → badge shows → "Pay now" reopens the SAME payment (idempotent reuse)
+await pg.goto('http://localhost:4176/appointments', { waitUntil: 'networkidle' }); await pg.waitForTimeout(1200)
 check('6. unpaid badge on appointment', (await pg.locator('main').textContent()).includes('Unpaid'))
+await pg.locator('button:has-text("Pay now"), button:has-text("View payment")').first().click()
+await pg.waitForFunction(() => /Pay Appointment Fee/.test(document.body.textContent), null, { timeout: 30000 }).catch(() => {})
 
-// upload proof via file input
-const appts = await pg.evaluate(async () => {
-  // read our appointment id from the pay route via supabase… simpler: grab from the page's own supabase through the appointments API
-  return null
-})
-await pg.locator('button:has-text("Pay now")').click()
-await pg.waitForTimeout(1000)
-// create a tiny PNG proof
-const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64')
-await pg.setInputFiles('#proofInput', { name: 'proof.png', mimeType: 'image/png', buffer: png })
-await pg.locator('button:has-text("Confirm Payment")').click()
-await pg.waitForTimeout(2000)
-check('7. payment confirms instantly', (await pg.locator('main h1').textContent()).includes('Appointment confirmed'))
+// settle the way PRODUCTION does it — provider confirmation (paymongo-check drives the
+// documented test_url simulation in test mode; the signed webhook settles), no UI crutch.
+const sbsP = createClient(env.VITE_SUPABASE_URL, env.VITE_SUPABASE_ANON_KEY)
+await sbsP.auth.signInWithPassword({ email: em, password: 'Password123' })
+const payRes = await sbsP.from('payments').select('id, status').order('created_at', { ascending: false }).limit(3)
+const payRow = payRes.data?.filter((r) => r.status === 'pending') ?? []
+if (!payRow.length) throw new Error('no pending payment: ' + JSON.stringify(payRes).slice(0, 300))
+const simRes = await sbsP.functions.invoke('paymongo-check', { body: { payment_id: payRow[0].id, simulate: 'paid' } })
+console.log('DEBUG-settle', JSON.stringify(simRes).slice(0, 400))
+await pg.reload({ waitUntil: 'networkidle' })
+let settled = false
+for (let i = 0; i < 20 && !settled; i++) { await pg.waitForTimeout(1500); settled = /confirmed/i.test(await pg.locator('main').textContent().catch(() => '')) }
+check('7. payment confirms instantly', settled)
 await pg.locator('button:has-text("My Appointments")').click()
 await pg.waitForTimeout(1200)
 check('8. status shows Confirmed', (await pg.locator('main').textContent()).includes('Confirmed'))
@@ -109,8 +109,8 @@ check('10. bell shows no request notifications', !(await pg.locator('header butt
 const sbs = createClient(env.VITE_SUPABASE_URL, env.VITE_SUPABASE_ANON_KEY)
 await sbs.auth.signInWithPassword({ email: em, password: 'Password123' })
 const { data: paidRow } = await sbs.from('appointments').select('status, payment_status').order('created_at', { ascending: false }).limit(1)
-check('12. auto-confirmed after payment', paidRow[0]?.status === 'approved' && paidRow[0]?.payment_status === 'verified')
-check('13. paid appointment counts as income source', paidRow[0]?.payment_status === 'verified')
+check('12. auto-confirmed after payment', paidRow[0]?.status === 'approved' && paidRow[0]?.payment_status === 'paid')
+check('13. paid appointment counts as income source', paidRow[0]?.payment_status === 'paid')
 check('11. no Verifying state exists', true)
 
 await pg.goto('http://localhost:4176/owner/income', { waitUntil: 'networkidle' })
@@ -132,7 +132,7 @@ check('17. patient cannot read clinic appointments', (stealAppts ?? []).every((a
 const { data: pats } = await sbs2.from('patients').select('id').limit(1)
 const { data: svcs } = await sbs2.from('services').select('id').limit(1)
 const { data: appt2 } = await sbs2.from('appointments').insert({ patient_id: pats[0].id, service_id: svcs[0].id, requested_date: '2030-01-15', price: 500, status: 'pending' }).select().single()
-const { error: gerr } = await sbs2.from('appointments').update({ status: 'approved', payment_status: 'verified' }).eq('id', appt2.id)
+const { error: gerr } = await sbs2.from('appointments').update({ status: 'approved', payment_status: 'paid' }).eq('id', appt2.id)
 check('18. unpaid stays unconfirmed (patient cannot self-confirm)', !!gerr)
 await sbs2.auth.signOut()
 await sbs2.auth.signInWithPassword({ email: 'doctor@dentalvibe.ph', password: 'password123' })

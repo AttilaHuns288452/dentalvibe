@@ -20,7 +20,7 @@ await svc.from('ehr_attachments').delete().in('filename', ['probe.png', 'evil.pn
 
 // INCOME RECOMPUTE — independent sum vs what IncomeHub shows
 const { data: appts } = await svc.from('appointments').select('price, status, payment_status, scheduled_at, requested_date')
-const paidIncome = appts.filter(a => a.payment_status === 'verified' && a.status !== 'cancelled').reduce((s, a) => s + Number(a.price), 0)
+const paidIncome = appts.filter(a => a.payment_status === 'paid' && a.status !== 'cancelled').reduce((s, a) => s + Number(a.price), 0)
 const completedIncome = appts.filter(a => a.status === 'completed').reduce((s, a) => s + Number(a.price), 0)
 const { data: tx } = await svc.from('transactions').select('*')
 const manualIncome = tx.filter(t => t.kind === 'income').reduce((s, t) => s + Number(t.amount), 0)

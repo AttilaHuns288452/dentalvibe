@@ -1,12 +1,14 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { isDev, mockPay } from '../../lib/dev'
 import { supabase } from '../../supabaseClient'
 import { peso } from '../../lib/api'
+import { useRevalidateOnVisible } from '../../lib/hooks'
 
-// Booking payment flow (p121→123): confirm summary → QR with 15:00 countdown →
-// then the existing proof-upload page. QR is a hand-rolled byte-mode QR
-// renderer (version auto, EC level L) — no external dependency.
+// Pay Appointment Fee — PayMongo dynamic QR: paymongo-create makes the payment
+// server-side and returns the provider QR (or a text payload in mock/demo mode);
+// paymongo-check is polled while pending and the webhook confirms server-side.
+// Mock-mode payloads render via the hand-rolled byte-mode QR encoder below.
 // ponytail: minimal QR spec impl; if logos/styling ever needed, swap for a lib.
 
 // ---- QR encoder (byte mode, ECC L, versions 1-10) ----
@@ -127,14 +129,12 @@ export default function QrPayment() {
   const apptId = new URLSearchParams(search).get('appt')
   const [appt, setAppt] = useState(state?.appointment || null)
   const [gone, setGone] = useState(false)
-  const [secs, setSecs] = useState(15 * 60)
+  const [pay, setPay] = useState(null) // paymongo-create response
+  const [status, setStatus] = useState('pending') // 'pending' | 'paid' | 'failed' | 'expired' | 'cancelled'
+  const [payErr, setPayErr] = useState('')
+  const [secs, setSecs] = useState(0)
   const [err, setErr] = useState('')
-  const svgRef = useRef(null)
-
-  useEffect(() => {
-    const t = setInterval(() => setSecs((s) => Math.max(0, s - 1)), 1000)
-    return () => clearInterval(t)
-  }, [])
+  const qrBoxRef = useRef(null)
 
   useEffect(() => {
     if (appt || !apptId) return
@@ -146,10 +146,53 @@ export default function QrPayment() {
   }, [apptId, appt])
   // authoritative check (#54): already paid = straight to the result, never a second payment
   useEffect(() => {
-    if (appt && (appt.payment_status === 'verified' || appt.status === 'approved')) {
+    if (appt && (appt.payment_status === 'paid' || appt.status === 'approved')) {
       navigate('/book/success?appt=' + appt.id, { replace: true, state: { appointment: appt } })
     }
   }, [appt, navigate])
+
+  // create is idempotent server-side (reused: true) — safe on every mount/refresh
+  const create = useCallback(async () => {
+    setPayErr(''); setErr(''); setStatus('pending')
+    const { data, error } = await supabase.functions.invoke('paymongo-create', { body: { appointment_id: apptId } })
+    if (error) { setPayErr(error.message); setStatus(''); return }
+    if (data.status && data.status !== 'pending') setStatus(data.status)
+    setPay(data)
+    // immediate first check — a reused payment may already be settled or failed
+    if (data.payment_id && data.status !== 'paid') {
+      const { data: c } = await supabase.functions.invoke('paymongo-check', { body: { payment_id: data.payment_id } })
+      if (c?.status) setStatus(c.status)
+    }
+  }, [apptId])
+  useEffect(() => { if (apptId) create() }, [apptId, create])
+
+  const check = useCallback(async () => {
+    if (!pay?.payment_id || status !== 'pending') return
+    const { data, error } = await supabase.functions.invoke('paymongo-check', { body: { payment_id: pay.payment_id } })
+    if (!error && data?.status) setStatus(data.status)
+  }, [pay?.payment_id, status])
+  useEffect(() => {
+    if (status !== 'pending' || !pay?.payment_id) return
+    const t = setInterval(check, 5000)
+    return () => clearInterval(t)
+  }, [status, pay?.payment_id, check])
+  useRevalidateOnVisible(check) // no-ops unless a payment is pending
+
+  // countdown to the server-set expiry (not a fixed timer)
+  useEffect(() => {
+    if (!pay?.expires_at) return
+    const tick = () => setSecs(Math.max(0, Math.floor((new Date(pay.expires_at).getTime() - Date.now()) / 1000)))
+    tick()
+    const t = setInterval(tick, 1000)
+    return () => clearInterval(t)
+  }, [pay?.expires_at])
+
+  // paid (poll or webhook-visible refetch) → the result screen; Back can never re-pay (#54)
+  useEffect(() => {
+    if (status === 'paid' && pay) {
+      navigate('/book/success?appt=' + apptId, { replace: true, state: { appointment: { ...appt, payment_status: 'paid', status: 'approved' } } })
+    }
+  }, [status, pay, appt, apptId, navigate])
 
   if (!appt) return (
     <div className="px-4 py-16 text-center">
@@ -161,15 +204,42 @@ export default function QrPayment() {
     </div>
   )
 
+  if (payErr) return (
+    <div className="px-4 py-16 text-center">
+      <p className="text-sm text-red-500">{payErr}</p>
+      <button onClick={() => navigate('/appointments')} className="mt-4 h-10 px-4 rounded-lg bg-primary-600 text-white text-sm font-semibold">My Appointments</button>
+    </div>
+  )
+
+  if (!pay) return (
+    <div className="px-4 py-16 text-center">
+      {payErr ? (
+        <>
+          <p className="text-sm text-red-500">{payErr}</p>
+          <button onClick={create} className="mt-4 h-11 px-4 rounded-lg bg-primary-600 text-white text-sm font-semibold">Try again</button>
+          <button onClick={() => navigate('/appointments')} className="mt-2 h-11 px-4 rounded-lg border border-gray-200 text-gray-700 text-sm font-semibold bg-white">My Appointments</button>
+        </>
+      ) : (
+        <p className="text-sm text-gray-500 animate-pulse">Preparing your payment QR…</p>
+      )}
+    </div>
+  )
+
   const svc = appt.services?.name ?? 'Appointment'
-  const amount = appt.price ?? 0
-  // GCash-style payload: clinic payment reference
+  const amount = pay.amount ?? appt.price ?? 0
   const ref = 'DAR-' + String(appt.id).slice(0, 8).toUpperCase()
-  const qrText = `DARDENTAL|REF:${ref}|AMT:${amount}|SERVICE:${svc}`
   const mm = String(Math.floor(secs / 60)).padStart(2, '0'), ss = String(secs % 60).padStart(2, '0')
+  const dead = secs === 0 || ['failed', 'expired', 'cancelled'].includes(status)
 
   const download = () => {
-    const svg = svgRef.current?.querySelector('svg')
+    if (pay.qr_image) {
+      const a = document.createElement('a')
+      a.href = pay.qr_image
+      a.download = `payment-qr-${ref}.png`
+      a.click()
+      return
+    }
+    const svg = qrBoxRef.current?.querySelector('svg')
     if (!svg) return
     const blob = new Blob([new XMLSerializer().serializeToString(svg)], { type: 'image/svg+xml' })
     const a = document.createElement('a')
@@ -189,35 +259,47 @@ export default function QrPayment() {
         <div className="absolute -top-6 left-1/2 -translate-x-1/2 w-12 h-12 rounded-xl bg-white shadow flex items-center justify-center">
           <svg viewBox="0 0 24 24" className="w-6 h-6 text-primary-600" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3l8 3v6c0 4.5-3 8-8 10-5-2-8-5.5-8-10V6zM9 12l2 2 4-4" /></svg>
         </div>
-        <h1 className="text-lg font-bold text-gray-900 mt-6">You're Almost Done!</h1>
-        <p className="text-xs text-gray-500 mt-1">Scan the QR code with your preferred payment app to secure your appointment.</p>
-        <p className="text-sm font-bold text-gray-900 mt-3">This QR is valid for <span className={secs < 60 ? 'text-red-500' : ''}>{mm}:{ss}</span></p>
+        <h1 className="text-lg font-bold text-gray-900 mt-6">Pay Appointment Fee</h1>
+        <p className="text-xs text-gray-500 mt-1">Scan this QR using GCash, Maya, or your bank app. This code is valid for <span className={secs < 60 && secs > 0 ? 'font-semibold text-red-500' : ''}>{mm}:{ss}</span>.</p>
 
-        <div ref={svgRef} className="flex justify-center my-4"><QR text={qrText} /></div>
+        <div ref={qrBoxRef} className="flex justify-center my-4">
+          {pay.qr_image ? (
+            <img src={pay.qr_image} alt="Payment QR code" className="w-[180px] h-[180px] rounded bg-white" />
+          ) : (
+            <div className="relative">
+              <QR text={pay.qr_payload} />
+              {/* mock provider payload — no real payment destination */}
+              <span className="absolute -top-2 -right-3 bg-amber-100 text-amber-700 border border-amber-200 text-[9px] font-bold px-1.5 py-0.5 rounded-full">DEMO</span>
+            </div>
+          )}
+        </div>
 
         <div className="flex justify-between text-sm font-bold text-gray-900 border-t border-gray-100 pt-3">
           <span>Total payment</span><span>{peso(amount)}</span>
         </div>
-        <div className="text-[11px] text-gray-500 mt-1">Ref: {ref} · {svc}</div>
+        <div className="text-[11px] text-gray-500 mt-1">Ref: {ref} · {svc}{appt.requested_date ? ` · ${appt.requested_date}` : ''}</div>
         <p className="text-[11px] text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2 mt-2">
           This is your <b>appointment fee</b> — it reserves the slot. Treatment charges are billed separately at the clinic.
         </p>
-        {secs === 0 && (
-          <p className="text-xs font-semibold text-red-500 mt-2">QR expired — generate a new one to continue.</p>
+
+        {status === 'pending' && secs > 0 && (
+          <p className="text-xs text-gray-500 mt-3 animate-pulse">Waiting for payment confirmation…</p>
+        )}
+        {status === 'pending' && secs === 0 && (
+          <p className="text-xs font-semibold text-red-500 mt-3">QR expired — generate a new one to continue.</p>
+        )}
+        {['failed', 'expired', 'cancelled'].includes(status) && (
+          <p className="text-xs font-semibold text-red-500 mt-3">Payment {status} — generate a new QR to try again.</p>
         )}
 
-        {secs === 0 ? (
-          <button onClick={() => setSecs(15 * 60)} className="w-full h-11 mt-4 rounded-lg bg-primary-600 text-white text-sm font-semibold">Generate new QR</button>
-        ) : (
-          <button onClick={download} className="w-full h-11 mt-4 rounded-lg bg-gray-100 text-gray-800 text-sm font-semibold">Download QR image</button>
+        {dead && (
+          <button onClick={create} className="w-full h-11 mt-4 rounded-lg bg-primary-600 text-white text-sm font-semibold">Generate new QR</button>
         )}
-        <button onClick={() => navigate('/pay?appt=' + appt.id, { state: { appointment: appt } })} className="w-full h-11 mt-2 rounded-lg bg-primary-600 text-white text-sm font-semibold">
-          I've paid — upload proof
-        </button>
+        <button onClick={download} className="w-full h-11 mt-2 rounded-lg bg-gray-100 text-gray-800 text-sm font-semibold">Download QR image</button>
         {isDev() && (
-          <button onClick={async () => { try { await mockPay(supabase, appt.id); navigate('/book/success?appt=' + appt.id, { state: { appointment: appt } }) } catch (ex) { alert(ex.message) } }}
+          <button onClick={async () => { try { await mockPay(supabase, appt.id); navigate('/book/success?appt=' + appt.id, { replace: true, state: { appointment: appt } }) } catch (ex) { setErr(ex.message) } }}
                   className="w-full h-10 mt-2 rounded-lg border-2 border-dashed border-gray-800 text-gray-800 text-xs font-bold">
-            DEV: mock GCash — mark paid now
+            DEV: simulate PayMongo test payment
           </button>
         )}
         {err && <p className="text-xs text-red-500 mt-2">{err}</p>}

@@ -17,7 +17,8 @@ const STATUS_LABEL = { pending: 'Unpaid', approved: 'Confirmed', completed: 'Com
 function StatusPill({ status }) {
   return <span className={`text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full ${STATUS_PILL[status] ?? 'bg-gray-100 text-gray-600'}`}>{STATUS_LABEL[status] ?? status}</span>
 }
-const PAY_LABEL = { unpaid: 'Unpaid', verified: 'Paid ✓' }
+const PAY_LABEL = { unpaid: 'Payment required', pending: 'Payment pending', paid: 'Paid ✓' }
+const PAY_PILL = { unpaid: 'bg-gray-100 text-gray-500', pending: 'bg-amber-100 text-amber-700', paid: 'bg-green-100 text-green-700' }
 
 export default function MyAppointments() {
   const { patientRecord, refresh } = useAuth()
@@ -108,22 +109,22 @@ export default function MyAppointments() {
             {/* payment state */}
             {a.status === 'pending' && (
               <div className="mt-2 flex items-center gap-2">
-                <span className={'text-[11px] font-bold px-2 py-0.5 rounded ' + (a.payment_status === 'submitted' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-500')}>
-                  {PAY_LABEL[a.payment_status]}
+                <span className={'text-[11px] font-bold px-2 py-0.5 rounded ' + (PAY_PILL[a.payment_status] ?? 'bg-gray-100 text-gray-500')}>
+                  {PAY_LABEL[a.payment_status] ?? a.payment_status}
                 </span>
-                {a.payment_status === 'unpaid' && (
-                  <button onClick={() => navigate('/pay', { state: { appointment: a } })}
+                {(a.payment_status === 'unpaid' || a.payment_status === 'pending') && (
+                  <button onClick={() => navigate('/pay/qr?appt=' + a.id, { state: { appointment: a } })}
                           className="h-11 px-3 rounded-lg bg-primary-600 text-white text-xs font-semibold">
-                    Pay now
+                    {a.payment_status === 'pending' ? 'View payment' : 'Pay now'}
                   </button>
                 )}
                 <button onClick={() => cancel(a.id)} className="ml-auto min-h-[44px] px-2 text-xs font-semibold text-red-500">Cancel booking</button>
               </div>
             )}
-            {a.status === 'approved' && a.payment_status === 'verified' && (
+            {a.status === 'approved' && a.payment_status === 'paid' && (
               <span className="inline-block mt-2 text-[11px] font-bold px-2 py-0.5 rounded bg-green-50 text-green-700">Paid ✓ · slot secured</span>
             )}
-            {(a.status === 'completed' || (a.payment_status === 'verified' && isPast(a))) && (
+            {(a.status === 'completed' || (a.payment_status === 'paid' && isPast(a))) && (
               <button onClick={() => navigate('/receipt', { state: { appointment: a } })}
                       className="mt-2 min-h-[44px] px-4 rounded-lg border border-primary-200 text-primary-700 text-xs font-semibold bg-white">
                 Attach receipt

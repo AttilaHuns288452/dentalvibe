@@ -39,7 +39,7 @@ export default function ConfirmBooking() {
     </div>
   )
 
-  if (appt.payment_status === 'verified' || appt.status === 'approved') {
+  if (appt.payment_status === 'paid' || appt.status === 'approved') {
     navigate('/book/success?appt=' + appt.id, { replace: true, state: { appointment: appt } })
     return null
   }
@@ -126,7 +126,7 @@ export function BookSuccess() {
     </div>
   )
 
-  const confirmed = appt.payment_status === 'verified' || appt.status === 'approved'
+  const confirmed = appt.payment_status === 'paid' || appt.status === 'approved'
   return (
     <div className="px-4 py-8 space-y-4">
       <div className="text-center">
@@ -136,7 +136,9 @@ export function BookSuccess() {
         <h1 className="text-lg font-bold text-gray-900 mt-3">{confirmed ? 'Appointment confirmed' : 'Appointment booked'}</h1>
         <p className="text-xs text-gray-500 mt-1">{confirmed
           ? 'Your slot is secured — arrive 10 minutes early. Treatment charges are billed at the clinic.'
-          : 'Pay the appointment fee to secure your slot.'}</p>
+          : appt.payment_status === 'pending'
+            ? 'Waiting for payment confirmation.'
+            : 'Pay the appointment fee to secure your slot.'}</p>
       </div>
 
       {appt && (

@@ -15,16 +15,13 @@ export const DEV_ACCOUNTS = [
 ]
 export const DEV_PW = 'password123'
 
-const MOCK_RECEIPT =
-  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='
-
-// Mock GCash payment — runs the REAL fn_submit_payment_proof path (instant confirm + income)
+// Simulates a completed payment through the live PayMongo edge functions
+// (simulate only works while the mock provider is active server-side).
 export async function mockPay(supabase, appointmentId) {
-  const { error } = await supabase.rpc('fn_submit_payment_proof', {
-    p_appointment: appointmentId,
-    p_image: MOCK_RECEIPT,
-  })
+  const { data, error } = await supabase.functions.invoke('paymongo-create', { body: { appointment_id: appointmentId } })
   if (error) throw error
+  const { error: simError } = await supabase.functions.invoke('paymongo-check', { body: { payment_id: data.payment_id, simulate: 'paid' } })
+  if (simError) throw simError
 }
 
 export function devLogout() {

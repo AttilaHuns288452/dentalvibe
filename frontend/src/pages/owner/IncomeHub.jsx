@@ -28,13 +28,14 @@ export default function IncomeHub() {
   const load = () => {
     supabase.from('transactions').select('*').order('entry_date', { ascending: false })
       .then(({ data, error }) => (error ? setErr(error.message) : setTxns(data ?? [])))
-    supabase.from('appointments').select('id, status, price, scheduled_at, services(name), patients(full_name)').eq('payment_status', 'verified').neq('status', 'cancelled')
+    supabase.from('appointments').select('id, status, price, scheduled_at, services(name), patients(full_name)').eq('payment_status', 'paid').neq('status', 'cancelled')
       .then(({ data }) => setAppts(data ?? []))
   }
   useEffect(load, [])
 
-  const income = useMemo(() => (txns ?? []).filter((t) => t.type === 'income').reduce((s, t) => s + Number(t.amount), 0)
-    + appts.reduce((s, a) => s + Number(a.price ?? 0), 0), [txns, appts])
+  // income derives from `transactions` alone — settled payments auto-create ledger
+  // rows (fn_apply_payment_result), so summing appointments too would double-count
+  const income = useMemo(() => (txns ?? []).filter((t) => t.type === 'income').reduce((s, t) => s + Number(t.amount), 0), [txns])
   const expenses = useMemo(() => (txns ?? []).filter((t) => t.type === 'expense').reduce((s, t) => s + Number(t.amount), 0), [txns])
 
   const inPeriod = (iso) => {
@@ -49,8 +50,7 @@ export default function IncomeHub() {
     if (period === 'Yearly') return d.getFullYear() === now.getFullYear()
     return true
   }
-  const pIncome = useMemo(() => (txns ?? []).filter((t) => t.type === 'income' && inPeriod(t.entry_date)).reduce((s, t) => s + Number(t.amount), 0)
-    + appts.filter((a) => inPeriod(a.scheduled_at ?? a.requested_date)).reduce((s, a) => s + Number(a.price ?? 0), 0), [txns, appts, period])
+  const pIncome = useMemo(() => (txns ?? []).filter((t) => t.type === 'income' && inPeriod(t.entry_date)).reduce((s, t) => s + Number(t.amount), 0), [txns, period])
   const pExpenses = useMemo(() => (txns ?? []).filter((t) => t.type === 'expense' && inPeriod(t.entry_date)).reduce((s, t) => s + Number(t.amount), 0), [txns, period])
   const net = pIncome - pExpenses
 

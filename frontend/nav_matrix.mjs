@@ -37,7 +37,7 @@ const cleanTestRows = async () => {
   const lo = new Date(Date.now() + 16 * 864e5).toISOString().slice(0, 10)
   const hi = new Date(Date.now() + 27 * 864e5).toISOString().slice(0, 10)
   const { data: rows } = await svc.from('appointments').select('id, requested_date').gte('requested_date', lo).lte('requested_date', hi)
-  for (const r of rows ?? []) { await svc.from('payment_proofs').delete().eq('appointment_id', r.id); await svc.from('appointments').delete().eq('id', r.id) }
+  for (const r of rows ?? []) { await svc.from('payments').delete().eq('appointment_id', r.id); await svc.from('appointments').delete().eq('id', r.id) }
 }
 const marId = async () => (await svc.from('patients').select('id').eq('full_name', 'Maria Santos').limit(1)).data[0].id
 const apptRows = async () => (await svc.from('appointments').select('id', { count: 'exact', head: true })).count
@@ -137,13 +137,14 @@ await cleanTestRows()
   await pg.locator('button:has-text("Continue to Payment")').click()
   await pg.waitForTimeout(1200)
   await pg.locator('button:has-text("Pay Now")').click()
-  await pg.waitForTimeout(1000)
-  await pg.locator('button:has-text("DEV: mock GCash")').click()
-  await pg.waitForTimeout(2500)
-  const t1 = await txt(pg)
+  const devBtn = pg.locator('button:has-text("DEV: simulate PayMongo test payment")')
+  await devBtn.waitFor({ state: 'visible', timeout: 30000 })
+  await devBtn.click()
+  let t1 = ''
+  for (let i = 0; i < 24; i++) { await pg.waitForTimeout(1500); t1 = await txt(pg); if (/Approved|Confirmed/i.test(t1)) break }
   check('E1. payment success state renders', /Approved|Confirmed/i.test(t1))
   const rowsBefore = await apptRows()
-  const proofsBefore = (await svc.from('payment_proofs').select('id', { count: 'exact', head: true })).count
+  const payRowsBefore = (await svc.from('payments').select('id', { count: 'exact', head: true })).count
   const successUrl = pg.url()
   await pg.reload({ waitUntil: 'networkidle' }); await pg.waitForTimeout(1200)
   const t2 = await txt(pg)
@@ -151,8 +152,8 @@ await cleanTestRows()
   await pg.goBack().catch(() => {}); await pg.waitForTimeout(500)
   await pg.goForward().catch(() => {}); await pg.waitForTimeout(800)
   const rowsAfter = await apptRows()
-  const proofsAfter = (await svc.from('payment_proofs').select('id', { count: 'exact', head: true })).count
-  check('C2. back/forward after pay: no duplicate appointment/proof rows', rowsAfter === rowsBefore && proofsAfter === proofsBefore, `appts ${rowsBefore}->${rowsAfter} proofs ${proofsBefore}->${proofsAfter}`)
+  const payRowsAfter = (await svc.from('payments').select('id', { count: 'exact', head: true })).count
+  check('C2. back/forward after pay: no duplicate appointment/payment rows', rowsAfter === rowsBefore && payRowsAfter === payRowsBefore, `appts ${rowsBefore}->${rowsAfter} proofs ${payRowsBefore}->${payRowsAfter}`)
   // reopen result URL in a brand-new tab (deep link)
   const { ctx: c2, pg: p2 } = await fresh()
   await p2.goto(successUrl, { waitUntil: 'networkidle' }); await p2.waitForTimeout(1200)
