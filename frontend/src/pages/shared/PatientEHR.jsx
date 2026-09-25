@@ -41,7 +41,14 @@ export default function PatientEHR() {
       .eq('patient_id', id).in('status', ['completed', 'approved']).order('scheduled_at', { ascending: false })
     setAppts(a ?? [])
     const { data: at } = await supabase.from('ehr_attachments').select('*').eq('patient_id', id).order('created_at', { ascending: false })
-    setAtts(at ?? [])
+    // newest row per category = the current record; older ones stay as history
+    const seen = new Set()
+    setAtts((at ?? []).map((x) => {
+      const key = x.category_id ?? x.category
+      const latest = !seen.has(key)
+      seen.add(key)
+      return { ...x, latest }
+    }))
   }
   useEffect(() => { load() }, [id])
 
@@ -199,7 +206,11 @@ export default function PatientEHR() {
               </span>
               <span className="flex-1 min-w-0">
                 <span className="block text-sm font-semibold text-gray-900 truncate">{x.filename}</span>
-                <span className="block text-xs text-gray-500">{x.category} · {fmt(x.created_at)} · {x.file_size ?? '—'}</span>
+                <span className="block text-xs text-gray-500">
+                  {x.category} · {fmt(x.created_at)} · {x.file_size ?? '—'}
+                  {x.latest && <span className="ml-1.5 inline-block px-1.5 py-0.5 rounded bg-green-50 text-green-700 text-[10px] font-bold">LATEST</span>}
+                </span>
+                {x.note && <span className="block text-[11px] text-gray-400 truncate">{x.note}</span>}
               </span>
               <span className="flex gap-2 flex-none">
                 <button onClick={() => viewAtt(x)} className="h-11 px-2.5 rounded-md border border-gray-200 bg-white text-[11px] font-semibold text-primary-700">View</button>
@@ -286,8 +297,12 @@ export default function PatientEHR() {
 
 // Add Attachment (Figma p110)
 function AddAttachment({ patient, onClose, onSaved }) {
-  const CATS = ['X-ray', 'Lab result', 'Consent form', 'Other']
-  const [cat, setCat] = useState('X-ray')
+  const [cats, setCats] = useState([]) // active record_categories — configurable
+  const [cat, setCat] = useState(null) // selected category row
+  useEffect(() => {
+    supabase.from('record_categories').select('id, name').eq('active', true).eq('archived', false).order('sort_order')
+      .then(({ data }) => { setCats(data ?? []); setCat((c) => c ?? data?.[0] ?? null) })
+  }, [])
   const [file, setFile] = useState(null)
   const [note, setNote] = useState('')
   const [err, setErr] = useState('')
@@ -304,6 +319,7 @@ function AddAttachment({ patient, onClose, onSaved }) {
   }
 
   const uploadImpl = async () => {
+    if (!cat) return setErr('Pick a category.')
     if (!file) return setErr('Choose a file first.')
     setBusy(true)
     setErr('')
@@ -313,7 +329,7 @@ function AddAttachment({ patient, onClose, onSaved }) {
       const { error: upErr } = await supabase.storage.from('ehr-files').upload(path, file, { upsert: false })
       if (upErr) throw upErr
       const { error } = await supabase.from('ehr_attachments').insert({
-        patient_id: patient.id, category: cat, filename: file.name, path,
+        patient_id: patient.id, category: cat.name, category_id: cat.id, filename: file.name, path,
         file_size: (file.size / 1048576).toFixed(1) + ' MB', note: note || null, uploaded_by: profile?.id ?? null,
       })
       if (error) throw error
@@ -342,10 +358,11 @@ function AddAttachment({ patient, onClose, onSaved }) {
         <div>
           <div className="text-[11px] font-bold uppercase tracking-wide text-gray-500 mb-1.5">File category</div>
           <div className="flex flex-wrap gap-2">
-            {CATS.map((c) => (
-              <button key={c} type="button" onClick={() => setCat(c)}
-                      className={'h-11 px-3 rounded-full text-xs font-semibold border ' + (cat === c ? 'bg-primary-50 text-primary-700 border-primary-300' : 'bg-white text-gray-600 border-gray-200')}>{c}</button>
+            {cats.map((c) => (
+              <button key={c.id} type="button" onClick={() => setCat(c)}
+                      className={'h-11 px-3 rounded-full text-xs font-semibold border ' + (cat?.id === c.id ? 'bg-primary-50 text-primary-700 border-primary-300' : 'bg-white text-gray-600 border-gray-200')}>{c.name}</button>
             ))}
+            {!cats.length && <span className="text-xs text-gray-500">No active categories — owner can add them in Manage.</span>}
           </div>
         </div>
 

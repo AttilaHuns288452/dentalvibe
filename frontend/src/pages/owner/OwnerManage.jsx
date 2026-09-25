@@ -3,7 +3,7 @@ import { useSubmit } from '../../lib/hooks'
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/RoleContext'
-import { listServices, listPatients, listPriceExceptions, upsertPriceException, deletePriceException, updateClinicSettings, getClinicSettings, createService, deleteService, peso } from '../../lib/api'
+import { supabase, listServices, listPatients, listPriceExceptions, upsertPriceException, deletePriceException, updateClinicSettings, getClinicSettings, createService, deleteService, peso } from '../../lib/api'
 import { fmtTime12 } from '../../lib/format'
 
 // Owner Manage — Figma frames 71–74: clinic profile, hours, services & pricing
@@ -116,8 +116,87 @@ export default function OwnerManage() {
       <button disabled={saveBusy} onClick={save} className="w-full h-12 rounded-lg bg-primary-600 text-white font-semibold">
         {saved ? 'Saved ✓' : 'Save Changes'}
       </button>
+      <RecordCategories />
       <div className="h-4" />
     </div>
+  )
+}
+
+// Record Categories — configurable EHR upload categories (Owner-only manage).
+// Rows referenced by records are never hard-deleted (FK blocks it): archive = remove.
+function RecordCategories() {
+  const [cats, setCats] = useState([])
+  const [name, setName] = useState('')
+  const [edit, setEdit] = useState(null) // {id, name}
+  const [err, setErr] = useState('')
+  const load = async () => {
+    const { data } = await supabase.from('record_categories').select('*').order('sort_order')
+    setCats(data ?? [])
+  }
+  useEffect(() => { load() }, [])
+
+  const add = async () => {
+    if (!name.trim()) return
+    const { error } = await supabase.from('record_categories').insert({ name: name.trim(), sort_order: (cats.at(-1)?.sort_order ?? 0) + 1 })
+    if (error) return setErr(error.message)
+    setName(''); setErr(''); load()
+  }
+  const patch = async (id, fields) => {
+    const { error } = await supabase.from('record_categories').update(fields).eq('id', id)
+    if (error) return setErr(error.message)
+    setErr(''); setEdit(null); load()
+  }
+  const move = async (i, dir) => {
+    const a = cats[i], b = cats[i + dir]
+    if (!b) return
+    await supabase.from('record_categories').update({ sort_order: b.sort_order }).eq('id', a.id)
+    await supabase.from('record_categories').update({ sort_order: a.sort_order }).eq('id', b.id)
+    load()
+  }
+
+  return (
+    <section>
+      <h2 className="text-[11px] font-bold uppercase tracking-wide text-gray-500 mb-1.5">Record Categories</h2>
+      <div className="bg-white border border-gray-200 rounded-lg p-4 space-y-2">
+        <p className="text-xs text-gray-500">Categories for EHR uploads. Deactivated categories stay on past records; archived ones disappear from new uploads.</p>
+        <div className="flex gap-2">
+          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="New category name"
+                 className="flex-1 h-11 border border-gray-200 rounded-lg px-3 text-sm" />
+          <button onClick={add} className="h-11 px-4 rounded-lg bg-primary-600 text-white text-sm font-semibold">Add</button>
+        </div>
+        {err && <p className="text-xs text-red-500">{err}</p>}
+        {cats.map((c, i) => (
+          <div key={c.id} className={'flex items-center gap-2 border border-gray-100 rounded-lg px-3 py-2 ' + (c.archived ? 'opacity-50' : '')}>
+            {edit?.id === c.id ? (
+              <>
+                <input value={edit.name} onChange={(e) => setEdit({ ...edit, name: e.target.value })}
+                       className="flex-1 h-10 border border-gray-200 rounded-lg px-2 text-sm" />
+                <button onClick={() => edit.name.trim() && patch(c.id, { name: edit.name.trim() })} className="h-10 px-3 rounded-lg bg-primary-600 text-white text-xs font-semibold">Save</button>
+                <button onClick={() => setEdit(null)} className="h-10 px-3 rounded-lg border border-gray-200 text-xs font-semibold text-gray-600">Cancel</button>
+              </>
+            ) : (
+              <>
+                <span className="flex-1 text-sm font-semibold text-gray-900 truncate">{c.name}</span>
+                <button onClick={() => move(i, -1)} disabled={i === 0} aria-label="Move up" className="w-9 h-10 rounded-lg border border-gray-200 text-gray-500 disabled:opacity-30">↑</button>
+                <button onClick={() => move(i, 1)} disabled={i === cats.length - 1} aria-label="Move down" className="w-9 h-10 rounded-lg border border-gray-200 text-gray-500 disabled:opacity-30">↓</button>
+                <button onClick={() => patch(c.id, { active: !c.active })}
+                        className={'h-10 px-2.5 rounded-lg border text-[11px] font-bold ' + (c.active ? 'border-green-200 bg-green-50 text-green-700' : 'border-gray-200 text-gray-400')}>
+                  {c.active ? 'Active' : 'Inactive'}
+                </button>
+                {c.archived ? (
+                  <button onClick={() => patch(c.id, { archived: false })} className="h-10 px-2.5 rounded-lg border border-gray-200 text-[11px] font-bold text-gray-600">Restore</button>
+                ) : (
+                  <button onClick={() => setEdit({ id: c.id, name: c.name })} aria-label="Rename" className="h-10 px-2.5 rounded-lg border border-gray-200 text-[11px] font-bold text-gray-600">Edit</button>
+                )}
+                {!c.archived && (
+                  <button onClick={() => patch(c.id, { archived: true })} aria-label="Archive" className="h-10 px-2.5 rounded-lg border border-red-100 text-[11px] font-bold text-red-500">Archive</button>
+                )}
+              </>
+            )}
+          </div>
+        ))}
+      </div>
+    </section>
   )
 }
 
