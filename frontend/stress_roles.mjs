@@ -3,12 +3,12 @@
 import { chromium } from '/home/attila/.hermes/hermes-agent/node_modules/playwright/index.mjs'
 import { createClient } from '@supabase/supabase-js'
 import fs from 'fs'
-import { cleanTestFuture } from './pretest_clean.mjs'
+import { cleanTestFuture, cleanTestPatients } from './pretest_clean.mjs'
 
 const BASE = process.env.QA_BASE || 'http://localhost:4176'
 const KEY = fs.readFileSync('.env.local', 'utf8').match(/VITE_SUPABASE_ANON_KEY=(.*)/)[1].trim()
 const svc = createClient('https://wfmtkmfevdqbhtpqamic.supabase.co', process.env.SB_SECRET, { auth: { persistSession: false } })
-await cleanTestFuture(['Stress Patient', 'Maria Santos', 'Journey Tester'])
+await cleanTestPatients(); await cleanTestFuture(['Stress Patient', 'Maria Santos', 'Journey Tester'])
 
 let pass = 0, fail = 0
 const check = (id, cond, detail = '') => { cond ? pass++ : fail++; console.log(`${cond ? 'PASS' : 'FAIL'} | ${id}${detail ? ' :: ' + detail : ''}`) }
@@ -280,5 +280,5 @@ const bookDate = (days) => {
 }
 
 check('Z. zero page errors across all stress', pageErrors.length === 0, pageErrors.slice(0, 3).join(' | '))
-console.log(`\n===== STRESS ROLES: ${pass} passed, ${fail} failed =====`)
+await cleanTestPatients(); cleanTestFuture(['Stress Patient','Journey Tester'])\nconsole.log(`\n===== STRESS ROLES: ${pass} passed, ${fail} failed =====`)
 await b.close()

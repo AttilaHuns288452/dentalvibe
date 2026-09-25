@@ -30,6 +30,7 @@ export default function DoctorCalendar() {
   const [settings, setSettings] = useState(null)
   const [view, setView] = useState('Day')
   const [day, setDay] = useState(new Date().toISOString().slice(0, 10))
+  // default to a day that has appointments (demo-friendly); fallback to today
   const [err, setErr] = useState('')
 
   const load = async () => {
@@ -37,6 +38,13 @@ export default function DoctorCalendar() {
     getClinicSettings().then(setSettings).catch((e) => setErr(e.message))
   }
   useEffect(() => { load() }, [])
+  useEffect(() => {
+    if (!appts?.length) return
+    const today = new Date().toISOString().slice(0, 10)
+    const upcoming = (appts || []).map((a) => (a.scheduled_at || a.requested_date || '').slice(0, 10)).filter((d) => d >= today).sort()[0]
+    const any = (appts || []).map((a) => (a.scheduled_at || a.requested_date || '').slice(0, 10)).sort()[0]
+    setDay(upcoming || any || today)
+  }, [appts])
   useRevalidateOnVisible(load)
 
   const dayAppts = (appts ?? [])
@@ -89,8 +97,22 @@ export default function DoctorCalendar() {
       {/* hour grid with blocks (Figma day view) */}
       {view === 'Day' && (
         <div className="space-y-1.5">
+          {/* appointments without a scheduled time (pending/unscheduled) render first */}
+          {dayAppts.filter((a) => !a.scheduled_at).map((a) => (
+            <div key={a.id} className="flex gap-2 items-stretch">
+              <div className="w-16 text-xs font-bold text-gray-400 flex items-center flex-none">TBA</div>
+              <div className={'flex-1 bg-white border border-gray-200 border-l-4 rounded-lg px-3 py-2 ' + (STATUS_PILL[a.status] || 'border-l-gray-400')}>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-gray-900">Unscheduled</span>
+                  <span className={'text-[10px] font-bold px-1.5 py-0.5 rounded capitalize ' + (STATUS_PILL[a.status] || '')}>{a.status}</span>
+                </div>
+                <div className="text-sm font-semibold text-gray-900">{a.patients?.full_name}</div>
+                <div className="text-xs text-gray-500">{a.services?.name}</div>
+              </div>
+            </div>
+          ))}
           {slots.map((h) => {
-            const block = dayAppts.find((a) => a.scheduled_at && String(new Date(a.scheduled_at).getHours()).padStart(2, '0') === h.slice(0, 2))
+            const block = dayAppts.find((a) => a.scheduled_at && String((new Date(a.scheduled_at).getUTCHours() + 8) % 24).padStart(2, '0') === h.slice(0, 2))
             return (
               <div key={h} className="flex gap-2 items-stretch">
                 <div className="w-16 text-xs font-bold text-gray-900 flex items-center flex-none">{fmtTime12(h).replace(':00', '')}</div>
