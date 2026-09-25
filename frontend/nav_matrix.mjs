@@ -16,7 +16,7 @@ async function fresh(email = 'maria@dentalvibe.ph', opts = {}) {
   const pg = await ctx.newPage()
   pg.on('pageerror', () => {})
   await pg.goto(BASE + '/?dev=1', { waitUntil: 'networkidle' })
-  await pg.evaluate(() => { try { localStorage.clear(); sessionStorage.clear(); sessionStorage.clear() } catch {} })
+  await pg.evaluate(() => { try { localStorage.clear(); sessionStorage.clear() } catch {} })
   await pg.goto(BASE + '/?dev=1', { waitUntil: 'networkidle' })
   await pg.fill('input[type="email"]', email)
   await pg.fill('input[type="password"]', 'password123')

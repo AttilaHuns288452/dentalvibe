@@ -9,7 +9,7 @@ import('/home/attila/.hermes/hermes-agent/node_modules/playwright/index.mjs').th
   let pass = 0, fail = 0
   const check = (n, c) => { c ? pass++ : fail++; console.log((c ? 'PASS' : 'FAIL'), n) }
   const login = async (email) => {
-    await pg.evaluate(() => localStorage.clear(); sessionStorage.clear()).catch(() => {})
+    await pg.evaluate(() => { localStorage.clear(); sessionStorage.clear() }).catch(() => {})
     await pg.goto(base + '/', { waitUntil: 'networkidle' })
     await pg.waitForTimeout(600)
     await pg.fill('input[type="email"]', email)

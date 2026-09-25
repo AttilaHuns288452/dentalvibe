@@ -30,7 +30,7 @@ let _role = 'owner'
 const check = (name, cond) => { cond ? pass++ : fail++; console.log((cond ? 'PASS' : 'FAIL'), name) }
 const login = async (email) => {
   await pg.goto(BASE + '/?dev=1', { waitUntil: 'domcontentloaded' })
-  await pg.evaluate(() => { try { localStorage.clear(); sessionStorage.clear(); sessionStorage.clear() } catch {} })
+  await pg.evaluate(() => { try { localStorage.clear(); sessionStorage.clear() } catch {} })
   await pg.goto(BASE + '/?dev=1', { waitUntil: 'networkidle' }) // re-seed dv_dev after the clear
   await pg.waitForTimeout(800)
   await pg.fill('input[type="email"]', email)
@@ -118,7 +118,7 @@ const dtabs = (await pg.locator('nav').textContent()).replace(/\s+/g, ' ')
 check('doctor: no Requests/Income/Staff tabs', !dtabs.includes('Requests') && !dtabs.includes('Income') && !dtabs.includes('Staff'))
 
 // PATIENT (register fresh)
-await pg.evaluate(() => localStorage.clear(); sessionStorage.clear())
+await pg.evaluate(() => { localStorage.clear(); sessionStorage.clear() })
 await pg.goto(BASE + '/?dev=1', { waitUntil: 'networkidle' }) // re-seed dv_dev after the clear
 await pg.waitForTimeout(800)
 await pg.locator('button:has-text("Register")').click()

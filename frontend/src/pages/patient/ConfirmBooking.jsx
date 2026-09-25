@@ -108,11 +108,21 @@ export function BookSuccess() {
 
   useEffect(() => {
     if (!id) return
-    supabase.from('appointments')
-      .select('id, price, requested_date, scheduled_at, status, payment_status, services(name)')
-      .eq('id', id).maybeSingle()
-      .then(({ data }) => (data ? setAppt(data) : setGone(true)))
-      .catch(() => setGone(true))
+    // the provider webhook settles in the background — keep re-reading until confirmed
+    let stop = false
+    const load = async () => {
+      const { data } = await supabase.from('appointments')
+        .select('id, price, requested_date, scheduled_at, status, payment_status, services(name)')
+        .eq('id', id).maybeSingle().then((r) => r).catch(() => ({ data: null }))
+      if (stop) return
+      if (data) {
+        setAppt(data)
+        if (data.payment_status === 'paid' || data.status === 'approved') clearInterval(t)
+      } else setGone(true)
+    }
+    const t = setInterval(load, 4000)
+    load()
+    return () => { stop = true; clearInterval(t) }
   }, [id])
   const dt = appt?.requested_date ? new Date(appt.requested_date + 'T00:00:00') : null
 
