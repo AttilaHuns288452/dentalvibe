@@ -216,7 +216,7 @@ The skill is registered under the `development` category and will activate for: 
 
 ### Post-deploy Verification
 - All 7 QA gates re-run green on the local build (production parity via Vercel's build cache)
-- Demo accounts active: owner/doctor/maria/juan/andrea/liza/carlo @dentalvibe.ph, password `password123`
+- Demo accounts active: owner/doctor/maria/juan/andrea/liza/carlo @dentalvibe.ph (seeded password kept out of docs — see seed.mjs)
 - QA tools: open `https://dentalvibe.vercel.app/?dev=1` — DEV pill for one-tap role logins + mock GCash payment
 
 ---
