@@ -80,7 +80,7 @@ API suites (plain node against the deployed Supabase; `SB_SECRET` = service-role
 | suite | covers | checks |
 |---|---|---|
 | `pay_security.mjs` | adversarial money-path + finance-linkage probes | 16 |
-| `pay_lifecycle_qa.mjs` | reservation + late-payment invariants | 8 |
+| `push_qa.mjs` | real Web Push chain (event → pg_net → dispatch → FCM → SW) + RLS + multi-device | 21 | `QA_BASE` + `SB_SECRET` + **`QA_CHROME`** (branded Chrome; headed + persistent profiles — unbranded Chromium cannot register push) | |
 | `pay_webhook_qa.mjs` | webhook correctness + adversarial cases | 19 |
 | `security_evidence.mjs` | S1/S2/S3/S5/S6 enforcement evidence | 13 |
 | `verify_fixes.mjs` | purges orphan profiles + duplicate transactions, then re-runs the attack battery | 24 |
