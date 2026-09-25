@@ -18,17 +18,31 @@ const check = (name, ok, extra = '') => { ok ? pass++ : fail++; console.log((ok 
 await maria.auth.signInWithPassword({ email: 'maria@dentalvibe.ph', password: 'password123' })
 const svcRow = (await svc.from('services').select('id, price').order('price', { ascending: false }).limit(1)).data?.[0]
 const DAY = 30 + Math.floor(Math.random() * 300)
+const when = new Date(Date.now() + DAY * 864e5); when.setUTCHours(2, 0, 0, 0)
 const me = (await maria.from('patients').select('id').eq('user_id', (await maria.auth.getUser()).data.user.id).maybeSingle()).data
 if (!me) { console.log('FAIL no patient row for maria'); process.exit(1) }
 
-// ── 1. self-settle attempts (the classic fraud) ──
-const { data: payRow } = await svc.from('payments').select('id, appointment_id, amount').eq('status', 'pending').limit(1).maybeSingle()
-if (payRow) {
-  const r = await maria.from('payments').update({ status: 'paid', paid_at: new Date().toISOString() }).eq('id', payRow.id).select()
+// setup: a real booking at the configured exception price + an open payment
+const EXC = 555
+await svc.from('service_prices').delete().eq('service_id', svcRow.id).eq('patient_id', me.id)
+await svc.from('service_prices').insert({ service_id: svcRow.id, patient_id: me.id, price: EXC })
+const book = await maria.from('appointments').insert({
+  patient_id: me.id, service_id: svcRow.id, service_ids: [svcRow.id],
+  scheduled_at: when.toISOString(), requested_date: when.toISOString().slice(0, 10),
+  price: EXC, status: 'pending', payment_status: 'unpaid',
+}).select()
+const appt = book.data?.[0]
+check('6a. booking accepts the configured exception price', !!appt, book.error?.message?.slice(0, 60) ?? '')
+const created = appt ? (await maria.functions.invoke('paymongo-create', { body: { appointment_id: appt.id, amount: 1, price: 1 } })).data : null
+
+// ── 1. self-settle attempts (the classic fraud) on OUR open payment ──
+if (created?.payment_id) {
+  const payId = created.payment_id
+  const r = await maria.from('payments').update({ status: 'paid', paid_at: new Date().toISOString() }).eq('id', payId).select()
   check('1a. patient cannot self-settle a payment', !!r.error || (r.data ?? []).length === 0, r.error?.code ?? 'rows:' + (r.data ?? []).length)
-  const r2 = await maria.from('payments').update({ amount: 1 }).eq('id', payRow.id).select()
+  const r2 = await maria.from('payments').update({ amount: 1 }).eq('id', payId).select()
   check('1b. patient cannot alter a payment amount', !!r2.error || (r2.data ?? []).length === 0, r2.error?.code ?? 'rows:' + (r2.data ?? []).length)
-} else check('1a/1b. pending payment available to probe', false, 'no pending payment')
+} else check('1a/1b. open payment created for probe', false, 'paymongo-create failed')
 
 // ── 2. appointment status tamper (must target a NOT-YET-PAID row or the test is vacuous) ──
 let { data: myAppt } = await svc.from('appointments').select('id, payment_status').eq('patient_id', me.id).neq('payment_status', 'paid').limit(1).maybeSingle()
@@ -55,7 +69,6 @@ const insExc = await maria.from('service_prices').insert({ service_id: svcRow.id
 check('4. patient cannot set their own price', !!insExc.error, insExc.error?.code ?? 'INSERTED!')
 
 // ── 5. booking price tamper (server-side validation) ──
-const when = new Date(Date.now() + DAY * 864e5); when.setUTCHours(2, 0, 0, 0)
 const tamper = await maria.from('appointments').insert({
   patient_id: me.id, service_id: svcRow.id, service_ids: [svcRow.id],
   scheduled_at: when.toISOString(), requested_date: when.toISOString().slice(0, 10),
@@ -63,20 +76,9 @@ const tamper = await maria.from('appointments').insert({
 }).select()
 check('5. booking with a fake price is rejected', !!tamper.error && /price/i.test(tamper.error.message), tamper.error?.message?.slice(0, 60) ?? 'ACCEPTED')
 
-// ── 6. configurable price flows correctly (per-patient exception) ──
-const EXC = 555
-await svc.from('service_prices').insert({ service_id: svcRow.id, patient_id: me.id, price: EXC })
-const book = await maria.from('appointments').insert({
-  patient_id: me.id, service_id: svcRow.id, service_ids: [svcRow.id],
-  scheduled_at: when.toISOString(), requested_date: when.toISOString().slice(0, 10),
-  price: EXC, status: 'pending', payment_status: 'unpaid',
-}).select()
-const appt = book.data?.[0]
-check('6a. booking accepts the configured exception price', !!appt, book.error?.message?.slice(0, 60) ?? '')
-
+// ── 6/7. configured price flows correctly (probe payment already created above) ──
 if (appt) {
   // 7. create ignores client-supplied amounts
-  const { data: created } = await maria.functions.invoke('paymongo-create', { body: { appointment_id: appt.id, amount: 1, price: 1 } })
   check('7a. QR amount = configured price, not client input', Number(created?.amount) === EXC, 'got ' + created?.amount)
   // 8. cannot pay someone else's appointment
   const { data: other } = await svc.from('appointments').select('id').neq('patient_id', me.id).limit(1).maybeSingle()
