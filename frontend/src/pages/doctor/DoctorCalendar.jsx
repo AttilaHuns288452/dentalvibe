@@ -14,11 +14,11 @@ const STATUS_PILL = {
   cancelled: 'bg-red-100 text-red-600 border-l-red-500',
 }
 
-// hour slots from settings, fallback 8AM–5PM
-// ponytail: date keys slice the ISO string; safe because all slots are 8:00–16:30 (UTC date == local date).
+// hour slots from settings, fallback 10AM–5PM
+// ponytail: date keys slice the ISO string; safe because all slots are 10:00–16:30 (UTC date == local date).
 // If evening slots are ever added, switch every day-key to a local-date formatter.
 function hoursFor(open, close) {
-  const [oh] = (open || '08:00').split(':').map(Number)
+  const [oh] = (open || '10:00').split(':').map(Number)
   const [ch] = (close || '17:00').split(':').map(Number)
   const out = []
   for (let h = oh; h <= ch; h++) out.push(`${String(h).padStart(2, '0')}:00`)

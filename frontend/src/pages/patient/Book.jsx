@@ -9,8 +9,8 @@ import { listServices, bookAppointment, peso, supabase } from '../../lib/api'
 //   1 · Services (search, multi-select, fee notice)   2 · Date & time (calendar grid, fit-checked slots, notes)
 // A paid appointment holds its slot; slot starts that don't fit the visit length are unavailable.
 
-const SLOTS = ['08:00', '08:30', '09:00', '09:30', '10:00', '10:30', '11:00', '11:30',
-  '13:00', '13:30', '14:00', '14:30', '15:00', '15:30', '16:00', '16:30']
+const SLOTS = ['10:00', '10:30', '11:00', '11:30',
+  '13:00', '13:30', '14:00', '14:30', '15:00', '15:30', '16:00', '16:30'] // clinic hours 10:00–17:00
 const SLOT_SET = new Set(SLOTS)
 const fmtSlot = (t) => t.replace(/^(\d+):(\d+)$/, (_, h, m) => `${((+h + 11) % 12) + 1}:${m} ${+h < 12 ? 'AM' : 'PM'}`)
 

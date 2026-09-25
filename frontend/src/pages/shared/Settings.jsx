@@ -30,7 +30,7 @@ export default function Settings() {
       setClinic({
         name: s?.clinic_name || 'D.A.R. Dental Clinic',
         email: s?.clinic_email ?? 'dr.joson@dardenal.ph',
-        hours: `${fmtTime12(s?.open_time ?? '08:00')} – ${fmtTime12(s?.close_time ?? '17:00')}`,
+        hours: `${fmtTime12(s?.open_time ?? '10:00')} – ${fmtTime12(s?.close_time ?? '17:00')}`,
       })
     }).catch((e) => setErr(e?.message || "Couldn't load clinic info — check your connection."))
   }, [profile?.full_name, patientRecord?.id])

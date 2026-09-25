@@ -38,7 +38,7 @@ export default function Home() {
   const greetingWord = now.getHours() < 12 ? 'Good morning' : now.getHours() < 18 ? 'Good afternoon' : 'Good evening'
   const hoursLine = settings
     ? `Clinic hours today: ${fmtTime12(settings.open_time)} – ${fmtTime12(settings.close_time)}`
-    : 'Clinic hours today: 8:00 AM – 5:00 PM'
+    : 'Clinic hours today: 10:00 AM – 5:00 PM'
 
   const approved = (appts ?? []).filter((a) => a.status === 'approved')
   const todayStr = new Date().toISOString().slice(0, 10)
