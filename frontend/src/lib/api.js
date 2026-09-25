@@ -13,6 +13,17 @@ const must = (data, error) => {
 }
 export const peso = (v) => '₱' + Number(v ?? 0).toLocaleString('en-US')
 
+// supabase-js wraps non-2xx edge-function responses in a generic
+// 'non-2xx status code' message and stashes the JSON body on error.context —
+// surface the server's own error text instead.
+export async function fnErr(error, fallback = 'Request failed') {
+  try {
+    const body = await error?.context?.json?.()
+    if (body?.error) return String(body.error)
+  } catch {}
+  return error?.message || fallback
+}
+
 // ---- auth ----
 export async function getSession() {
   const { data } = await supabase.auth.getSession()

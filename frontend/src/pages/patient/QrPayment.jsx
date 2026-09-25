@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { isDev, mockPay } from '../../lib/dev'
 import { supabase } from '../../supabaseClient'
-import { peso } from '../../lib/api'
+import { peso, fnErr } from '../../lib/api'
 import { useRevalidateOnVisible } from '../../lib/hooks'
 
 // Pay Appointment Fee — PayMongo dynamic QR: paymongo-create makes the payment
@@ -155,7 +155,7 @@ export default function QrPayment() {
   const create = useCallback(async () => {
     setPayErr(''); setErr(''); setStatus('pending')
     const { data, error } = await supabase.functions.invoke('paymongo-create', { body: { appointment_id: apptId } })
-    if (error) { setPayErr(error.message); setStatus(''); return }
+    if (error) { setPayErr(await fnErr(error)); setStatus(''); return }
     if (data.status && data.status !== 'pending') setStatus(data.status)
     setPay(data)
     // immediate first check — a reused payment may already be settled or failed
@@ -297,7 +297,7 @@ export default function QrPayment() {
         )}
         <button onClick={download} className="w-full h-11 mt-2 rounded-lg bg-gray-100 text-gray-800 text-sm font-semibold">Download QR image</button>
         {isDev() && (
-          <button onClick={async () => { try { await mockPay(supabase, appt.id); navigate('/book/success?appt=' + appt.id, { replace: true, state: { appointment: appt } }) } catch (ex) { setErr(ex.message) } }}
+          <button onClick={async () => { try { await mockPay(supabase, appt.id); navigate('/book/success?appt=' + appt.id, { replace: true, state: { appointment: appt } }) } catch (ex) { setErr(await fnErr(ex, ex.message)) } }}
                   className="w-full h-10 mt-2 rounded-lg border-2 border-dashed border-gray-800 text-gray-800 text-xs font-bold">
             DEV: simulate PayMongo test payment
           </button>

@@ -1,3 +1,4 @@
+import { fnErr } from './api'
 // Dev/QA helpers — active only with ?dev=1 (persisted) or in a Vite dev build.
 // ponytail: demo-grade tooling; strip this file for a real clinic launch.
 
@@ -19,9 +20,9 @@ export const DEV_PW = 'password123'
 // (simulate only works while the mock provider is active server-side).
 export async function mockPay(supabase, appointmentId) {
   const { data, error } = await supabase.functions.invoke('paymongo-create', { body: { appointment_id: appointmentId } })
-  if (error) throw error
+  if (error) throw new Error(await fnErr(error))
   const { error: simError } = await supabase.functions.invoke('paymongo-check', { body: { payment_id: data.payment_id, simulate: 'paid' } })
-  if (simError) throw simError
+  if (simError) throw new Error(await fnErr(simError))
 }
 
 export function devLogout() {
