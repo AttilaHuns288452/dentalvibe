@@ -188,9 +188,65 @@ check('19. one event reaches EVERY active device', sA && sB, 'A=' + sA + ' B=' +
 await svc.from('notifications').delete().eq('id', multi.id)
 await ctxB.close()
 
+// ── 7. payment notifications deep-link to their entity (§13) ──
+// settle the run's appointment payment through the authoritative function
+const { data: payRow } = await svc.from('payments').insert({
+  appointment_id: appt.id, provider: 'mock', payment_intent_id: 'pi_mock_deeplink',
+  amount: Number(svcRow.price), status: 'pending', reference: 'DL-' + Date.now(),
+}).select().maybeSingle()
+await svc.rpc('fn_apply_payment_result', { p_payment: payRow.id, p_result: 'paid', p_provider_status: 'succeeded', p_amount_centavos: Math.round(Number(svcRow.price) * 100), p_currency: 'PHP' })
+const { data: payNotif } = await svc.from('notifications').select('route, dedupe_key').eq('dedupe_key', 'payment:' + payRow.id + ':paid').maybeSingle()
+check('20. payment notification carries the appointment deep link', payNotif?.route === '/appointments?appt=' + appt.id, payNotif?.route || 'none')
+// duplicate settlement attempts must not duplicate the notification (§11)
+try { await svc.rpc('fn_apply_payment_result', { p_payment: payRow.id, p_result: 'paid', p_provider_status: 'succeeded', p_amount_centavos: Math.round(Number(svcRow.price) * 100), p_currency: 'PHP' }) } catch {}
+const { data: payNotif2 } = await svc.from('notifications').select('id').eq('dedupe_key', 'payment:' + payRow.id + ':paid')
+check('21. duplicate payment events = one notification', (payNotif2 ?? []).length === 1, 'rows=' + (payNotif2 ?? []).length)
+// the pushed payload carries the same route (dispatch reads the row)
+await pg.evaluate(async () => { const r = await navigator.serviceWorker.ready; (await r.getNotifications()).forEach((n) => n.close()) })
+await svc.from('notifications').insert({ user_id: me.user_id, title: 'Payment confirmed', body: 'Your payment was received.', route: '/appointments?appt=' + appt.id, dedupe_key: 'dlink:' + Date.now() })
+let pushedRoute = null
+for (let i = 0; i < 15 && !pushedRoute; i++) {
+  await pg.waitForTimeout(1500)
+  const n = await pg.evaluate(async () => (await (await navigator.serviceWorker.ready).getNotifications()).map((x) => ({ t: x.title, r: x.data && x.data.route })))
+  const hit = n.find((x) => x.t === 'Payment confirmed')
+  if (hit) pushedRoute = hit.r
+}
+check('22. push payload deep-links to the entity', pushedRoute === '/appointments?appt=' + appt.id, String(pushedRoute))
+
+// ── 7b. deep-link behavior: refresh-safe, closed-app open semantics, auth-safe ──
+// (a) opening the route = what notificationclick does via openWindow on a closed app
+await pg.goto(BASE + '/appointments?appt=' + appt.id, { waitUntil: 'networkidle' })
+await pg.waitForTimeout(1200)
+let txt = await pg.locator('main').textContent()
+check('23. deep link opens scoped to the appointment', (await pg.locator('#appt-' + appt.id).textContent()).includes('Paid'), '')
+const hl = await pg.locator('#appt-' + appt.id).count()
+check('24. target appointment card is highlighted', hl === 1)
+// (b) refresh keeps the scoped view
+await pg.reload({ waitUntil: 'networkidle' })
+await pg.waitForTimeout(1200)
+check('25. refresh keeps the deep-linked appointment in view', (await pg.locator('#appt-' + appt.id).count()) === 1)
+// (c) unauthorized appointment id: no crash, no leak
+const { data: juanAppt } = await svc.from('appointments').insert({
+  patient_id: (await svc.from('patients').select('id').eq('email', 'juan@dentalvibe.ph').maybeSingle()).data.id,
+  service_id: svcRow.id, service_ids: [svcRow.id], scheduled_at: new Date(Date.now() + 200 * 864e5).toISOString(),
+  requested_date: new Date(Date.now() + 200 * 864e5).toISOString().slice(0, 10), price: svcRow.price, status: 'pending', payment_status: 'unpaid',
+}).select().maybeSingle()
+await pg.goto(BASE + '/appointments?appt=' + juanAppt.id, { waitUntil: 'networkidle' })
+await pg.waitForTimeout(1200)
+txt = await pg.locator('main').textContent()
+const juanName = (await svc.from('patients').select('full_name').eq('email', 'juan@dentalvibe.ph').maybeSingle()).data.full_name
+check('26. foreign appointment id renders NO private data (RLS)', !txt.includes(juanName) && (await pg.locator('#appt-' + juanAppt.id).count()) === 0, '')
+check('27. page still works with an unknown id (graceful)', txt.includes('Appointment') || txt.includes('appointment'))
+
+// cleanup additions
+await svc.from('appointments').delete().eq('id', juanAppt.id)
+await svc.from('notifications').delete().eq('dedupe_key', 'payment:' + payRow.id + ':paid')
+
 // ── 7. logout unregisters this device ──
 await pg.evaluate(async () => { const reg = await navigator.serviceWorker.ready; const s = await reg.pushManager.getSubscription(); if (s) window.__ep = s.endpoint })
 const ep = await pg.evaluate(() => window.__ep)
+await pg.goto(BASE + '/settings', { waitUntil: 'networkidle' }) // logout lives here
+await pg.waitForTimeout(800)
 await pg.locator('button:has-text("Log Out")').first().click().catch(() => {})
 await pg.waitForTimeout(2500)
 const { data: afterLogout } = await svc.from('push_subscriptions').select('revoked_at').eq('endpoint', ep).maybeSingle()

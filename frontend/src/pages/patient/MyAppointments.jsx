@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import Skel from '../../components/Skel'
 import { useStickyState , useRevalidateOnVisible } from '../../lib/hooks'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../../context/RoleContext'
 import { listMyAppointments, setAppointmentStatus, peso, getClinicSettings } from '../../lib/api'
 import { fmtTime12, fmtDays } from '../../lib/format'
@@ -21,6 +21,16 @@ const PAY_LABEL = { unpaid: 'Payment required', pending: 'Payment pending', paid
 const PAY_PILL = { unpaid: 'bg-gray-100 text-gray-500', pending: 'bg-amber-100 text-amber-700', paid: 'bg-green-100 text-green-700' }
 
 export default function MyAppointments() {
+  const location = useLocation()
+  const focusAppt = new URLSearchParams(location.search).get('appt') // deep link from a notification
+  useEffect(() => {
+    if (!focusAppt) return
+    const t = setTimeout(() => {
+      const el = document.getElementById('appt-' + focusAppt)
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }, 400)
+    return () => clearTimeout(t)
+  }, [focusAppt])
   const [clinic, setClinic] = useState(null)
   useEffect(() => { getClinicSettings().then(setClinic).catch(() => {}); }, [])
   const { patientRecord, refresh } = useAuth()
@@ -88,7 +98,7 @@ export default function MyAppointments() {
       {appts?.length === 0 && <p className="text-sm text-gray-500 py-8 text-center">No appointments yet — book one from the Book tab.</p>}
       <div className="space-y-2">
         {(filtered ?? []).map((a) => (
-          <div key={a.id} className="bg-white border border-gray-200 rounded-lg px-3.5 py-3">
+          <div key={a.id} id={'appt-' + a.id} className={'bg-white border rounded-lg px-3.5 py-3 ' + (a.id === focusAppt ? 'border-primary-400 ring-2 ring-primary-200' : 'border-gray-200')}>
             <button type="button" onClick={() => setOpenId(openId === a.id ? null : a.id)} className="min-h-[44px] w-full flex items-center gap-2 text-left">
               <div className="flex-1 min-w-0 text-sm font-semibold text-gray-900">{a.services?.name || 'Appointment'}</div>
               <StatusPill status={a.status} />
