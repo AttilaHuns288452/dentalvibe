@@ -10,7 +10,11 @@
     "qa": "node qa_all.mjs && node journey_qa.mjs",
     "qa:security": "node pay_security.mjs",
     "qa:cross-role": "node cross_role_qa.mjs",
-    "qa:e2e": "node prod_e2e.mjs && node nav_matrix.mjs && node fidelity_e2e.mjs"
+    "qa:e2e": "node prod_e2e.mjs && node nav_matrix.mjs && node fidelity_e2e.mjs",
+    "qa:payment": "node ../pay_smoke.mjs && node ../pay_sandbox.mjs && node pay_lifecycle_qa.mjs && node pay_webhook_qa.mjs",
+    "qa:scheduling": "node scheduling_qa.mjs",
+    "qa:ehr": "node ehr_qa.mjs && node ehr_link_qa.mjs && node catalog_prices_qa.mjs",
+    "qa:full": "npm run qa && npm run qa:e2e && npm run qa:security && npm run qa:scheduling && npm run qa:ehr && npm run qa:cross-role && npm run qa:payment"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.116.0",

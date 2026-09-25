@@ -46,7 +46,7 @@ Credentials are seeded by `seed.mjs` and kept out of this README — ask Attila.
 
 ## QA script matrix
 
-Run suites from `frontend/` unless noted. `:4176` = hardcoded `http://localhost:4176` — serve it first (e.g. `npm run preview -- --port 4176`). `QA_BASE` = env override where the target column says so. Check counts are the static `check()`/probe tallies each script prints at the end.
+Run suites from `frontend/` unless noted. `:4176` = hardcoded `http://localhost:4176` — serve it first (e.g. `npm run preview -- --port 4176`). `QA_BASE` = env override where the target column says so. Counts = probe call sites in the script; one result is printed per executed probe (error paths may print fewer).
 
 npm scripts (from `frontend/`):
 
@@ -73,7 +73,7 @@ Browser suites (Playwright via `qa_playwright.mjs`):
 | `stress_roles.mjs` | per-role speed + cross-role interference | 20 | `QA_BASE` → `:4176` | `SB_SECRET` |
 | `shots_responsive.mjs` | every route × 6 viewports × 3 roles → screenshots + audit JSON | — | `QA_BASE` → `:4176` | |
 | `shots_spacing.mjs` | before/after spacing screenshots | — | `:4176` | |
-| `stress_ui.mjs` | UI stress | — | live site | |
+| `stress_ui.mjs` | UI stress | 18 | live site | |
 
 API suites (plain node against the deployed Supabase; `SB_SECRET` = service-role key):
 
@@ -81,11 +81,12 @@ API suites (plain node against the deployed Supabase; `SB_SECRET` = service-role
 |---|---|---|
 | `pay_security.mjs` | adversarial money-path + finance-linkage probes | 16 |
 | `pay_lifecycle_qa.mjs` | reservation + late-payment invariants | 8 |
-| `pay_webhook_qa.mjs` | webhook correctness + adversarial cases | 18 |
+| `pay_webhook_qa.mjs` | webhook correctness + adversarial cases | 19 |
 | `security_evidence.mjs` | S1/S2/S3/S5/S6 enforcement evidence | 13 |
 | `verify_fixes.mjs` | purges orphan profiles + duplicate transactions, then re-runs the attack battery | 24 |
 | `race_check.mjs` | concurrent double-verify race (5 rounds) | — |
-| `stress_api.mjs` / `stress_api2.mjs` / `stress_api3.mjs` | API stress probes | — |
+| `stress_api.mjs` | API stress probes | 35 |
+| `stress_api2.mjs` / `stress_api3.mjs` | API stress probes (console output only) | — |
 | `seed.mjs` + `seed_map.mjs`, `cleanup.mjs`, `pretest_clean.mjs` | demo-data seed/cleanup (`seed_map.mjs` = single source of truth) | — |
 | `qa_settle.mjs` | provider-side settle helper imported by suites | — |
 | `e2e_flow.mjs` | legacy signup → book → chat flow | — |
