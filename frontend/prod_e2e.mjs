@@ -94,7 +94,7 @@ await pg.waitForTimeout(1200)
 check('8. status shows Confirmed', (await pg.locator('main').textContent()).includes('Confirmed'))
 
 // ---- OWNER: no approve step — paid appointments land in Income automatically ----
-await pg.evaluate(() => localStorage.clear())
+await pg.evaluate(() => localStorage.clear(); sessionStorage.clear())
 await pg.goto('http://localhost:4176/', { waitUntil: 'networkidle' })
 await pg.waitForTimeout(800)
 await pg.fill('input[type="email"]', 'owner@dentalvibe.ph')
@@ -118,7 +118,7 @@ await pg.waitForTimeout(1200)
 check('15. income renders', /[₱]/.test(await pg.locator('main .text-3xl').textContent()))
 
 // ---- SECURITY: patient blocked from staff data ----
-await pg.evaluate(() => localStorage.clear())
+await pg.evaluate(() => localStorage.clear(); sessionStorage.clear())
 const sbs2 = createClient(env.VITE_SUPABASE_URL, env.VITE_SUPABASE_ANON_KEY)
 await sbs2.auth.signInWithPassword({ email: em, password: 'Password123' })
 const { data: steal, error: stealErr } = await sbs2.from('patients').select('id, full_name')

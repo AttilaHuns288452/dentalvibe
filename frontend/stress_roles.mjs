@@ -20,7 +20,7 @@ async function login(email) {
   const pg = await ctx.newPage()
   pg.on('pageerror', (e) => pageErrors.push(email + ': ' + String(e).slice(0, 80)))
   await pg.goto(BASE + '/?dev=1', { waitUntil: 'networkidle' })
-  await pg.evaluate(() => { try { localStorage.clear(); sessionStorage.clear() } catch {} })
+  await pg.evaluate(() => { try { localStorage.clear(); sessionStorage.clear(); sessionStorage.clear() } catch {} })
   await pg.goto(BASE + '/?dev=1', { waitUntil: 'networkidle' })
   await pg.fill('input[type="email"]', email)
   await pg.fill('input[type="password"]', 'password123')

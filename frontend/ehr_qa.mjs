@@ -18,7 +18,7 @@ const ctx = await b.newContext()
 const pg = await ctx.newPage()
 const login = async (email) => {
   await pg.goto(BASE + '/', { waitUntil: 'networkidle' })
-  await pg.evaluate(() => { try { localStorage.clear() } catch {} })
+  await pg.evaluate(() => { try { localStorage.clear(); sessionStorage.clear() } catch {} })
   await pg.goto(BASE + '/', { waitUntil: 'networkidle' })
   await pg.fill('input[type="email"]', email)
   await pg.fill('input[type="password"]', 'password123')
