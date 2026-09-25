@@ -1,5 +1,6 @@
-import { useState } from 'react'
-import { signIn, signUp } from '../lib/api'
+import { useEffect, useState } from 'react'
+import { signIn, signUp, getClinicSettings } from '../lib/api'
+import { fmtTime12 } from '../lib/format'
 import { useAuth } from '../context/RoleContext'
 
 // Login (p31) + 3-step registration wizard (p32/70/73) → Account Activated (p55).
@@ -10,6 +11,10 @@ const STEPS = ['Your Details', 'Contact', 'Account']
 export default function Login() {
   const { refresh } = useAuth()
   const [mode, setMode] = useState('signin')
+  const [hours, setHours] = useState('')
+  useEffect(() => {
+    getClinicSettings().then((st) => st?.open_time && setHours(`Mon – Sat · ${fmtTime12(st.open_time)} – ${fmtTime12(st.close_time)}`)).catch(() => {})
+  }, [])
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [err, setErr] = useState('')
@@ -68,7 +73,7 @@ export default function Login() {
             <button disabled={busy} className="w-full h-11 rounded-lg bg-primary-600 text-white text-sm font-semibold disabled:opacity-60">
               {busy ? 'Please wait…' : 'Sign In'}
             </button>
-            <a href="#/reset" className="block text-center text-xs text-gray-500">Forgot password?</a>
+            <a href="/reset" className="block text-center text-xs text-gray-500">Forgot password?</a>
           </div>
         </form>
       ) : (
@@ -77,7 +82,7 @@ export default function Login() {
 
       <div className="mt-4 bg-primary-50 border border-primary-100 rounded-xl px-3.5 py-2.5 text-[11px] text-primary-800 flex items-center justify-center gap-1.5">
         <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>
-        Clinic hours: Mon – Sat · 8:00 AM – 5:00 PM
+        {hours ? `Clinic hours: ${hours}` : null}
       </div>
     </div>
   )

@@ -52,7 +52,7 @@ await cleanTestRows()
   await pg.locator('button:has-text("Next")').last().click()
   await pg.waitForTimeout(300)
   const t = await txt(pg)
-  check('A1. forward flow reaches step 2', t.includes('Total appointment fee'))
+  check('A1. forward flow reaches step 2', /Total₱/.test(t))
   await ctx.close()
 }
 
@@ -97,7 +97,7 @@ await cleanTestRows()
   await pg.goBack(); await pg.waitForTimeout(400)
   await pg.goForward(); await pg.waitForTimeout(500)
   const t = await txt(pg)
-  check('C1. Forward restores step 2', t.includes('Total appointment fee'))
+  check('C1. Forward restores step 2', /Total₱/.test(t))
   await ctx.close()
 }
 
@@ -111,7 +111,7 @@ await cleanTestRows()
   await pg.reload({ waitUntil: 'networkidle' })
   await pg.waitForTimeout(600)
   const t = await txt(pg)
-  check('D1. refresh on step 2 keeps a VALID booking state', t.includes('Total appointment fee') || (await pg.locator('input[placeholder*="Search services"]').count()) === 1)
+  check('D1. refresh on step 2 keeps a VALID booking state', /Total₱/.test(t) || (await pg.locator('input[placeholder*="Search services"]').count()) === 1)
   await ctx.close()
 }
 

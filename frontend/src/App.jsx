@@ -98,10 +98,18 @@ function Routes() {
 
 function Shell() {
   const { session, profile, loading, pendingCount, deactivated, logout } = useAuth()
+  const path = useLocation().pathname
   if (import.meta.env.DEV) window.__auth = { session: !!session, profile, loading }
 
   if (loading) return <><DevPanel /><div className="max-w-md mx-auto min-h-screen flex items-center justify-center text-sm text-gray-500">Loading…</div></>
-  if (!session || !profile) return <><DevPanel /><Login /></>
+  if (!session || !profile) {
+    // password recovery works logged out; other deep links normalize to '/' —
+    // a logged-out browser never keeps a protected URL on screen
+    if (path === '/reset') return <><DevPanel /><ResetPassword /></>
+    if (path === '/reset-confirm') return <><DevPanel /><ResetConfirm /></>
+    if (path !== '/') return <Navigate to="/" replace />
+    return <><DevPanel /><Login /></>
+  }
   if (deactivated) return (
     <div className="max-w-md mx-auto min-h-screen flex flex-col items-center justify-center gap-4 px-6 text-center">
       <h1 className="text-lg font-bold text-gray-900">Account deactivated</h1>
