@@ -1,5 +1,6 @@
 import { NAV_BY_ROLE, ICONS } from './navConfig'
 import { useAuth } from '../context/RoleContext'
+import { useClinicName } from '../lib/hooks'
 import { useLocation, useNavigate } from 'react-router-dom'
 
 function TabIcon({ name, active }) {
@@ -12,6 +13,7 @@ function TabIcon({ name, active }) {
 }
 
 function Sidebar({ links, activePath, navigate, roleBase, role, name, unreadCount }) {
+  const clinicName = useClinicName()
   return (
     <aside className="hidden md:flex fixed inset-y-0 left-0 z-40 w-[72px] lg:w-60 flex-col bg-white border-r border-gray-200 pt-[env(safe-area-inset-top)]">
       <div className="flex items-center gap-3 px-4 lg:px-5 h-14 flex-none">
@@ -21,7 +23,7 @@ function Sidebar({ links, activePath, navigate, roleBase, role, name, unreadCoun
           </svg>
         </span>
         <div className="hidden lg:block min-w-0">
-          <div className="text-sm font-bold text-gray-900 leading-tight truncate">D.A.R. Dental Clinic</div>
+          <div className="text-sm font-bold text-gray-900 leading-tight truncate">{clinicName}</div>
           <div className="text-[11px] text-gray-500 leading-tight truncate capitalize">{role === 'patient' ? 'Patient Portal' : role === 'doctor' ? 'Dentist Portal' : 'Clinic Owner'} · {name}</div>
         </div>
       </div>
@@ -57,6 +59,7 @@ function Sidebar({ links, activePath, navigate, roleBase, role, name, unreadCoun
 }
 
 export default function Navbar({ unreadCount = 0 }) {
+  const clinicName = useClinicName()
   const { profile } = useAuth()
   const role = profile?.role
   const path = useLocation().pathname
@@ -84,7 +87,7 @@ export default function Navbar({ unreadCount = 0 }) {
             </svg>
           </a>
           <div className="flex-1 min-w-0">
-            <div className="text-sm font-bold text-gray-900 leading-tight">D.A.R. Dental Clinic</div>
+            <div className="text-sm font-bold text-gray-900 leading-tight">{clinicName}</div>
             <div className="text-[11px] text-gray-500 leading-tight capitalize">
               {role === 'patient' ? 'Patient Portal' : role === 'doctor' ? 'Dentist Portal' : 'Clinic Owner'}
               {' · '}{profile?.full_name}

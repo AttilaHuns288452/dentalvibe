@@ -12,8 +12,9 @@ export default function Login() {
   const { refresh } = useAuth()
   const [mode, setMode] = useState('signin')
   const [hours, setHours] = useState('')
+  const [clinicBrand, setClinicBrand] = useState('D.A.R. Dental Clinic')
   useEffect(() => {
-    getClinicSettings().then((st) => st?.open_time && setHours(`Mon – Sat · ${fmtTime12(st.open_time)} – ${fmtTime12(st.close_time)}`)).catch(() => {})
+    getClinicSettings().then((st) => { if (st?.open_time) setHours(`Mon – Sat · ${fmtTime12(st.open_time)} – ${fmtTime12(st.close_time)}`); if (st?.clinic_name) setClinicBrand(st.clinic_name) }).catch(() => {})
   }, [])
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -42,7 +43,7 @@ export default function Login() {
             <path d="M12 2.5C9.4 2.5 7.5 4.6 7.5 7.2c0 1.7.5 3.1 1.1 4.6.5 1.2 1 2.5 1.3 3.9.2 1 .4 1.9.4 2.4 0 1.4.8 2.4 1.7 2.4s1.7-1 1.7-2.4c0-.5.2-1.4.4-2.4.3-1.4.8-2.7 1.3-3.9.6-1.5 1.1-2.9 1.1-4.6C16.5 4.6 14.6 2.5 12 2.5z" />
           </svg>
         </div>
-        <h1 className="text-lg font-bold mt-2">D.A.R. Dental Clinic</h1>
+        <h1 className="text-lg font-bold mt-2">{clinicBrand}</h1>
         <p className="text-xs opacity-80 mt-1">Appointment &amp; Record System</p>
       </div>
 

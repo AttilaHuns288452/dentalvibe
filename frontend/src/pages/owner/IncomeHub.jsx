@@ -76,15 +76,16 @@ export default function IncomeHub() {
   const patientCount = new Set(appts.map((a) => a.patients?.full_name)).size
   const avg = completedCount ? Math.round(pIncome / completedCount) : 0
 
-  const exportReport = (which) => {
+  const exportReport = async (which) => {
+    const clinic = await clinicName()
     const lines = [
-      `D.A.R. Dental Clinic — ${which} Report`, `Generated: ${new Date().toLocaleString()}`, `Period: ${period}`,
+      clinic + ` — ${which} Report`, `Generated: ${new Date().toLocaleString()}`, `Period: ${period}`,
       '', `Total income: ${peso(pIncome)}`, `Total expenses: ${peso(pExpenses)}`, `Net income: ${peso(net)}`,
       `Completed visits: ${completedCount}`, `Average per visit: ${peso(avg)}`, '',
       'By procedure:', ...byProc.map(([n, v]) => `  ${n}: ${peso(v)}`), '',
       'Expenses by category:', ...byExpCat.map(([n, v, pct]) => `  ${n}: ${peso(v)} (${pct}%)`),
     ]
-    printReport(`D.A.R. Dental Clinic — ${which} Report`, lines)
+    printReport(clinic + ` — ${which} Report`, lines)
   }
 
   const maxProc = Math.max(1, ...byProc.map(([, v]) => v))

@@ -13,6 +13,15 @@ const must = (data, error) => {
 }
 export const peso = (v) => '₱' + Number(v ?? 0).toLocaleString('en-US')
 
+// clinic display name — every surface reads clinic_settings (Navbar/Login/exports
+// used to hardcode it, so owner edits never propagated)
+let _clinicName = null
+export async function clinicName() {
+  if (_clinicName) return _clinicName
+  try { _clinicName = (await getClinicSettings())?.clinic_name || 'D.A.R. Dental Clinic' } catch { _clinicName = 'D.A.R. Dental Clinic' }
+  return _clinicName
+}
+
 // supabase-js wraps non-2xx edge-function responses in a generic
 // 'non-2xx status code' message and stashes the JSON body on error.context —
 // surface the server's own error text instead.

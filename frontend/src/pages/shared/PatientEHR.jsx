@@ -99,13 +99,13 @@ export default function PatientEHR() {
     if (data?.signedUrl) window.open(data.signedUrl, '_blank')
   }
   
-  const exportEHR = () => {
-    printReport(`EHR — ${p.full_name} (${p.patient_code ?? '—'})`, exportLines())
+  const exportEHR = async () => {
+    printReport(`EHR — ${p.full_name} (${p.patient_code ?? '—'})`, await exportLines())
   }
 
-  const exportLines = () => {
+  const exportLines = async () => {
     const lines = [
-      'D.A.R. Dental Clinic — Patient Record (EHR)',
+      (await clinicName()) + ' — Patient Record (EHR)',
       `Generated: ${new Date().toLocaleString()}`, '',
       `Name: ${p.full_name}`, `Patient ID: ${p.patient_code ?? '—'}`,
       `Sex: ${p.sex ?? '—'}${a != null ? ` · ${a} y/o` : ''}`,

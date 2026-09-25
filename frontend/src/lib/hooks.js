@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { clinicName } from './api'
 
 // Small navigation/state hooks shared by screens (#44/#45/#50/#52/#53).
 
@@ -45,4 +46,11 @@ export function useSubmit(fn) {
     try { await fn(...a) } finally { lock.current = false; setBusy(false) }
   }, [fn])
   return [run, busy]
+}
+
+// clinic display name, fetched once and cached (see lib/api clinicName)
+export function useClinicName() {
+  const [name, setName] = useState('D.A.R. Dental Clinic')
+  useEffect(() => { clinicName().then(setName) }, [])
+  return name
 }
