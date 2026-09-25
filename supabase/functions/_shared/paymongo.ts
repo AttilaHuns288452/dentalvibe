@@ -12,11 +12,12 @@ export type Cfg = {
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+const svcAuth = { apikey: SERVICE_KEY, Authorization: 'Bearer ' + SERVICE_KEY }
 
 export async function rpc(fn: string, args: Record<string, unknown>): Promise<unknown> {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${fn}`, {
     method: 'POST',
-    headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}`, 'Content-Type': 'application/json' },
+    headers: { ...svcAuth, 'Content-Type': 'application/json' },
     body: JSON.stringify(args),
   })
   const text = await res.text()
@@ -27,7 +28,7 @@ export async function rpc(fn: string, args: Record<string, unknown>): Promise<un
 export async function rest<T = Record<string, unknown>>(path: string, init: RequestInit = {}): Promise<T[]> {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
     ...init,
-    headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}`, 'Content-Type': 'application/json', ...(init.headers ?? {}) },
+    headers: { ...svcAuth, 'Content-Type': 'application/json', ...(init.headers ?? {}) },
   })
   const text = await res.text()
   if (!res.ok) throw new Error(`rest ${path} failed: ${res.status} ${text}`)
@@ -39,10 +40,13 @@ export async function loadCfg(): Promise<Cfg> {
   const map = Object.fromEntries(rows.map((r) => [r.key, r.value]))
   const secretKey = Deno.env.get('PAYMONGO_SECRET_KEY') ?? map.paymongo_secret_key ?? ''
   const webhookSecret = Deno.env.get('PAYMONGO_WEBHOOK_SECRET') ?? map.paymongo_webhook_secret ?? ''
-  const raw = (Deno.env.get('PAYMONGO_MODE') ?? map.provider_mode ?? (secretKey ? 'live' : 'mock')).toLowerCase()
-  const mode: Cfg['mode'] = raw === 'test' || raw === 'live' ? raw : 'mock'
+  // FAIL CLOSED: the mode must be EXPLICIT. A secret key alone never implies live —
+  // forgetting PAYMONGO_MODE must never silently move real money. Unknown → mock.
+  const raw = (Deno.env.get('PAYMONGO_MODE') ?? map.provider_mode ?? '').toLowerCase()
+  const mode: Cfg['mode'] = raw === 'live' || raw === 'test' || raw === 'mock' ? raw : 'mock'
+  // a money mode without keys degrades to mock (safe direction), never the reverse
   return {
-    mode: secretKey || mode === 'mock' ? mode : 'mock',
+    mode: mode !== 'mock' && !secretKey ? 'mock' : mode,
     secretKey,
     webhookSecret,
     qrStyle: (map.qr_style === 'instore' ? 'instore' : 'dynamic') as Cfg['qrStyle'],
@@ -107,7 +111,7 @@ export async function reconcile(paymentId: string, cfg: Cfg): Promise<{ status: 
   if (!row) throw new Error('payment not found')
   if (row.status === 'paid') return { status: 'paid' }
 
-  // mock / in-store (static QR) intents never hit the payments API — webhook is the authority
+  // mock intents never hit the payments API — the internal state machine is the authority
   if (cfg.mode === 'mock' || !row.payment_intent_id || row.payment_intent_id.startsWith('pi_mock_')) return { status: row.status }
 
   const intent = await paymongo<Intent>(`payment_intents/${row.payment_intent_id}`, cfg.secretKey)

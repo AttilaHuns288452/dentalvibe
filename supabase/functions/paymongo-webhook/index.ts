@@ -1,8 +1,37 @@
 // paymongo-webhook — the ONLY authority that marks a payment paid.
-// Signature-verified (Paymongo-Signature, HMAC-SHA256 over `${t}.${rawBody}`),
-// idempotent per event_id (provider_events ledger), amount verified before
-// any state change. Duplicate deliveries are acknowledged no-ops.
+//
+// Official PayMongo event envelope:
+//   { data: { id: 'evt_...', type: 'event',
+//     attributes: { type: 'payment.paid', livemode: bool, created_at: ts,
+//                   data: { id: 'pay_...', type: 'payment',
+//                           attributes: { payment_intent_id: 'pi_...', ... } } } } }
+// Event mode lives at data.attributes.livemode — NEVER at data.livemode.
+//
+// Signature: `Paymongo-Signature: t=<ts>,te=<test-hash>,li=<live-hash>` where the
+// hashes are HMAC-SHA256 over `${t}.${rawBody}`. te verifies TEST events, li LIVE
+// events — selected by the event's own livemode, cross-checked against the
+// header's livemode token when present. Fail-closed: missing/invalid signature,
+// mode mismatch, or stale timestamp (±300s) → 401.
+//
+// Idempotency: provider_events (PK event_id) — ONLY the first delivery of an
+// event processes; every replay is an acknowledged no-op. At-least-once delivery
+// is safe: settlement (fn_apply_payment_result) is itself idempotent per payment.
+//
+// payment.paid is settled via reconcile(): the provider intent is RE-READ and the
+// amount/currency verified server-side before PAID — the event alone is the
+// trigger, not the proof.
 import { loadCfg, verifySignature, rest, rpc, json, CORS, reconcile } from '../_shared/paymongo.ts'
+
+type Envelope = {
+  id?: string
+  type?: string
+  livemode?: boolean
+  attributes?: {
+    type?: string
+    livemode?: boolean
+    data?: { id?: string; attributes?: Record<string, unknown> }
+  }
+}
 
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS })
@@ -14,64 +43,69 @@ Deno.serve(async (req: Request) => {
     // fail closed: an unconfigured secret must never 'verify' anything
     if (!cfg.webhookSecret) return json({ error: 'webhook secret not configured' }, 503)
 
-    let event: {
-      id?: string
-      type?: string
-      livemode?: boolean
-      data?: { id?: string; attributes?: { type?: string; data?: { id?: string; attributes?: Record<string, unknown> } } }
-    }
+    let event: { data?: Envelope } & Envelope
     try {
       event = JSON.parse(rawBody)
     } catch {
       return json({ error: 'invalid payload' }, 400)
     }
 
-    // envelope: { data: { id: evt_..., type: 'event', attributes: { type: 'payment.paid', data: {...} } } }
-    const evt = event.data ?? {}
-    const evtId: string = (evt.id as string) ?? ''
-    const evtType: string = (evt.attributes?.type as string) ?? (event.type as string) ?? ''
-    const livemode = !!(evt as { livemode?: boolean }).livemode ?? false
+    const evt: Envelope = event.data ?? {}
+    const attrs = evt.attributes ?? {}
+    const evtId = typeof evt.id === 'string' ? evt.id : ''
+    const evtType = typeof attrs.type === 'string' ? attrs.type : typeof event.type === 'string' ? event.type : ''
+    // mode: attributes.livemode (official) — legacy top-level fallback, never inferred
+    const livemode = typeof attrs.livemode === 'boolean' ? attrs.livemode : event.livemode === true
 
-    const ok = await verifySignature(sig, rawBody, cfg.webhookSecret, livemode || event.livemode === true)
-    if (!ok) return json({ error: 'bad signature' }, 401)
-
-    // idempotency: first delivery inserts the event; replays are acked no-ops
-    if (evtId) {
-      const dup = await rest('provider_events', {
-        method: 'POST',
-        headers: { Prefer: 'return=minimal' },
-        body: JSON.stringify([{ event_id: evtId, event_type: evtType, payload: rawBody.slice(0, 2000) }]),
-      }).catch(() => [{ duplicate: true }])
-      if (Array.isArray(dup) && dup.length === 0) return json({ received: true, duplicate: true })
+    // the signature header's own livemode token must agree with the envelope
+    const sigParts = Object.fromEntries(
+      sig.split(',').map((p) => { const i = p.indexOf('='); return [p.slice(0, i).trim(), p.slice(i + 1).trim()] }),
+    )
+    if (typeof sigParts.livemode === 'string' && sigParts.livemode !== String(livemode)) {
+      return json({ error: 'mode mismatch between signature and event' }, 401)
     }
 
-    // find our payment by the provider payment/intent id embedded in the event
-    const inner = evt.attributes?.data
-    const providerId: string = (inner?.id as string) ?? ''
-    const intentId: string =
-      (inner?.attributes?.payment_intent_id as string) ??
-      (providerId.startsWith('pi_') ? providerId : '') ??
-      ''
-    // fallback: any pi_* id anywhere in the snapshot links through the unique index
-    const fallbackId = intentId || (rawBody.match(/pi_[A-Za-z0-9]+/) ?? [''])[0]
+    // te for test events, li for live events — wrong-mode signatures cannot verify
+    const ok = await verifySignature(sig, rawBody, cfg.webhookSecret, livemode)
+    if (!ok) return json({ error: 'bad signature' }, 401)
 
-    if (fallbackId) {
-      const rows = await rest<{ id: string }>(
-        `payments?payment_intent_id=eq.${fallbackId}&select=id`,
-      )
+    // event-id idempotency: first delivery inserts (PK event_id); replays ack no-op
+    if (evtId) {
+      const ins = await rest('provider_events', {
+        method: 'POST',
+        headers: { Prefer: 'return=representation, resolution=ignore-duplicates' },
+        body: JSON.stringify([{ event_id: evtId, event_type: evtType, payload: rawBody.slice(0, 2000) }]),
+      })
+      if (Array.isArray(ins) && ins.length === 0) return json({ received: true, duplicate: true })
+    }
+
+    // provider resource: the payment object inside attributes.data
+    const inner = attrs.data
+    const providerId = typeof inner?.id === 'string' ? inner.id : ''
+    const intentId =
+      (typeof inner?.attributes?.payment_intent_id === 'string' ? inner.attributes.payment_intent_id : '') ||
+      (providerId.startsWith('pi_') ? providerId : '') ||
+      (rawBody.match(/pi_[A-Za-z0-9]+/) ?? [''])[0]
+
+    if (intentId) {
+      const rows = await rest<{ id: string }>(`payments?payment_intent_id=eq.${intentId}&select=id`)
       const paymentId = rows[0]?.id
       if (paymentId) {
         if (evtType === 'payment.paid') {
-          // reconcile re-reads the provider intent and verifies amount server-side
+          // provider re-read + amount/currency verification inside reconcile;
+          // failures surface as 5xx so PayMongo retries (bounded, 12x) — safe:
+          // settle is idempotent and the event ledger already recorded the delivery
           await reconcile(paymentId, cfg)
         } else if (evtType === 'payment.failed') {
+          // late/out-of-order failures after settlement are acked no-ops, never
+          // retry storms (settle is authoritative; expired/failed stay re-payable)
           await rpc('fn_apply_payment_result', {
             p_payment: paymentId,
             p_result: 'failed',
             p_failure: 'provider reported payment.failed',
-          })
+          }).catch(() => null)
         } else if (evtType === 'qrph.expired' || evtType === 'payment.expired') {
-          await rpc('fn_apply_payment_result', { p_payment: paymentId, p_result: 'expired' })
+          await rpc('fn_apply_payment_result', { p_payment: paymentId, p_result: 'expired' }).catch(() => null)
         }
       }
     }
