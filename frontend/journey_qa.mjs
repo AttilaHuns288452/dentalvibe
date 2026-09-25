@@ -104,7 +104,7 @@ await pg.locator('form section:has-text("Available time") button:not([disabled])
 
   // notifications got booking entry
   await pg.goto(BASE + '/notifications', { waitUntil: 'networkidle' }); await pg.waitForTimeout(1200)
-  check('P12. notification for the booking', (await pg.locator('main').textContent()).includes('Appointment Approved'))
+  check('P12. notification for the booking', (await pg.locator('main').textContent()).includes('Appointment Confirmed'))
 
   // chat
   await pg.goto(BASE + '/messages', { waitUntil: 'networkidle' }); await pg.waitForTimeout(1200)

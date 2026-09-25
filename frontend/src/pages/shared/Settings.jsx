@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { pushSupported, pushStatus, enablePush, disablePush, isIos, isStandalone } from '../../lib/push'
 import { useUnsavedGuard, useSubmit } from '../../lib/hooks'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/RoleContext'
@@ -19,6 +20,10 @@ export default function Settings() {
   const [savedC, setSavedC] = useState(false)
   const [err, setErr] = useState('')
   const [busy, setBusy] = useState(false)
+  const [push, setPush] = useState('loading')
+  const [pushMsg, setPushMsg] = useState('')
+  const [pushBusy, setPushBusy] = useState(false)
+  useEffect(() => { pushStatus().then(setPush) }, [])
 
   useEffect(() => {
     const parts = (profile?.full_name ?? '').split(' ')
@@ -104,6 +109,67 @@ export default function Settings() {
             <input value={p.contact} onChange={(e) => setP((v) => ({ ...v, contact: e.target.value }))} className="mt-1 w-full h-11 border border-gray-200 rounded-lg px-3 text-sm" /></label>
           {savedP && <p className="text-xs text-green-600">Saved ✓</p>}
           <button onClick={saveProfile} disabled={busy} className="w-full h-11 rounded-lg bg-primary-600 text-white text-sm font-semibold disabled:opacity-60">Save Changes</button>
+        </div>
+      </section>
+
+      {/* PHONE NOTIFICATIONS — real Web Push (§5/§16) */}
+      <section>
+        <h2 className="text-[11px] font-bold uppercase tracking-wide text-gray-500 mb-1.5">Phone notifications</h2>
+        <div className="bg-white border border-gray-200 rounded-lg p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-sm font-semibold text-gray-900">Phone notifications</div>
+              <div className="text-xs text-gray-500">Appointment, payment, and message updates on your phone — even when DentalVibe is closed.</div>
+            </div>
+            <span className={'text-[11px] font-bold px-2.5 py-1 rounded-full flex-none ' + (push === 'enabled' ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-600')}>
+              {push === 'enabled' ? 'Enabled' : push === 'loading' ? '…' : 'Not enabled'}
+            </span>
+          </div>
+
+          {push === 'ios-not-installed' && (
+            <div className="text-xs text-gray-600 bg-amber-50 border border-amber-200 rounded-lg p-3">
+              <b>Install DentalVibe first:</b> tap the <b>Share</b> button in Safari, then <b>Add to Home Screen</b>.
+              Open DentalVibe from your Home Screen and enable notifications here — iPhone notifications work from the installed app.
+            </div>
+          )}
+          {push === 'denied' && (
+            <div className="text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded-lg p-3">
+              Notifications are blocked for this site. Allow notifications for DentalVibe in your browser settings, then come back here.
+            </div>
+          )}
+          {push === 'unsupported' && (
+            <div className="text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded-lg p-3">
+              This browser doesn't support phone notifications. You'll still find every update under Notifications in the app.
+            </div>
+          )}
+          {pushMsg && <p className="text-xs text-gray-600">{pushMsg}</p>}
+
+          {push === 'disabled' && (
+            <button onClick={async () => {
+              setPushBusy(true); setPushMsg('')
+              try {
+              const r = await enablePush()
+              if (r.ok) { setPush('enabled'); setPushMsg('Notifications enabled ✓') }
+              else {
+                setPushMsg(r.reason === 'denied' ? 'Permission was denied. Enable it in your browser settings to receive phone notifications.' : r.reason === 'ios-not-installed' ? 'Add DentalVibe to your Home Screen first (see above).' : 'Could not enable notifications on this device.')
+                pushStatus().then(setPush)
+              }
+              } finally { setPushBusy(false) }
+            }} disabled={pushBusy} className="w-full h-11 rounded-lg bg-primary-600 text-white text-sm font-semibold disabled:opacity-60">
+              {pushBusy ? 'Enabling…' : 'Enable phone notifications'}
+            </button>
+          )}
+          {push === 'enabled' && (
+            <button onClick={async () => {
+              setPushBusy(true)
+              await disablePush()
+              setPush('disabled'); setPushMsg('Turned off on this device.')
+              setPushBusy(false)
+            }} disabled={pushBusy} className="w-full h-11 rounded-lg border border-gray-200 text-gray-700 text-sm font-semibold">
+              Turn off on this device
+            </button>
+          )}
+          <p className="text-[11px] text-gray-400">Notifications may include appointment times and payment amounts — never clinical details.</p>
         </div>
       </section>
 

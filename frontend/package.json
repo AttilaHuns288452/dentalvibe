@@ -14,7 +14,8 @@
     "qa:payment": "node ../pay_smoke.mjs && node ../pay_sandbox.mjs && node pay_lifecycle_qa.mjs && node pay_webhook_qa.mjs",
     "qa:scheduling": "node scheduling_qa.mjs",
     "qa:ehr": "node ehr_qa.mjs && node ehr_link_qa.mjs && node catalog_prices_qa.mjs",
-    "qa:full": "npm run qa && npm run qa:e2e && npm run qa:security && npm run qa:scheduling && npm run qa:ehr && npm run qa:cross-role && npm run qa:payment"
+    "qa:full": "npm run qa && npm run qa:e2e && npm run qa:security && npm run qa:scheduling && npm run qa:ehr && npm run qa:cross-role && npm run qa:payment",
+    "qa:push": "node push_qa.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.116.0",
@@ -28,6 +29,7 @@
     "playwright": "^1.62.1",
     "postcss": "^8.4.49",
     "tailwindcss": "^3.4.17",
-    "vite": "^6.0.5"
+    "vite": "^6.0.5",
+    "web-push": "^3.6.7"
   }
 }
