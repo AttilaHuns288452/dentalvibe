@@ -53,7 +53,7 @@ export default function Book() {
     const to = new Date(from.getTime() + 864e5)
     supabase.from('appointments')
       .select('scheduled_at, duration_minutes')
-      .eq('payment_status', 'verified').neq('status', 'cancelled')
+      .eq('payment_status', 'paid').neq('status', 'cancelled')
       .gte('scheduled_at', from.toISOString()).lt('scheduled_at', to.toISOString())
       .then(({ data }) => setBusyRanges((data ?? []).map((r) => ({ start: new Date(r.scheduled_at), mins: r.duration_minutes ?? 30 }))))
   }, [date])
