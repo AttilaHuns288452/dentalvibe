@@ -51,7 +51,7 @@ export default function Chat({ patient }) {
     if (!active?.id) return
     let unsub
     listChat(active.id).then(setMessages).catch((e) => { setMessages([]); setThreadErr(e?.message || "connection lost") })
-    unsub = subscribeChat(active.id, (m) => setMessages((prev) => [...(prev ?? []), m]))
+    unsub = subscribeChat(active.id, (m) => setMessages((prev) => (prev ?? []).some((x) => x.id === m.id) ? prev : [...(prev ?? []), m]))
     return unsub
   }, [active?.id])
 
@@ -80,7 +80,6 @@ export default function Chat({ patient }) {
     <div className="flex flex-col h-[calc(100vh-9.5rem)]">
       <div className="bg-white border-b border-gray-200 px-4 py-3">
         <h1 className="text-base font-bold text-gray-900">{active.full_name || 'DentalVibe'}</h1>
-        <p className="text-[11px] text-primary-600">Mon – Sat · 8 AM – 5 PM</p>
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2 bg-gray-50">
@@ -89,9 +88,12 @@ export default function Chat({ patient }) {
         {(messages ?? []).map((m) => {
           const mine = m.sender === me
           return (
-            <div key={m.id} className={'max-w-[78%] px-3 py-2 rounded-lg text-sm ' + (mine ? 'ml-auto bg-primary-50 text-gray-800' : 'bg-white border border-gray-200 text-gray-800')}>
+            <div key={m.id} className={'max-w-[78%] px-3 py-2 rounded-lg text-sm ' + (mine ? 'ml-auto bg-primary-600 text-white' : 'bg-white border border-gray-200 text-gray-800')}>
+              <div className={'text-[10px] font-bold mb-0.5 ' + (mine ? 'text-right text-primary-100' : 'text-gray-400')}>
+                {mine ? 'You' : m.sender === 'patient' ? 'Patient' : 'Clinic'}
+              </div>
               {m.body}
-              <div className={'text-[10px] text-gray-500 mt-1 ' + (mine ? 'text-right' : '')}>
+              <div className={'text-[10px] mt-1 ' + (mine ? 'text-right text-primary-100' : 'text-gray-500')}>
                 {new Date(m.created_at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
               </div>
             </div>
