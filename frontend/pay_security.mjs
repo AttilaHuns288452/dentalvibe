@@ -17,6 +17,7 @@ const check = (name, ok, extra = '') => { ok ? pass++ : fail++; console.log((ok 
 
 await maria.auth.signInWithPassword({ email: 'maria@dentalvibe.ph', password: 'password123' })
 const svcRow = (await svc.from('services').select('id, price').order('price', { ascending: false }).limit(1)).data?.[0]
+const DAY = 30 + Math.floor(Math.random() * 300)
 const me = (await maria.from('patients').select('id').eq('user_id', (await maria.auth.getUser()).data.user.id).maybeSingle()).data
 if (!me) { console.log('FAIL no patient row for maria'); process.exit(1) }
 
@@ -34,7 +35,7 @@ let { data: myAppt } = await svc.from('appointments').select('id, payment_status
 if (!myAppt) {
   const mk = await maria.from('appointments').insert({
     patient_id: me.id, service_id: svcRow?.id, service_ids: svcRow ? [svcRow.id] : [],
-    scheduled_at: new Date(Date.now() + 400 * 864e5).toISOString(), requested_date: new Date(Date.now() + 400 * 864e5).toISOString().slice(0, 10),
+    scheduled_at: new Date(Date.now() + (DAY + 1) * 864e5).toISOString(), requested_date: new Date(Date.now() + (DAY + 1) * 864e5).toISOString().slice(0, 10),
     price: svcRow?.price ?? 100, status: 'pending', payment_status: 'unpaid',
   }).select()
   myAppt = mk.data?.[0] ? { id: mk.data[0].id, payment_status: 'unpaid' } : null
@@ -54,7 +55,7 @@ const insExc = await maria.from('service_prices').insert({ service_id: svcRow.id
 check('4. patient cannot set their own price', !!insExc.error, insExc.error?.code ?? 'INSERTED!')
 
 // ── 5. booking price tamper (server-side validation) ──
-const when = new Date(Date.now() + 300 * 864e5); when.setUTCHours(2, 0, 0, 0)
+const when = new Date(Date.now() + DAY * 864e5); when.setUTCHours(2, 0, 0, 0)
 const tamper = await maria.from('appointments').insert({
   patient_id: me.id, service_id: svcRow.id, service_ids: [svcRow.id],
   scheduled_at: when.toISOString(), requested_date: when.toISOString().slice(0, 10),
@@ -101,8 +102,9 @@ if (appt) {
   await svc.from('payments').delete().eq('appointment_id', appt.id)
   await svc.from('notifications').delete().like('body', '%arrive 10 minutes early%')
 }
-await svc.from('appointments').delete().eq('price', 1).eq('patient_id', me.id)
+if (appt) await svc.from('appointments').delete().eq('id', appt.id)
 await svc.from('service_prices').delete().eq('service_id', svcRow.id).eq('patient_id', me.id)
+await svc.from('appointments').delete().eq('patient_id', me.id).gte('requested_date', new Date(Date.now() + 25 * 864e5).toISOString().slice(0, 10))
 
 console.log(`\n===== PAY SECURITY: ${pass} passed, ${fail} failed =====`)
 process.exit(fail ? 1 : 0)
