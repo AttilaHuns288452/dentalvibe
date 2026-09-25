@@ -75,11 +75,11 @@ await pg.locator('form section:has-text("Available time") button:not([disabled])
   await pg.waitForTimeout(1800)
   check('P5. booking → Confirm step', (await pg.locator('main h1').textContent()).includes('Confirm Your Appointment'))
   await shot('03-confirm')
-  check('P6. Confirm shows service + fee + Free admin', (await pg.locator('main').textContent()).includes('Appointment fee') && (await pg.locator('main').textContent()).includes('Free') && /₱[\d,]+/.test(await pg.locator('main').textContent()))
+  check('P6. Confirm shows services + total + Free admin', (await pg.locator('main').textContent()).includes('Services') && (await pg.locator('main').textContent()).includes('Free') && /₱[\d,]+/.test(await pg.locator('main').textContent()))
   await pg.locator('button:has-text("Pay Now")').click()
   let qrTxt = ''
-  for (let i = 0; i < 20; i++) { await pg.waitForTimeout(1500); qrTxt = await pg.locator('body').textContent(); if (qrTxt.includes('Pay Appointment Fee') && /\d{2}:\d{2}/.test(qrTxt)) break }
-  check('P7. QR page with countdown + total', qrTxt.includes("Pay Appointment Fee") && /\d{2}:\d{2}/.test(qrTxt) && /₱[\d,]+/.test(qrTxt) && qrTxt.includes('Download QR image'))
+  for (let i = 0; i < 20; i++) { await pg.waitForTimeout(1500); qrTxt = await pg.locator('body').textContent(); if (qrTxt.includes('Pay for Your Appointment') && /\d{2}:\d{2}/.test(qrTxt)) break }
+  check('P7. QR page with countdown + total', qrTxt.includes("Pay for Your Appointment") && /\d{2}:\d{2}/.test(qrTxt) && /₱[\d,]+/.test(qrTxt) && qrTxt.includes('Download QR image'))
   await shot('04-qr')
   await pg.locator('button:has-text("DEV: simulate PayMongo test payment")').click()
   let settled = false

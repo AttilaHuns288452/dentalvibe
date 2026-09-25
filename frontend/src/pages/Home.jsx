@@ -162,7 +162,7 @@ export default function Home() {
                   <span className="text-xs text-green-700">
                     <b>Upcoming Appointment</b> — Your {upcoming.services?.name} on{' '}
                     {d.toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })}
-                    {upcoming.scheduled_at ? ` · ${fmtTime12(upcoming.scheduled_at.slice(11, 16))}` : ''} — {isApproved ? 'confirmed' : 'pay to confirm your slot'}.
+                    {upcoming.scheduled_at ? ` · ${fmtTime12(upcoming.scheduled_at.slice(11, 16))}` : ''} — {isApproved ? 'confirmed' : 'pay to confirm'}.
                   </span>
                 </div>
                 <section>

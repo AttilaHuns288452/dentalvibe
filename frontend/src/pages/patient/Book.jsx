@@ -186,7 +186,7 @@ export default function Book() {
                   </div>
                 ))}
                 <div className="flex justify-between px-3.5 py-2 text-sm font-bold">
-                  <span>Total appointment fee</span><span className="text-primary-700 tabular-nums">{peso(total)}</span>
+                  <span>Total</span><span className="text-primary-700 tabular-nums">{peso(total)}</span>
                 </div>
               </div>
             </section>
@@ -227,7 +227,7 @@ export default function Book() {
         <div className="sticky -mx-4 px-4 pt-6 pb-2 bottom-[calc(4.25rem+env(safe-area-inset-bottom))] md:bottom-0 bg-gradient-to-t from-gray-50 via-gray-50 to-transparent">
         {step === 1 && (
           <p className="text-[11px] text-gray-500 bg-primary-50 border border-primary-100 rounded-lg px-3 py-2 mb-2">
-            The appointment fee reserves your slot — it is <b>not</b> your full treatment bill. Any treatment is charged at the clinic.
+            You pay for your selected service(s) <b>in full</b> when you confirm — scan the QR code to pay.
           </p>
         )}
         {err && <p className="text-xs text-red-500 mb-2">{err}</p>}

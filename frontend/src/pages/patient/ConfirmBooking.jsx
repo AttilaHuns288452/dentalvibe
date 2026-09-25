@@ -55,7 +55,7 @@ export default function ConfirmBooking() {
           <svg viewBox="0 0 24 24" className="w-8 h-8" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 13l4 4L19 7" /></svg>
         </div>
         <h1 className="text-lg font-bold text-gray-900 mt-3">Confirm Your Appointment</h1>
-        <p className="text-xs text-gray-500 mt-1">Pay the appointment fee to reserve your slot — treatment charges are billed at the clinic.</p>
+        <p className="text-xs text-gray-500 mt-1">Pay for your selected service(s) to confirm your appointment.</p>
       </div>
 
       <div className="bg-white border border-gray-200 rounded-lg p-4 flex items-center gap-3">
@@ -80,9 +80,9 @@ export default function ConfirmBooking() {
       </div>
 
       <div className="bg-white border border-gray-200 rounded-lg p-4">
-        <div className="text-sm font-bold text-gray-900 mb-2">Appointment fee</div>
+        <div className="text-sm font-bold text-gray-900 mb-2">Payment summary</div>
         <div className="flex justify-between text-sm py-1.5 border-t border-gray-100">
-          <span className="text-gray-600">Appointment fee</span><span className="font-bold text-gray-900">{peso(appt.price ?? 0)}</span>
+          <span className="text-gray-600">Services</span><span className="font-bold text-gray-900">{peso(appt.price ?? 0)}</span>
         </div>
         <div className="flex justify-between text-sm py-1.5 border-t border-gray-100">
           <span className="text-gray-600">Admin</span><span className="font-bold text-green-600">Free</span>
@@ -145,10 +145,10 @@ export function BookSuccess() {
         </div>
         <h1 className="text-lg font-bold text-gray-900 mt-3">{confirmed ? 'Appointment confirmed' : 'Appointment booked'}</h1>
         <p className="text-xs text-gray-500 mt-1">{confirmed
-          ? 'Your slot is secured — arrive 10 minutes early. Treatment charges are billed at the clinic.'
+          ? 'Your appointment is confirmed and fully paid — arrive 10 minutes early.'
           : appt.payment_status === 'pending'
             ? 'Waiting for payment confirmation.'
-            : 'Pay the appointment fee to secure your slot.'}</p>
+            : 'Pay for your appointment to confirm it.'}</p>
       </div>
 
       {appt && (

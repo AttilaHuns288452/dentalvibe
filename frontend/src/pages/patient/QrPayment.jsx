@@ -5,7 +5,7 @@ import { supabase } from '../../supabaseClient'
 import { peso, fnErr } from '../../lib/api'
 import { useRevalidateOnVisible } from '../../lib/hooks'
 
-// Pay Appointment Fee — PayMongo dynamic QR: paymongo-create makes the payment
+// Pay for Your Appointment — PayMongo dynamic QR: paymongo-create makes the payment
 // server-side and returns the provider QR (or a text payload in mock/demo mode);
 // paymongo-check is polled while pending and the webhook confirms server-side.
 // Mock-mode payloads render via the hand-rolled byte-mode QR encoder below.
@@ -259,7 +259,7 @@ export default function QrPayment() {
         <div className="absolute -top-6 left-1/2 -translate-x-1/2 w-12 h-12 rounded-xl bg-white shadow flex items-center justify-center">
           <svg viewBox="0 0 24 24" className="w-6 h-6 text-primary-600" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3l8 3v6c0 4.5-3 8-8 10-5-2-8-5.5-8-10V6zM9 12l2 2 4-4" /></svg>
         </div>
-        <h1 className="text-lg font-bold text-gray-900 mt-6">Pay Appointment Fee</h1>
+        <h1 className="text-lg font-bold text-gray-900 mt-6">Pay for Your Appointment</h1>
         <p className="text-xs text-gray-500 mt-1">Scan this QR using GCash, Maya, or your bank app. This code is valid for <span className={secs < 60 && secs > 0 ? 'font-semibold text-red-500' : ''}>{mm}:{ss}</span>.</p>
 
         <div ref={qrBoxRef} className="flex justify-center my-4">
@@ -279,7 +279,7 @@ export default function QrPayment() {
         </div>
         <div className="text-[11px] text-gray-500 mt-1">Ref: {ref} · {svc}{appt.requested_date ? ` · ${appt.requested_date}` : ''}</div>
         <p className="text-[11px] text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2 mt-2">
-          This is your <b>appointment fee</b> — it reserves the slot. Treatment charges are billed separately at the clinic.
+          This is the <b>full payment</b> for your selected service(s) — nothing more to pay at the clinic for these.
         </p>
 
         {status === 'pending' && secs > 0 && (

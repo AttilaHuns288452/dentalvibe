@@ -64,7 +64,7 @@ await pg.locator('button:has-text("Continue to Payment")').click()
 await pg.waitForTimeout(1800)
 check('4. confirm step after booking', (await pg.locator('main h1').textContent()).includes('Confirm Your Appointment'))
 await pg.locator('button:has-text("Pay Now")').click()
-await pg.waitForFunction(() => /Pay Appointment Fee/.test(document.body.textContent), null, { timeout: 30000 }).catch(() => {})
+await pg.waitForFunction(() => /Pay for Your Appointment/.test(document.body.textContent), null, { timeout: 30000 }).catch(() => {})
 check('4b. QR payment page with countdown', /\d{2}:\d{2}/.test(await pg.locator('main').textContent()))
 check('5. payment shows service + price', (await pg.locator('main').textContent()).includes('₱'))
 check('5b. production page hides DEV chrome', !(await pg.locator('button:has-text("DEV: simulate")').count()))
@@ -74,7 +74,7 @@ await pg.screenshot({ path: '/tmp/prod-payment.png' })
 await pg.goto('http://localhost:4176/appointments', { waitUntil: 'networkidle' }); await pg.waitForTimeout(1200)
 check('6. unpaid badge on appointment', (await pg.locator('main').textContent()).includes('Unpaid'))
 await pg.locator('button:has-text("Pay now"), button:has-text("View payment")').first().click()
-await pg.waitForFunction(() => /Pay Appointment Fee/.test(document.body.textContent), null, { timeout: 30000 }).catch(() => {})
+await pg.waitForFunction(() => /Pay for Your Appointment/.test(document.body.textContent), null, { timeout: 30000 }).catch(() => {})
 
 // settle the way PRODUCTION does it — provider confirmation (paymongo-check drives the
 // documented test_url simulation in test mode; the signed webhook settles), no UI crutch.
