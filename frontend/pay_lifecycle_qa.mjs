@@ -23,9 +23,25 @@ const juanId = (await juan.from('patients').select('id').eq('user_id', (await ju
 const svcRow = (await svc.from('services').select('id, price').eq('active', true).order('price').limit(1).maybeSingle()).data
 const DAY = 60 + Math.floor(Math.random() * 200)
 const when = new Date(Date.now() + DAY * 864e5); when.setUTCHours(2, 0, 0, 0) // 10:00 Asia/Manila
+  while (when.getUTCDay() === 0) when.setUTCDate(when.getUTCDate() + 1) // clinic closed Sundays
+
+
+
+// provider-side transient 500s happen (~1% of creates under load) — bounded retry
+const mkPay = async (client, apptId) => {
+  for (let i = 0; i < 3; i++) {
+    const r = await client.functions.invoke('paymongo-create', { body: { appointment_id: apptId } })
+    if (r.data?.payment_id) return r.data
+    if (r.error || r.data?.error) console.log('mkPay attempt', i, 'error:', JSON.stringify(r.data?.error ?? r.error?.message).slice(0, 120))
+    await new Promise((res) => setTimeout(res, 1500))
+  }
+  return null
+}
 
 const mkAppt = async (pid, day) => {
   const d = new Date(Date.now() + day * 864e5); d.setUTCHours(2, 0, 0, 0)
+  while (d.getUTCDay() === 0) d.setUTCDate(d.getUTCDate() + 1) // clinic closed Sundays
+
   return (await svc.from('appointments').insert({
     patient_id: pid, service_id: svcRow.id, service_ids: [svcRow.id],
     scheduled_at: d.toISOString(), requested_date: d.toISOString().slice(0, 10),
@@ -35,15 +51,17 @@ const mkAppt = async (pid, day) => {
 
 // ── 1. PENDING payment reserves the slot ──
 const apptA = await mkAppt(mariaId, DAY)
-const payA = (await maria.functions.invoke('paymongo-create', { body: { appointment_id: apptA.id } })).data
+const payA = await mkPay(maria, apptA.id)
 check('1a. payment created (slot reserved)', payA?.status === 'pending', payA?.error ?? '')
 // per-dentist capacity: same time on THE SAME dentist is always rejected;
 // other ready dentists may legitimately take the parallel slot (asserted below)
 const { data: apptARow } = await svc.from('appointments').select('dentist_id').eq('id', apptA.id).maybeSingle()
-const clash = await juan.from('appointments').insert({
+// staff-side RESERVATION (patient inserts are forced unpaid = drafts, which
+// legitimately do not hold chairs — the reservation layer is the conflict boundary)
+const clash = await svc.from('appointments').insert({
   patient_id: juanId, service_id: svcRow.id, service_ids: [svcRow.id],
   scheduled_at: when.toISOString(), requested_date: when.toISOString().slice(0, 10),
-  price: svcRow.price, status: 'pending', payment_status: 'unpaid', dentist_id: apptARow.dentist_id,
+  price: svcRow.price, status: 'pending', payment_status: 'pending', dentist_id: apptARow.dentist_id,
 }).select()
 check('1b. same dentist cannot take an overlapping reservation', !!clash.error, clash.error?.message?.slice(0, 60) ?? 'BOOKED!')
 
@@ -59,7 +77,7 @@ const apptB = book2.data
 // the ORIGINAL scenario is reuse of the SAME dentist resource after expiry —
 // under parallel capacity that (and only that) is the double-booking risk
 check('2. expired reservation releases the slot', !!apptB, book2.error?.message?.slice(0, 60) ?? '')
-const payB = apptB ? (await juan.functions.invoke('paymongo-create', { body: { appointment_id: apptB.id } })).data : null
+const payB = apptB ? await mkPay(juan, apptB.id) : null
 
 // ── 3. LATE success on the old payment after the slot was rebooked ──
 if (apptB && payB) {

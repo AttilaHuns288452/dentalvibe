@@ -1,6 +1,7 @@
 // scheduling_qa.mjs — clinic scheduling must derive from clinic_settings (single source of truth).
 // Owner changes hours via the Manage UI → patient booking slots and the doctor calendar rows must
-// both follow; original settings are restored at the end. No data is created (no bookings).
+// both follow; original settings are restored at the end. No bookings are created
+// (dentist work-schedule rows are temporarily aligned to the hours under test).
 // Run (from frontend/): node scheduling_qa.mjs   (QA_BASE defaults to http://localhost:4176)
 import { chromium } from './qa_playwright.mjs'
 import { createClient } from '@supabase/supabase-js'
@@ -13,6 +14,18 @@ let pass = 0, fail = 0
 const check = (name, ok, extra = '') => { ok ? pass++ : fail++; console.log((ok ? 'PASS' : 'FAIL') + ' ' + name + (extra ? ' | ' + extra : '')) }
 const pad = (n) => String(n).padStart(2, '0')
 const settingsInDb = async () => (await sb.from('clinic_settings').select('open_time, close_time, open_days').eq('id', 1).single()).data
+// per-dentist work schedules are an inner bound on slots (spec §2) — align every
+// active dentist's rows to the clinic hours under test so the suite measures the
+// clinic_settings behavior it is written for
+const svc = createClient(env.VITE_SUPABASE_URL, process.env.SB_SECRET ?? '')
+const syncSchedules = async (open, close) => {
+  const { data: ds } = await svc.from('dentists').select('id').eq('active', true)
+  for (const d of ds ?? []) {
+    for (const dow of [1, 2, 3, 4, 5, 6]) {
+      await svc.from('dentist_work_schedules').upsert({ dentist_id: d.id, day_of_week: dow, open_time: open, close_time: close, active: true }, { onConflict: 'dentist_id,day_of_week' })
+    }
+  }
+}
 
 const b = await chromium.launch()
 const pg = await b.newPage()
@@ -62,6 +75,7 @@ try {
   await setHoursUI('09:00', '18:00', ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'])
   const saved = await settingsInDb()
   check('S1. settings saved as 09:00–18:00 Mon–Sat', /09:00/.test(saved?.open_time ?? '') && /18:00/.test(saved?.close_time ?? '') && (saved?.open_days ?? []).length === 6, JSON.stringify(saved ?? {}))
+  await syncSchedules('09:00', '18:00')
 
   // ── phase B: patient booking follows ──
   await login('maria@dentalvibe.ph')
@@ -86,6 +100,7 @@ try {
 try {
   await login('owner@dentalvibe.ph')
   await setHoursUI(orig.open_time.slice(0, 5), orig.close_time.slice(0, 5), orig.open_days)
+  await syncSchedules(orig.open_time.slice(0, 5), orig.close_time.slice(0, 5))
 } catch (e) {
   check('restore settings via UI', false, e.message.slice(0, 160))
 }

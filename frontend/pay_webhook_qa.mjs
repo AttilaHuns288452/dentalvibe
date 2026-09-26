@@ -17,6 +17,17 @@ import { createClient } from '@supabase/supabase-js'
 import crypto from 'crypto'
 import fs from 'fs'
 
+// provider-side transient 500s (~1% under load) — bounded retry
+const mkPay = async (client, apptId) => {
+  for (let i = 0; i < 3; i++) {
+    const r = await client.functions.invoke('paymongo-create', { body: { appointment_id: apptId } })
+    if (r.data?.payment_id) return r.data
+    console.log('mkPay attempt', i, 'RAW:', JSON.stringify(r).slice(0, 180))
+    await new Promise((res) => setTimeout(res, 1500))
+  }
+  return null
+}
+
 const env = Object.fromEntries(fs.readFileSync('.env.local', 'utf8').trim().split('\n').map((l) => l.split('=')))
 const SB = env.VITE_SUPABASE_URL
 const svc = createClient(SB, process.env.SB_SECRET)
@@ -43,12 +54,14 @@ const maria = createClient(SB, env.VITE_SUPABASE_ANON_KEY)
 await maria.auth.signInWithPassword({ email: 'maria@dentalvibe.ph', password: 'password123' })
 const { data: me } = await maria.from('patients').select('id').eq('user_id', (await maria.auth.getUser()).data.user.id).maybeSingle()
 const { data: svcRow } = await svc.from('services').select('id, price').eq('active', true).order('price').limit(1).maybeSingle()
-const day = new Date(Date.now() + (140 + Math.floor(Math.random() * 100)) * 864e5); day.setUTCHours(1, 0, 0, 0)
+const day = new Date(Date.now() + (140 + Math.floor(Math.random() * 100)) * 864e5); day.setUTCHours(2, 0, 0, 0) // 10:00 Asia/Manila — inside work hours
+  while (day.getUTCDay() === 0) day.setUTCDate(day.getUTCDate() + 1) // clinic closed Sundays
+
 const { data: appt } = await svc.from('appointments').insert({
   patient_id: me.id, service_id: svcRow.id, service_ids: [svcRow.id], scheduled_at: day.toISOString(),
   requested_date: day.toISOString().slice(0, 10), price: svcRow.price, status: 'pending', payment_status: 'unpaid',
 }).select().maybeSingle()
-const pay = (await maria.functions.invoke('paymongo-create', { body: { appointment_id: appt.id } })).data
+const pay = await mkPay(maria, appt.id)
 check('setup. payment created (dynamic QR)', !!pay?.payment_id && !!pay?.qr_image)
 if (pay?.test_url) {
   const u = new URL(pay.test_url)
@@ -151,7 +164,9 @@ if (cfg.paymongo_secret_key) {
 } else check('W10. provider idempotency probe', false, 'no secret key in config')
 
 // W11: concurrent double-click create → one payment row, one intent
-const day2 = new Date(Date.now() + (240 + Math.floor(Math.random() * 50)) * 864e5); day2.setUTCHours(1, 0, 0, 0)
+const day2 = new Date(Date.now() + (240 + Math.floor(Math.random() * 50)) * 864e5); day2.setUTCHours(2, 0, 0, 0) // 10:00 Manila
+  while (day2.getUTCDay() === 0) day2.setUTCDate(day2.getUTCDate() + 1) // clinic closed Sundays
+
 const { data: appt2 } = await svc.from('appointments').insert({
   patient_id: me.id, service_id: svcRow.id, service_ids: [svcRow.id], scheduled_at: day2.toISOString(),
   requested_date: day2.toISOString().slice(0, 10), price: svcRow.price, status: 'pending', payment_status: 'unpaid',
@@ -173,12 +188,14 @@ check('W11b. double-click → one provider intent', intents2.size === 1, [...int
 //   second webhook: SAME event id, reconcile succeeds -> processed
 //   final: paid, 1 transaction, 1 notification, processed_at set; later
 //   duplicates are harmless acks
-const day3 = new Date(Date.now() + (300 + Math.floor(Math.random() * 60)) * 864e5); day3.setUTCHours(1, 0, 0, 0)
+const day3 = new Date(Date.now() + (300 + Math.floor(Math.random() * 60)) * 864e5); day3.setUTCHours(2, 0, 0, 0) // 10:00 Manila
+  while (day3.getUTCDay() === 0) day3.setUTCDate(day3.getUTCDate() + 1) // clinic closed Sundays
+
 const { data: appt3 } = await svc.from('appointments').insert({
   patient_id: me.id, service_id: svcRow.id, service_ids: [svcRow.id], scheduled_at: day3.toISOString(),
   requested_date: day3.toISOString().slice(0, 10), price: svcRow.price, status: 'pending', payment_status: 'unpaid',
 }).select().maybeSingle()
-const pay3 = (await maria.functions.invoke('paymongo-create', { body: { appointment_id: appt3.id } })).data
+const pay3 = await mkPay(maria, appt3.id)
 const { data: pay3row } = await svc.from('payments').select('payment_intent_id, amount').eq('id', pay3.payment_id).maybeSingle()
 const realIntent = pay3row.payment_intent_id
 const AMT3 = Math.round(Number(pay3row.amount) * 100)

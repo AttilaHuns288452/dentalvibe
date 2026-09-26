@@ -8,6 +8,15 @@ import fs from 'fs'
 import crypto from 'crypto'
 import { chromium } from './qa_playwright.mjs'
 
+const mkPay = async (client, apptId) => {
+  for (let i = 0; i < 3; i++) {
+    const r = await client.functions.invoke('paymongo-create', { body: { appointment_id: apptId } })
+    if (r.data?.payment_id) return r.data
+    await new Promise((res) => setTimeout(res, 1500))
+  }
+  return null
+}
+
 const env = Object.fromEntries(fs.readFileSync('.env.local', 'utf8').trim().split('\n').map((l) => l.split('=')))
 const SB = env.VITE_SUPABASE_URL
 const svc = createClient(SB, process.env.SB_SECRET)
@@ -71,7 +80,9 @@ check('5. multi-device safe (rows keyed by endpoint)', (rows ?? []).every((r) =>
 // ── 3. REAL push chain: business event → SW shows the notification ──
 // clear any existing notifications first
 await pg.evaluate(async () => { const reg = await navigator.serviceWorker.ready; (await reg.getNotifications()).forEach((n) => n.close()) })
-const d = new Date(Date.now() + (90 + Math.floor(Math.random() * 100)) * 864e5); d.setUTCHours(1, 0, 0, 0)
+const d = new Date(Date.now() + (90 + Math.floor(Math.random() * 100)) * 864e5); d.setUTCHours(2, 0, 0, 0) // 10:00 Asia/Manila — inside work hours
+  while (d.getUTCDay() === 0) d.setUTCDate(d.getUTCDate() + 1) // clinic closed Sundays
+
 const { data: svcRow } = await svc.from('services').select('id, price').eq('active', true).order('price').limit(1).maybeSingle()
 const { data: appt, error: aerr } = await svc.from('appointments').insert({
   patient_id: me.id, service_id: svcRow.id, service_ids: [svcRow.id], scheduled_at: d.toISOString(),
@@ -203,14 +214,16 @@ await ctxB.close()
 // ── 7. payment notifications deep-link to their entity (§13) ──
 // settle the run's appointment payment through the authoritative function
 const { data: payRow } = await svc.from('payments').insert({
-  appointment_id: appt.id, provider: 'mock', payment_intent_id: 'pi_mock_deeplink',
+  appointment_id: appt.id, provider: 'mock', payment_intent_id: 'pi_mock_deeplink_' + Date.now(), // unique per run — a crashed run's leftover blocked re-runs via the intent unique index
   amount: Number(svcRow.price), status: 'pending', reference: 'DL-' + Date.now(),
 }).select().maybeSingle()
-await svc.rpc('fn_apply_payment_result', { p_payment: payRow.id, p_result: 'paid', p_provider_status: 'succeeded', p_amount_centavos: Math.round(Number(svcRow.price) * 100), p_currency: 'PHP' })
+const settleR = await svc.rpc('fn_apply_payment_result', { p_payment: payRow.id, p_result: 'paid', p_provider_status: 'succeeded', p_amount_centavos: Math.round(Number(svcRow.price) * 100), p_currency: 'PHP' })
+if (settleR.error) console.log('SETTLE ERROR:', JSON.stringify(settleR.error).slice(0, 120), 'appt:', appt.scheduled_at, 'day:', appt.requested_date, 'dow:', new Date(appt.requested_date + 'T12:00:00Z').getUTCDay())
 const { data: payNotif } = await svc.from('notifications').select('route, dedupe_key').eq('dedupe_key', 'payment:' + payRow.id + ':paid').maybeSingle()
 check('20. payment notification carries the appointment deep link', payNotif?.route === '/appointments?appt=' + appt.id, payNotif?.route || 'none')
 // duplicate settlement attempts must not duplicate the notification (§11)
-try { await svc.rpc('fn_apply_payment_result', { p_payment: payRow.id, p_result: 'paid', p_provider_status: 'succeeded', p_amount_centavos: Math.round(Number(svcRow.price) * 100), p_currency: 'PHP' }) } catch {}
+try { const settleR = await svc.rpc('fn_apply_payment_result', { p_payment: payRow.id, p_result: 'paid', p_provider_status: 'succeeded', p_amount_centavos: Math.round(Number(svcRow.price) * 100), p_currency: 'PHP' })
+if (settleR.error) console.log('SETTLE ERROR:', JSON.stringify(settleR.error).slice(0, 120), 'appt:', appt.scheduled_at, 'day:', appt.requested_date, 'dow:', new Date(appt.requested_date + 'T12:00:00Z').getUTCDay()) } catch {}
 const { data: payNotif2 } = await svc.from('notifications').select('id').eq('dedupe_key', 'payment:' + payRow.id + ':paid')
 check('21. duplicate payment events = one notification', (payNotif2 ?? []).length === 1, 'rows=' + (payNotif2 ?? []).length)
 // the pushed payload carries the same route (dispatch reads the row)
@@ -239,11 +252,15 @@ await pg.reload({ waitUntil: 'networkidle' })
 await pg.waitForTimeout(1200)
 check('25. refresh keeps the deep-linked appointment in view', (await pg.locator('#appt-' + appt.id).count()) === 1)
 // (c) unauthorized appointment id: no crash, no leak
+const juanDay = new Date(Date.now() + (200 + Math.floor(Math.random() * 80)) * 864e5)
+  while (juanDay.getUTCDay() === 0) juanDay.setUTCDate(juanDay.getUTCDate() + 1) // clinic closed Sundays
+
 const { data: juanAppt } = await svc.from('appointments').insert({
   patient_id: (await svc.from('patients').select('id').eq('email', 'juan@dentalvibe.ph').maybeSingle()).data.id,
-  service_id: svcRow.id, service_ids: [svcRow.id], scheduled_at: new Date(Date.now() + 200 * 864e5).toISOString(),
-  requested_date: new Date(Date.now() + 200 * 864e5).toISOString().slice(0, 10), price: svcRow.price, status: 'pending', payment_status: 'unpaid',
+  service_id: svcRow.id, service_ids: [svcRow.id], scheduled_at: juanDay.toISOString(),
+  requested_date: juanDay.toISOString().slice(0, 10), price: svcRow.price, status: 'pending', payment_status: 'unpaid',
 }).select().maybeSingle()
+if (!juanAppt) { console.log('juanAppt insert failed'); process.exit(1) }
 await pg.goto(BASE + '/appointments?appt=' + juanAppt.id, { waitUntil: 'networkidle' })
 await pg.waitForTimeout(1200)
 txt = await pg.locator('main').textContent()
