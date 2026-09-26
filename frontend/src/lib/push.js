@@ -4,7 +4,10 @@
 // server-derived from the session — we never send a user_id.
 import { supabase } from './api'
 
-const VAPID_PUBLIC = import.meta.env.VITE_VAPID_PUBLIC_KEY ?? ''
+// Public half of the VAPID pair — safe in the browser by design (the private
+// key lives only in service_config). Env var overrides for key rotation.
+const VAPID_PUBLIC = import.meta.env.VITE_VAPID_PUBLIC_KEY ||
+  'BNBtCxTgahV7PNGcxGbi04HrUJXKTNECjft32kd1kAP6_ZYloPAWmKpRGlfHMjilU54b7DMJduUHO4mEoySQ4uc'
 
 export const pushSupported = () =>
   typeof window !== 'undefined' && 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window
