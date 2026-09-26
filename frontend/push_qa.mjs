@@ -184,14 +184,21 @@ await pgB.goto(BASE + '/settings', { waitUntil: 'networkidle' })
 await pgB.locator('button:has-text("Enable phone notifications")').click()
 // ponytail: fresh-profile FCM registration can take well over 5s — settle on the
 // real signal (the server row landing) instead of a blind timer
-let mariaSubs = []
-for (let i = 0; i < 20 && mariaSubs.length < 2; i++) {
+let epB = null // read AFTER registration settles (getSubscription is null mid-registration)
+for (let i = 0; i < 20 && !epB; i++) {
+  await pgB.waitForTimeout(1000)
+  epB = await pgB.evaluate(async () => { const r = await navigator.serviceWorker.ready; const s = await r.pushManager.getSubscription(); return s ? s.endpoint : null })
+}
+if (epB) runEndpoints.add(epB) // device B's row — same endpoint-scoped cleanup set
+// wait for device B's OWN row to land (a count check is fooled by stale rows)
+let bLanded = false, mariaSubs = []
+for (let i = 0; i < 20 && !bLanded; i++) {
   await pgB.waitForTimeout(1500)
   mariaSubs = (await svc.from('push_subscriptions').select('endpoint').eq('user_id', me.user_id).is('revoked_at', null)).data ?? []
+  bLanded = !!epB && mariaSubs.some((x) => x.endpoint === epB)
 }
-const epB = await pgB.evaluate(async () => { const r = await navigator.serviceWorker.ready; const s = await r.pushManager.getSubscription(); return s ? s.endpoint : null })
-if (epB) runEndpoints.add(epB) // device B's row — same endpoint-scoped cleanup set
-check('18. two devices = two active subscriptions (no overwrite)', mariaSubs.length >= 2, 'subs=' + mariaSubs.length)
+if (!bLanded) console.log('B DIAG: url=' + pgB.url() + ' epB=' + (epB ? 'set' : 'NULL') + ' subs=' + mariaSubs.length + ' btn=' + await pgB.locator('button:has-text("Enable phone notifications")').count())
+check('18. two devices = two active subscriptions (no overwrite)', mariaSubs.length >= 2 && bLanded, 'subs=' + mariaSubs.length + ' bRow=' + bLanded)
 // clear both devices' notifications, fire ONE event, both must show it
 await pg.evaluate(async () => { const r = await navigator.serviceWorker.ready; (await r.getNotifications()).forEach((n) => n.close()) })
 await pgB.evaluate(async () => { const r = await navigator.serviceWorker.ready; (await r.getNotifications()).forEach((n) => n.close()) })
@@ -199,7 +206,8 @@ const { data: multi } = await svc.from('notifications').insert({
   user_id: me.user_id, title: 'Multi-device probe', body: 'both devices should show this', route: '/notifications', dedupe_key: 'multi:' + Date.now(),
 }).select().maybeSingle()
 const seen = async (p) => {
-  for (let i = 0; i < 15; i++) {
+  // a just-registered FCM token can take tens of seconds to become deliverable
+  for (let i = 0; i < 30; i++) {
     await p.waitForTimeout(1500)
     const n = await p.evaluate(async () => (await (await navigator.serviceWorker.ready).getNotifications()).map((x) => x.title))
     if (n.includes('Multi-device probe')) return true
@@ -208,6 +216,8 @@ const seen = async (p) => {
 }
 const [sA, sB] = await Promise.all([seen(pg), seen(pgB)])
 check('19. one event reaches EVERY active device', sA && sB, 'A=' + sA + ' B=' + sB)
+const { data: bRow } = await svc.from('push_subscriptions').select('revoked_at, last_success_at').eq('endpoint', epB).maybeSingle()
+console.log('B ROW after check19:', JSON.stringify(bRow))
 await svc.from('notifications').delete().eq('id', multi.id)
 await ctxB.close()
 
