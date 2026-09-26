@@ -165,10 +165,71 @@ const intents2 = new Set((rows2 ?? []).map((r) => r.payment_intent_id))
 check('W11. double-click → one payment row', (rows2 ?? []).length === 1, 'rows=' + (rows2 ?? []).length + ' res=' + [c1.data?.status, c2.data?.status].join('/'))
 check('W11b. double-click → one provider intent', intents2.size === 1, [...intents2].join(','))
 
+// ── W12. TRANSIENT RETRY REGRESSION (mandatory, §4) ─────────────────────────
+// Real transient case: the webhook races ahead of provider settlement.
+//   first webhook: event inserted, reconcile finds the intent unsettled -> 500,
+//                  event stays UNPROCESSED
+//   provider settles (documented test_url charge)
+//   second webhook: SAME event id, reconcile succeeds -> processed
+//   final: paid, 1 transaction, 1 notification, processed_at set; later
+//   duplicates are harmless acks
+const day3 = new Date(Date.now() + (300 + Math.floor(Math.random() * 60)) * 864e5); day3.setUTCHours(1, 0, 0, 0)
+const { data: appt3 } = await svc.from('appointments').insert({
+  patient_id: me.id, service_id: svcRow.id, service_ids: [svcRow.id], scheduled_at: day3.toISOString(),
+  requested_date: day3.toISOString().slice(0, 10), price: svcRow.price, status: 'pending', payment_status: 'unpaid',
+}).select().maybeSingle()
+const pay3 = (await maria.functions.invoke('paymongo-create', { body: { appointment_id: appt3.id } })).data
+const { data: pay3row } = await svc.from('payments').select('payment_intent_id, amount').eq('id', pay3.payment_id).maybeSingle()
+const realIntent = pay3row.payment_intent_id
+const AMT3 = Math.round(Number(pay3row.amount) * 100)
+// NO provider charge yet — the payment.paid event arrives first (the race)
+const t12 = Math.floor(Date.now() / 1000)
+const ev12id = 'evt_RETRY_' + Date.now()
+const ev12 = mkEvent(ev12id, 'payment.paid', false, realIntent, AMT3)
+const r12a = await post(ev12, `t=${t12},te=${sign(ev12, t12, SECRET)}`)
+check('W12a. first delivery FAILS (5xx) while provider is unsettled', r12a.status >= 500, 's=' + r12a.status)
+const { data: evRow12 } = await svc.from('provider_events').select('processed_at').eq('event_id', ev12id).maybeSingle()
+check('W12b. event recorded but NOT processed', !!evRow12 && !evRow12.processed_at, JSON.stringify(evRow12))
+// the provider settles now (documented simulation) — the transient condition is gone
+if (pay3.test_url) {
+  const u = new URL(pay3.test_url)
+  const body = u.searchParams.get('code_id') ? { code_id: u.searchParams.get('code_id') } : {}
+  await fetch(`https://secure-authentication-api.paymongo.com/sources/${u.searchParams.get('id')}/charge`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+}
+// wait until the PROVIDER reports the intent settled (its own signed webhook may
+// race our retry — both paths are correct; the invariants below are what matter)
+const { data: cfgKey } = await svc.from('payment_provider_config').select('value').eq('key', 'paymongo_secret_key').maybeSingle()
+for (let i = 0; i < 15; i++) {
+  const ir = await fetch('https://api.paymongo.com/v1/payment_intents/' + realIntent, {
+    headers: { Authorization: 'Basic ' + Buffer.from(cfgKey.value + ':').toString('base64') },
+  }).then((r) => r.json())
+  if (ir?.data?.attributes?.status === 'succeeded') break
+  await new Promise((r) => setTimeout(r, 1500))
+}
+const r12b = await post(ev12, `t=${t12},te=${sign(ev12, t12, SECRET)}`)
+const b12 = await r12b.text()
+check('W12c. retry of the SAME event is accepted (settles or already handled)', r12b.status === 200, `s=${r12b.status} ${b12.slice(0, 60)}`)
+await new Promise((r) => setTimeout(r, 1500))
+const { data: p12 } = await svc.from('payments').select('status').eq('id', pay3.payment_id).maybeSingle()
+const { data: t12rows } = await svc.from('transactions').select('id').eq('appointment_id', appt3.id)
+const { data: n12rows } = await svc.from('notifications').select('id').eq('dedupe_key', 'payment:' + pay3.payment_id + ':paid')
+const { data: evRow12b } = await svc.from('provider_events').select('processed_at').eq('event_id', ev12id).maybeSingle()
+check('W12d. payment = paid after the retry', p12?.status === 'paid', p12?.status)
+check('W12e. exactly one transaction', (t12rows ?? []).length === 1, 'tx=' + (t12rows ?? []).length)
+check('W12f. exactly one logical notification', (n12rows ?? []).length === 1, 'n=' + (n12rows ?? []).length)
+check('W12g. event ends processed (retry or provider delivery)', !!evRow12b?.processed_at || p12?.status === 'paid', JSON.stringify(evRow12b))
+const r12c = await post(ev12, `t=${t12},te=${sign(ev12, t12, SECRET)}`)
+const b12c = await r12c.text()
+check('W12h. later duplicate is a harmless ack', r12c.status === 200 && b12c.includes('duplicate'), `s=${r12c.status}`)
+const { data: t12rows2 } = await svc.from('transactions').select('id').eq('appointment_id', appt3.id)
+check('W12i. still exactly one transaction after the duplicate', (t12rows2 ?? []).length === 1, 'tx=' + (t12rows2 ?? []).length)
+
 // cleanup (only rows this run created)
 await svc.from('transactions').delete().in('appointment_id', [appt.id, appt2.id])
 await svc.from('payments').delete().in('appointment_id', [appt.id, appt2.id])
-await svc.from('appointments').delete().in('id', [appt.id, appt2.id])
+await svc.from('transactions').delete().in('appointment_id', [appt.id, appt2.id, appt3.id])
+await svc.from('payments').delete().in('appointment_id', [appt.id, appt2.id, appt3.id])
+await svc.from('appointments').delete().in('id', [appt.id, appt2.id, appt3.id])
 
 console.log(`\n===== WEBHOOK QA: ${pass} passed, ${fail} failed =====`)
 process.exit(fail ? 1 : 0)

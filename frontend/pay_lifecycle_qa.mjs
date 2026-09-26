@@ -37,21 +37,27 @@ const mkAppt = async (pid, day) => {
 const apptA = await mkAppt(mariaId, DAY)
 const payA = (await maria.functions.invoke('paymongo-create', { body: { appointment_id: apptA.id } })).data
 check('1a. payment created (slot reserved)', payA?.status === 'pending', payA?.error ?? '')
+// per-dentist capacity: same time on THE SAME dentist is always rejected;
+// other ready dentists may legitimately take the parallel slot (asserted below)
+const { data: apptARow } = await svc.from('appointments').select('dentist_id').eq('id', apptA.id).maybeSingle()
 const clash = await juan.from('appointments').insert({
   patient_id: juanId, service_id: svcRow.id, service_ids: [svcRow.id],
   scheduled_at: when.toISOString(), requested_date: when.toISOString().slice(0, 10),
-  price: svcRow.price, status: 'pending', payment_status: 'unpaid',
+  price: svcRow.price, status: 'pending', payment_status: 'unpaid', dentist_id: apptARow.dentist_id,
 }).select()
-check('1b. other patient cannot book a reserved slot', !!clash.error, clash.error?.message?.slice(0, 60) ?? 'BOOKED!')
+check('1b. same dentist cannot take an overlapping reservation', !!clash.error, clash.error?.message?.slice(0, 60) ?? 'BOOKED!')
 
 // ── 2. expire → released ──
 await svc.rpc('fn_apply_payment_result', { p_payment: payA.payment_id, p_result: 'expired' })
-const book2 = await juan.from('appointments').insert({
+const { data: _aRow } = await svc.from('appointments').select('dentist_id').eq('id', apptA.id).maybeSingle()
+const book2 = await juan.from('appointments').insert({ dentist_id: _aRow.dentist_id,
   patient_id: juanId, service_id: svcRow.id, service_ids: [svcRow.id],
   scheduled_at: when.toISOString(), requested_date: when.toISOString().slice(0, 10),
   price: svcRow.price, status: 'pending', payment_status: 'unpaid',
 }).select().maybeSingle()
 const apptB = book2.data
+// the ORIGINAL scenario is reuse of the SAME dentist resource after expiry —
+// under parallel capacity that (and only that) is the double-booking risk
 check('2. expired reservation releases the slot', !!apptB, book2.error?.message?.slice(0, 60) ?? '')
 const payB = apptB ? (await juan.functions.invoke('paymongo-create', { body: { appointment_id: apptB.id } })).data : null
 
@@ -60,12 +66,13 @@ if (apptB && payB) {
   await svc.rpc('fn_apply_payment_result', { p_payment: payB.payment_id, p_result: 'paid', p_provider_status: 'succeeded', p_amount_centavos: Math.round(Number(svcRow.price) * 100), p_currency: 'PHP' })
   // the OLD payment (A) now reports success late
   try { await svc.rpc('fn_apply_payment_result', { p_payment: payA.payment_id, p_result: 'paid', p_provider_status: 'succeeded', p_amount_centavos: Math.round(Number(svcRow.price) * 100), p_currency: 'PHP' }) } catch {}
-  const { data: both } = await svc.from('appointments').select('id, status, payment_status').in('id', [apptA.id, apptB.id])
+  const { data: both } = await svc.from('appointments').select('id, status, payment_status, dentist_id').in('id', [apptA.id, apptB.id])
   const a = (both ?? []).find((x) => x.id === apptA.id)
   const b = (both ?? []).find((x) => x.id === apptB.id)
-  check('3a. late payment does NOT resurrect the old booking', a?.status !== 'approved', JSON.stringify(a))
+  const sameDentist = a && b && a.dentist_id === b.dentist_id
+  check('3a. late payment does NOT resurrect a same-dentist booking', !sameDentist || a?.status !== 'approved', JSON.stringify(a))
   check('3b. the rebooked slot holder stays confirmed', b?.status === 'approved', JSON.stringify(b))
-  check('3c. never a double booking on the same slot', !(a?.status === 'approved' && b?.status === 'approved'))
+  check('3c. never two approved bookings on the SAME dentist', !(sameDentist && a?.status === 'approved' && b?.status === 'approved'), 'sameDentist=' + sameDentist)
   const { data: txs } = await svc.from('transactions').select('id').in('appointment_id', [apptA.id, apptB.id])
   const { data: payRows } = await svc.from('payments').select('id, status').in('id', [payA.payment_id, payB.payment_id])
   const paidCount = (payRows ?? []).filter((p) => p.status === 'paid').length
