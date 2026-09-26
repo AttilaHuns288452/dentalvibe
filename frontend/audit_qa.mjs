@@ -95,6 +95,19 @@ check('ui: dentist deactivation row visible', txt.includes('dentists') && /activ
 const PROBE = 'audit_qa_probe'
 const ins = await maria.from('audit_log').insert({ action: 'QA_PROBE', entity: 'audit_qa', entity_id: PROBE }).select()
 check('rls: patient cannot insert into audit_log (RLS deny)', !!ins.error, ins.error?.message ?? 'inserted!')
+// §3 release gate: NO client role may forge audit rows — generation is
+// trigger/SECURITY-DEFINER only (0033 dropped every client INSERT policy)
+const { createClient: cc } = await import('@supabase/supabase-js')
+const mkC = async (email) => { const c = cc(process.env.VITE_SUPABASE_URL ?? env.VITE_SUPABASE_URL, env.VITE_SUPABASE_ANON_KEY); await c.auth.signInWithPassword({ email, password: 'password123' }); return c }
+for (const [who, email] of [['doctor', 'doctor@dentalvibe.ph'], ['owner', 'owner@dentalvibe.ph']]) {
+  const c = await mkC(email)
+  const r = await c.from('audit_log').insert({ action: 'QA_PROBE', entity: 'audit_qa', entity_id: PROBE }).select()
+  check(`rls: ${who} cannot insert into audit_log (trigger-only generation)`, !!r.error, r.error?.message ?? 'inserted!')
+}
+const gateUpd = await (await mkC('owner@dentalvibe.ph')).from('audit_log').update({ action: 'TAMPERED' }).eq('entity_id', PROBE)
+check('rls: owner cannot UPDATE audit_log', (gateUpd.data ?? []).length === 0 && !gateUpd.error, JSON.stringify(gateUpd.error ?? gateUpd.data))
+const gateDel = await (await mkC('owner@dentalvibe.ph')).from('audit_log').delete().eq('entity_id', PROBE)
+check('rls: owner cannot DELETE audit_log', (gateDel.data ?? []).length === 0 && !gateDel.error, JSON.stringify(gateDel.error ?? gateDel.data))
 const { data: probeRows } = await svc.from('audit_log').select('id').eq('entity_id', PROBE)
 check('rls: no probe row persisted', (probeRows ?? []).length === 0, `rows ${probeRows?.length}`)
 

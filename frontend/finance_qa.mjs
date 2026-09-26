@@ -31,10 +31,33 @@ const { data: ins, error: insErr } = await svc.from('transactions').insert({
 }).select()
 if (insErr) throw new Error('setup insert failed: ' + insErr.message)
 const TX = ins[0].id
-const { data: plRows } = await svc.from('transactions').select('id, amount, payment_id, appointment_id')
+let { data: plRows } = await svc.from('transactions').select('id, amount, payment_id, appointment_id')
   .not('payment_id', 'is', null).limit(1)
-const PL = plRows?.[0]
-if (!PL) throw new Error('no payment-linked transaction to test against')
+let PL = plRows?.[0]
+let PL_FIXTURE = null
+if (!PL) {
+  // self-sufficient fixture: settle a mock payment so a payment-linked
+  // transaction exists (test sweeps legitimately remove ambient ones)
+  const { data: plPatient } = await svc.from('patients').select('id').eq('email', 'maria@dentalvibe.ph').maybeSingle()
+  const { data: plSvc } = await svc.from('services').select('id, price').eq('active', true).limit(1).maybeSingle()
+  const d = new Date(Date.now() + (160 + Math.floor(Math.random() * 60)) * 864e5)
+  while (d.getUTCDay() === 0) d.setUTCDate(d.getUTCDate() + 1) // clinic closed Sundays
+  d.setUTCHours(2, 0, 0, 0) // 10:00 Manila
+  const { data: plAppt } = await svc.from('appointments').insert({
+    patient_id: plPatient.id, service_id: plSvc.id, service_ids: [plSvc.id], scheduled_at: d.toISOString(),
+    requested_date: d.toISOString().slice(0, 10), price: plSvc.price, status: 'pending', payment_status: 'unpaid',
+  }).select().maybeSingle()
+  const { data: plPay } = await svc.from('payments').insert({
+    appointment_id: plAppt.id, provider: 'mock', payment_intent_id: 'pi_mock_fin_' + Date.now(),
+    amount: Number(plSvc.price), status: 'pending', reference: 'FIN-' + Date.now(),
+  }).select().maybeSingle()
+  const sR = await svc.rpc('fn_apply_payment_result', { p_payment: plPay.id, p_result: 'paid', p_provider_status: 'succeeded', p_amount_centavos: Math.round(Number(plSvc.price) * 100), p_currency: 'PHP' })
+  if (sR.error) throw new Error('pl fixture settle failed: ' + sR.error.message)
+  const { data: plRow2 } = await svc.from('transactions').select('id, amount, payment_id, appointment_id').eq('payment_id', plPay.id).maybeSingle()
+  PL = plRow2
+  PL_FIXTURE = { appt: plAppt.id, pay: plPay.id }
+  if (!PL) throw new Error('pl fixture produced no transaction')
+}
 
 const b = await chromium.launch()
 const ctx = await b.newContext({ viewport: { width: 390, height: 844 } })
@@ -137,12 +160,30 @@ const { data: voids } = await svc.from('audit_log').select('*').eq('action', 'VO
 check('audit: VOID row has reason', voids?.[0]?.reason === 'duplicate entry', JSON.stringify(voids?.[0]?.reason))
 
 // ---- cleanup ----
+// §5 release gate: no client role can hard-delete a transaction (Create -> Review -> Correct/Void -> Audit)
+const { createClient: cc2 } = await import('@supabase/supabase-js')
+const ownC = cc2(process.env.VITE_SUPABASE_URL ?? env.VITE_SUPABASE_URL, env.VITE_SUPABASE_ANON_KEY)
+await ownC.auth.signInWithPassword({ email: 'owner@dentalvibe.ph', password: 'password123' })
+const delTry = await ownC.from('transactions').delete().eq('id', TX)
+const survived = await svc.from('transactions').select('id').eq('id', TX).maybeSingle()
+check('owner CANNOT hard-delete a transaction (void only)', (delTry.data ?? []).length === 0 && !!survived, 'rows=' + (delTry.data ?? []).length + ' survived=' + !!survived)
+const patC = cc2(process.env.VITE_SUPABASE_URL ?? env.VITE_SUPABASE_URL, env.VITE_SUPABASE_ANON_KEY)
+await patC.auth.signInWithPassword({ email: 'maria@dentalvibe.ph', password: 'password123' })
+const patDel = await patC.from('transactions').delete().eq('id', TX)
+check('patient CANNOT delete transactions', (patDel.data ?? []).length === 0, JSON.stringify(patDel.error ?? patDel.data))
+
 await svc.from('transactions').delete().eq('description', 'finance_qa dup') // only if the dup insert misbehaved
 await svc.from('transactions').delete().eq('id', TX)
 await svc.from('audit_log').delete().eq('entity_id', TX) // after the row delete — the DELETE fires one more audit row
 const leftTx = (await svc.from('transactions').select('id').eq('id', TX)).data?.length ?? -1
 const leftAudit = (await svc.from('audit_log').select('id').eq('entity_id', TX)).data?.length ?? -1
 check('cleanup: test rows removed', leftTx === 0 && leftAudit === 0, `tx ${leftTx} audit ${leftAudit}`)
+
+if (PL_FIXTURE) {
+  await svc.from('transactions').delete().eq('payment_id', PL_FIXTURE.pay)
+  await svc.from('payments').delete().eq('id', PL_FIXTURE.pay)
+  await svc.from('appointments').delete().eq('id', PL_FIXTURE.appt)
+}
 
 console.log(`\n===== FINANCE QA: ${pass} passed, ${fail} failed =====`)
 console.log('page errors:', errs.length ? errs.slice(0, 5) : 'NONE')

@@ -241,6 +241,8 @@ const daySchedule = async (dateISO) => (await svc.rpc('fn_day_schedule', { p_dat
   await pg.goto(BASE + '/doctor/calendar', { waitUntil: 'networkidle' }); await pg.waitForTimeout(1500)
   const tog = pg.locator('[data-testid="ready-toggle"]')
   check('6a doctor Ready toggle present', await tog.count() === 1)
+  await svc.from('dentist_ready').upsert({ dentist_id: C, clinic_date: today, ready: true }, { onConflict: 'dentist_id,clinic_date' })
+  await pg.reload({ waitUntil: 'networkidle' }); await pg.waitForTimeout(1200)
   await tog.click(); await pg.waitForTimeout(1200)
   const rowAfter = (await svc.from('dentist_ready').select('ready').eq('dentist_id', C).eq('clinic_date', today)).data
   check('6b toggle click persists to dentist_ready', rowAfter?.length === 1 && rowAfter[0].ready === false, JSON.stringify(rowAfter))
@@ -253,6 +255,23 @@ const daySchedule = async (dateISO) => (await svc.rpc('fn_day_schedule', { p_dat
   const z1 = await book(carlo, D_TUE, '10:00')
   check('6d booking succeeds with zero ready rows (Ready never gates booking)',
     !z1.error && dTueIds.includes(z1.data?.[0]?.dentist_id), z1.error?.message ?? 'ok')
+
+  // ── (6e) fresh-day state machine: NO ROW must show NOT READY (§1) ──────────
+  await svc.from('dentist_ready').delete().eq('dentist_id', C).eq('clinic_date', today)
+  await pg.reload({ waitUntil: 'networkidle' }); await pg.waitForTimeout(1200)
+  const btnFresh = (await tog.innerText()).trim()
+  const headFresh = (await pg.locator('text=Today\'s presence').first().innerText()).trim()
+  check('6e fresh day (no row) shows NOT READY + Ready action',
+    btnFresh === 'Ready for Today' && /not ready/i.test(headFresh), 'btn=' + btnFresh + ' head=' + headFresh)
+  await tog.click(); await pg.waitForTimeout(1200)
+  const rowE = (await svc.from('dentist_ready').select('ready').eq('dentist_id', C).eq('clinic_date', today)).data
+  check('6f click on fresh day SETS Ready (not false)', rowE?.[0]?.ready === true, JSON.stringify(rowE))
+  check('6g Ready state shows Ready + Not Ready action',
+    (await tog.innerText()).trim() === 'Not Ready' && /· ready$/i.test((await pg.locator('text=Today\'s presence').first().innerText()).trim()), await tog.innerText())
+  await tog.click(); await pg.waitForTimeout(1200)
+  const rowE2 = (await svc.from('dentist_ready').select('ready').eq('dentist_id', C).eq('clinic_date', today)).data
+  check('6h second click sets Not Ready', rowE2?.[0]?.ready === false, JSON.stringify(rowE2))
+  await svc.from('dentist_ready').delete().eq('dentist_id', C).eq('clinic_date', today)
 
   // ── (7) owner with no dentist row is never a resource ───────────────────────
   const u = await svc.auth.admin.createUser({ email: OWNER_EMAIL, password: 'password123', email_confirm: true })

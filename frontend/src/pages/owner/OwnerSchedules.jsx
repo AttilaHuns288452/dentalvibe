@@ -100,7 +100,7 @@ export default function OwnerSchedules() {
     schedules.some((x) => x.dentist_id === den.id && x.day_of_week === todayDow && x.active))
   const readyFor = (id) => readyRows.find((x) => x.dentist_id === id)?.ready
   const nScheduled = scheduledToday.length
-  const nReady = scheduledToday.filter((den) => readyFor(den.id) !== false).length
+  const nReady = scheduledToday.filter((den) => readyFor(den.id) === true).length
   const nAppts = todayAppts.length
 
   // conflict warnings — display only (no auto-cancel/move)
@@ -191,8 +191,8 @@ export default function OwnerSchedules() {
                 <span className="flex-1 font-semibold text-gray-900">{d.full_name}</span>
                 {!d.active && <span className="text-[10px] font-bold bg-red-100 text-red-600 rounded px-1.5 py-0.5">Deactivated</span>}
                 <span className="text-gray-500">{row ? `Scheduled ${row.open_time.slice(0, 5)}–${row.close_time.slice(0, 5)}` : anyActive ? 'Not scheduled today' : 'No working schedule — not bookable'}</span>
-                <span className={'font-bold px-1.5 py-0.5 rounded ' + (readyFor(d.id) === false ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-700')}>
-                  {readyFor(d.id) === false ? 'Not Ready' : 'Ready'}
+                <span className={'font-bold px-1.5 py-0.5 rounded ' + (readyFor(d.id) === true ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-600')}>
+                  {readyFor(d.id) === true ? 'Ready' : 'Not Ready'}
                 </span>
                 <span className="text-gray-500 tabular-nums">{k} appt{k !== 1 ? 's' : ''}</span>
               </div>
@@ -217,16 +217,17 @@ export default function OwnerSchedules() {
 
       {/* (d) owner-as-provider: own presence toggle, or the explicit non-provider note */}
       <section>
-        <h2 className="text-[11px] font-bold uppercase tracking-wide text-gray-500 mb-1.5">Today's presence</h2>
+        <h2 className="text-[11px] font-bold uppercase tracking-wide text-gray-500 mb-1.5">Today's presence · {myReady === true ? 'Ready' : 'Not Ready'}</h2>
         {me ? (
           <div>
             <button type="button" data-testid="ready-toggle" onClick={async () => {
-                    try { const next = myReady === false; await setMyReady(next); setMyReadyState(next) }
+                    // null (fresh day) and false both mean NOT READY
+                    try { const next = myReady !== true; await setMyReady(next); setMyReadyState(next) }
                     catch (e) { setErr(e.message) }
                   }}
                     className={'w-full h-12 rounded-lg text-sm font-bold border ' +
-                      (myReady === false ? 'bg-red-50 text-red-600 border-red-200' : 'bg-green-600 text-white border-green-600')}>
-              {myReady === false ? 'Not Ready' : 'Ready for Today'}
+                      (myReady === true ? 'bg-green-600 text-white border-green-600' : 'bg-red-50 text-red-600 border-red-200')}>
+              {myReady === true ? 'Not Ready' : 'Ready for Today'}
             </button>
             <p className="text-[11px] text-gray-400 mt-1">Operational signal only — patient booking is never affected by this.</p>
           </div>

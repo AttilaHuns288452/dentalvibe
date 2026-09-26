@@ -69,7 +69,7 @@ export default function Navbar({ unreadCount = 0 }) {
   // ponytail: sub-routes (EHR, pay, settings…) map to their parent tab per the Figma frames
   const SUFFIX_TAB = {
     '/ehr': 'Patients', '/notifications': 'Home', '/settings': 'Home',
-    '/security': 'Profile', '/pay': 'Book', '/receipt': 'Appointments',
+    '/security': 'Profile', '/pay': 'Book',
   }
   const suffixHit = Object.entries(SUFFIX_TAB).find(([sfx]) => path.endsWith(sfx))
   const activePath = matches.sort((a, b) => b.path.length - a.path.length)[0]?.path

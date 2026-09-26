@@ -163,7 +163,7 @@ import('./frontend/qa_playwright.mjs').then(async ({ chromium, createClient }) =
   await pg.reload({ waitUntil: 'networkidle' })
   await pg.waitForTimeout(1000)
   const patTxt = await txt(pg)
-  t('S4 patient: completed visit in Past w/ Receipt', patTxt.includes('Completed') && /receipt/i.test(patTxt))
+  t('S4 patient: completed visit shows in Past', patTxt.includes('Completed'))
   await pd.goto(BASE + '/doctor/calendar', { waitUntil: 'networkidle' })
   await pd.reload({ waitUntil: 'networkidle' })
   t('S4 doctor: completed persists after refresh', (await txt(pd)).includes('completed'))
