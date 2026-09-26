@@ -77,19 +77,26 @@ export default function DoctorCalendar() {
         <p className="text-xs text-gray-500">Color-coded by appointment status</p>
       </div>
 
-      {/* Ready-for-today presence toggle (dentist_ready per Manila clinic date) */}
+      {/* Ready-for-today PRESENCE toggle (dentist_ready per Manila clinic date).
+          Purely operational: it drives the clinic's day-of view + conflict warnings.
+          It never enables or blocks what patients can book — capacity comes only
+          from the work schedule (dentist_work_schedules). */}
       {me && (
-        <button type="button" data-testid="ready-toggle" disabled={deactivated}
-                onClick={async () => {
-                  try { const next = ready === false; await setMyReady(next); setReady(next) }
-                  catch (e) { alert(e.message) }
-                }}
-                className={'w-full h-12 rounded-lg text-sm font-bold border ' +
-                  (deactivated ? 'bg-gray-100 text-gray-400 border-gray-200'
-                    : ready === false ? 'bg-red-50 text-red-600 border-red-200'
-                    : 'bg-green-600 text-white border-green-600')}>
-          {deactivated ? 'Account deactivated' : ready === false ? 'Not Ready' : 'Ready for Today'}
-        </button>
+        <div>
+          <div className="text-[11px] font-bold uppercase tracking-wide text-gray-500 mb-1.5">Today's presence</div>
+          <button type="button" data-testid="ready-toggle" disabled={deactivated}
+                  onClick={async () => {
+                    try { const next = ready === false; await setMyReady(next); setReady(next) }
+                    catch (e) { alert(e.message) }
+                  }}
+                  className={'w-full h-12 rounded-lg text-sm font-bold border ' +
+                    (deactivated ? 'bg-gray-100 text-gray-400 border-gray-200'
+                      : ready === false ? 'bg-red-50 text-red-600 border-red-200'
+                      : 'bg-green-600 text-white border-green-600')}>
+            {deactivated ? 'Account deactivated' : ready === false ? 'Not Ready' : 'Ready for Today'}
+          </button>
+          <p className="text-[11px] text-gray-400 mt-1">Operational signal only — patient booking is never affected by this.</p>
+        </div>
       )}
 
       {/* legend chips (Figma p42) */}

@@ -73,14 +73,25 @@ export function slotStartsFor({ open_time, close_time, open_days }, dateISO, dur
   return out
 }
 
-// Capacity-aware variant (multi-dentist): perDentistBusy is one busyRanges list per
-// available dentist. A start is offered when AT LEAST ONE dentist is free for the
-// whole visit — parallel chairs may overlap each other, never themselves.
-// Empty perDentistBusy (zero available dentists) ⇒ no slots.
-export function slotStartsForDentists(settings, dateISO, durationMinutes = 30, perDentistBusy = []) {
+// Capacity-aware variant (multi-dentist): each entry is one SCHEDULED dentist's
+// {open_time, close_time, busy} — their own hours clipped to clinic hours. Per-dentist
+// slot lists are computed inside THEIR hours and unioned: a start is offered iff at
+// least one scheduled dentist is free for the whole visit within their own hours.
+// Empty perDentist ⇒ no slots. (A bare busy-array entry = dentist hours = clinic hours —
+// ponytail: kept so old callers of the busy-only shape still work.)
+export function slotStartsForDentists(settings, dateISO, durationMinutes = 30, perDentist = []) {
   const ok = new Set()
-  for (const busy of perDentistBusy) {
-    for (const t of slotStartsFor(settings, dateISO, durationMinutes, busy)) ok.add(t)
+  const cOpen = minsOf(settings.open_time)
+  const cClose = minsOf(settings.close_time)
+  for (const e of perDentist) {
+    const legacy = Array.isArray(e)
+    const busy = legacy ? e : (e.busy ?? [])
+    const dOpen = Math.max(legacy ? cOpen : minsOf(e.open_time ?? '00:00'), cOpen)
+    const dClose = Math.min(legacy ? cClose : minsOf(e.close_time ?? '24:00'), cClose)
+    for (const t of slotStartsFor(settings, dateISO, durationMinutes, busy)) {
+      const m = minsOf(t)
+      if (m >= dOpen && m + durationMinutes <= dClose) ok.add(t)
+    }
   }
   return [...ok].sort()
 }

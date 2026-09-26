@@ -5,12 +5,14 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/RoleContext'
 import { listServices, bookAppointment, peso, supabase, getClinicSettings } from '../../lib/api'
 import { isOpenOn, slotStartsForDentists, manilaDayKey, manilaToInstant } from '../../lib/availability'
-import { readyStateForDate } from '../../lib/scheduling'
+import { dayScheduleForDate } from '../../lib/scheduling'
 
 // Booking — two focused steps (p36 → p87→121):
 //   1 · Services (search, multi-select, fee notice)   2 · Date & time (calendar grid, fit-checked slots, notes)
 // A pending or paid appointment holds its dentist's slot; a start is offered only when some
-// available dentist is free for the whole visit length (the DB assigns the dentist).
+// SCHEDULED dentist is free for the whole visit length within THEIR work hours (the DB
+// assigns the dentist). Capacity comes from dentist_work_schedules via fn_day_schedule —
+// the dentist_ready day-of state never enables or blocks what a patient can book.
 // Hours, open days, and slot starts all come from clinic_settings via lib/availability.js — no hardcoded slots.
 
 const fmtSlot = (t) => t.replace(/^(\d+):(\d+)$/, (_, h, m) => `${((+h + 11) % 12) + 1}:${m} ${+h < 12 ? 'AM' : 'PM'}`)
@@ -29,7 +31,7 @@ export default function Book() {
   const [time, setTime] = useStickyState('dv_book_time', '')
   const [notes, setNotes] = useStickyState('dv_book_notes', '')
   const [busyRanges, setBusyRanges] = useState([]) // [{dentistId, start: Date, mins}] of reserved visits
-  const [dayDentists, setDayDentists] = useState([]) // available dentist ids that day (active, no ready=false)
+  const [daySched, setDaySched] = useState([]) // [{id, open, close}] dentists WORKING that day (fn_day_schedule)
   const [err, setErr] = useState('')
   const [busy, setBusy] = useState(false)
 
@@ -49,25 +51,21 @@ export default function Book() {
     }).catch((e) => setErr(e.message))
   }, [patientRecord?.id])
 
-  // reserved visits (pending/paid) + available dentists for the chosen day
+  // reserved visits (pending/paid) + WORK SCHEDULE for the chosen day
   // (either payment state holds the chair — pending payment = slot reservation)
   useEffect(() => {
     setBusyRanges([])
-    setDayDentists([])
+    setDaySched([])
     setTime('')
     if (!date) return
-    // busy window is the Manila calendar day (the patient's chosen date), not the browser's
-    const from = manilaToInstant(date, '00:00')
-    const to = new Date(from.getTime() + 864e5) // Manila has no DST: a day is exactly 24h
     Promise.all([
-      supabase.from('appointments')
-        .select('dentist_id, scheduled_at, duration_minutes')
-        .in('payment_status', ['pending', 'paid']).neq('status', 'cancelled')
-        .gte('scheduled_at', from.toISOString()).lt('scheduled_at', to.toISOString()),
-      readyStateForDate(date),
-    ]).then(([{ data }, state]) => {
-      setBusyRanges((data ?? []).map((r) => ({ dentistId: r.dentist_id, start: new Date(r.scheduled_at), mins: r.duration_minutes ?? 30 })))
-      setDayDentists(state.filter((d) => d.ready !== false).map((d) => d.id))
+      // identity-free busy intervals (patients can only read their own rows,
+      // so the raw appointments table would hide other patients' bookings)
+      supabase.rpc('fn_day_busy', { p_date: date }),
+      dayScheduleForDate(date),
+    ]).then(([{ data }, sched]) => {
+      setBusyRanges((data ?? []).map((r) => ({ dentistId: r.dentist_id, start: new Date(r.start_at), mins: r.mins ?? 30 })))
+      setDaySched(sched)
     }).catch((e) => setErr(e.message))
   }, [date])
 
@@ -77,13 +75,18 @@ export default function Book() {
   const total = chosen.reduce((sum, s) => sum + (prices[s.id] ?? s.price), 0)
   const visitMins = chosen.reduce((sum, s) => sum + (s.duration_minutes ?? 30), 0)
 
-  // slot starts derive from clinic_settings (30-min intervals); a start is offered when at
-  // least one available dentist is free for the whole visit (the DB then assigns who)
+  // slot starts derive from clinic_settings (30-min intervals) clipped to each scheduled
+  // dentist's own work hours; a start is offered when at least one such dentist is free
+  // for the whole visit (the DB then assigns who). dentist_ready is never consulted.
   const slots = useMemo(
     () => (settings && date
-      ? slotStartsForDentists(settings, date, visitMins, dayDentists.map((id) => busyRanges.filter((b) => b.dentistId === id).map(({ start, mins }) => ({ start, mins }))))
+      ? slotStartsForDentists(settings, date, visitMins, daySched.map((d) => ({
+          open_time: d.open,
+          close_time: d.close,
+          busy: busyRanges.filter((b) => b.dentistId === d.id).map(({ start, mins }) => ({ start, mins })),
+        })))
       : []),
-    [settings, date, visitMins, busyRanges, dayDentists],
+    [settings, date, visitMins, busyRanges, daySched],
   )
 
   const submit = async (e) => {
@@ -214,7 +217,7 @@ export default function Book() {
                   {date && settings && !slots.length && (
                     <div className="col-span-4 text-xs text-gray-500 text-center py-2">
                       {!isOpenOn(settings, date) ? 'Clinic is closed on this day.'
-                        : !dayDentists.length ? 'No dentist is available on this day.'
+                        : !daySched.length ? 'No dentist is available on this day.'
                         : 'No available time — visit does not fit before closing.'}
                     </div>
                   )}

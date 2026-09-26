@@ -25,6 +25,41 @@ function summarize(r) {
   return changes.join(' · ')
 }
 
+// human-readable line for an audit row (§12: WHO did WHAT) — keeps raw
+// action/entity for filters, describes the change itself
+function describe(r) {
+  const b = r.before_data ?? {}
+  const a = r.after_data ?? {}
+  const who = (o) => o.full_name || o.name || o.patient_name || o.clinic_name || r.entity_id?.slice(0, 8) || ''
+  if (r.entity === 'dentists') {
+    if (r.action === 'INSERT') return `Added dentist ${who(a)}`
+    if (b.active === true && a.active === false) return `Deactivated ${who(a) || who(b)}`
+    if (b.active === false && a.active === true) return `Reactivated ${who(a) || who(b)}`
+    return `Updated dentist ${who(a) || who(b)}`
+  }
+  if (r.entity === 'services') {
+    if (r.action === 'INSERT') return `Added service ${who(a)}`
+    if (b.price !== a.price && a.price !== undefined) return `Changed service price · ${who(a) || who(b)} · ₱${fmt(b.price)} → ₱${fmt(a.price)}`
+    if (b.active === true && a.active === false) return `Deactivated service ${who(a) || who(b)}`
+    if (b.active === false && a.active === true) return `Activated service ${who(a) || who(b)}`
+    return `Updated service ${who(a) || who(b)}`
+  }
+  if (r.entity === 'service_prices') return `Changed patient-specific price · ₱${fmt(b.price)} → ₱${fmt(a.price)}`
+  if (r.entity === 'transactions') {
+    if (r.action === 'CORRECT') return `Corrected transaction · ${who(a) || who(b)} · ₱${fmt(b.amount)} → ₱${fmt(a.amount)}`
+    if (r.action === 'VOID') return `Voided transaction · ${who(a) || who(b)}`
+    return `${r.action === 'INSERT' ? 'Recorded' : 'Updated'} transaction · ${who(a) || who(b)}`
+  }
+  if (r.entity === 'clinic_settings') {
+    const fields = Object.keys({ ...b, ...a }).filter((k) => JSON.stringify(b[k]) !== JSON.stringify(a[k]) && k !== 'id')
+    return `Updated clinic settings (${fields.join(', ') || 'no visible change'})`
+  }
+  if (r.entity === 'ehr_attachments') return r.action === 'DELETE' ? 'Deleted EHR attachment' : r.action === 'INSERT' ? 'Uploaded EHR attachment' : 'Updated EHR attachment'
+  if (r.entity === 'record_categories') return `${r.action === 'INSERT' ? 'Added' : r.action === 'DELETE' ? 'Removed' : 'Updated'} record category`
+  if (r.entity === 'patients') return 'Updated patient record'
+  return `${r.action} ${r.entity}`
+}
+
 export default function OwnerAudit() {
   const navigate = useNavigate()
   const [rows, setRows] = useState(null)
@@ -95,6 +130,7 @@ export default function OwnerAudit() {
                   {r.actor_name} <span className="text-gray-400 font-normal">· {r.actor_role || 'system'}</span>
                 </div>
                 <div className="text-[11px] text-gray-500">{new Date(r.created_at).toLocaleString()}</div>
+                <div className="text-xs text-gray-700">{describe(r)}</div>
               </div>
               <div className="flex items-center gap-1.5 shrink-0">
                 <span className="text-[10px] font-bold uppercase px-2 py-1 rounded-full bg-gray-100 text-gray-600">{r.action}</span>

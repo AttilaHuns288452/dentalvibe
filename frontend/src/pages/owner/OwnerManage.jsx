@@ -113,6 +113,10 @@ export default function OwnerManage() {
       </section>
 
       {err && <p className="text-xs text-red-500">{err}</p>}
+      <button onClick={() => navigate('/owner/schedules')}
+              className="w-full flex items-center justify-between bg-white border border-gray-200 rounded-lg px-4 py-3 text-sm font-semibold text-gray-700">
+        Dentist Schedules <span className="text-gray-400">→</span>
+      </button>
       <button onClick={() => navigate('/owner/audit')}
               className="w-full flex items-center justify-between bg-white border border-gray-200 rounded-lg px-4 py-3 text-sm font-semibold text-gray-700">
         Audit Log <span className="text-gray-400">→</span>

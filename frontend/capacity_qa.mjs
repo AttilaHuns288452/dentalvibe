@@ -1,7 +1,9 @@
-// capacity_qa.mjs — multi-dentist capacity contract (supabase/migrations/0021_dentist_capacity.sql).
-// Mostly API/DB assertions against the live project via the service key (SB_SECRET) — the
-// DB trigger fn_appt_dentist_guard is the source of truth; a short Playwright smoke covers
-// the Ready toggle and the per-doctor calendar filter. All rows created here are removed.
+// capacity_qa.mjs — multi-dentist capacity contract on WORK SCHEDULES
+// (supabase/migrations/0030_dentist_work_schedules.sql): dentist_work_schedules is
+// the ONLY source of booking capacity; dentist_ready is a day-of presence signal
+// and NEVER gates a booking. API/DB assertions against the live project via the
+// service key (SB_SECRET) + patient clients; a short Playwright smoke covers the
+// per-doctor calendar view and owner visibility. All rows created here are removed.
 // Run (from frontend/): SB_SECRET=... node capacity_qa.mjs   (QA_BASE defaults to http://localhost:4176)
 import { chromium, createClient } from './qa_playwright.mjs'
 import { slotStartsForDentists } from './src/lib/availability.js'
@@ -18,9 +20,6 @@ const check = (name, ok, extra = '') => { ok ? pass++ : fail++; console.log((ok 
 
 // Manila wall time → instant ISO (Asia/Manila is fixed UTC+8, no DST)
 const at = (dateISO, hhmm) => `${dateISO}T${hhmm}:00+08:00`
-const manilaToday = () => new Intl.DateTimeFormat('en-CA', {
-  timeZone: 'Asia/Manila', year: 'numeric', month: '2-digit', day: '2-digit',
-}).format(new Date())
 
 // ── pure check: capacity-aware slot union (slotStartsForDentists) ──────────────
 {
@@ -35,197 +34,311 @@ const manilaToday = () => new Intl.DateTimeFormat('en-CA', {
 }
 
 // ── fixtures ──────────────────────────────────────────────────────────────────
-// far-future clinic dates, one per test — nothing else lives there
-const [D_A, D_B, D_C, D_D, D_E, D_F, D_G, D_H, D_I, D_J] =
-  ['2033-03-06', '2033-03-07', '2033-03-08', '2033-03-09', '2033-03-10', '2033-03-11', '2033-03-12', '2033-03-13', '2033-03-14', '2033-03-15']
-const D_UI = '2033-03-16'
-const TEST_DATES = [D_A, D_B, D_C, D_D, D_E, D_F, D_G, D_H, D_I, D_J]
+// far-future SUNDAYS, one per case — seeded schedules are Mon–Sat only, so each
+// test date starts with zero scheduled dentists and the case builds its own.
+const [D1, D2, D3, D4, D5, D6, D7, D8, D9, D10, D11, D12, D13, D14] = [
+  '2033-03-06', '2033-03-13', '2033-03-20', '2033-03-27', '2033-04-03', '2033-04-10', '2033-04-17',
+  '2033-04-24', '2033-05-01', '2033-05-08', '2033-05-15', '2033-05-22', '2033-05-29', '2033-06-05',
+]
+const TEST_DATES = [D1, D2, D3, D4, D5, D6, D7, D8, D9, D10, D11, D12, D13, D14]
 
-// self-heal: clear leftovers of a previous crashed run (only our dates / our marker / our fake dentist)
-await svc.from('appointments').delete().in('requested_date', [...TEST_DATES, D_UI]).eq('notes', 'capacity_qa')
-await svc.from('dentist_ready').delete().in('clinic_date', [...TEST_DATES, D_UI])
-await svc.from('dentists').delete().eq('email', 'qa-off@dentalvibe.qa')
+// self-heal: clear leftovers of a previous crashed run (our dates / our marker /
+// our throwaway dentists — deleting a dentist cascades its schedule + ready rows)
+await svc.from('appointments').delete().in('requested_date', TEST_DATES).eq('notes', 'capacity_qa')
+await svc.from('dentist_ready').delete().in('clinic_date', TEST_DATES)
+await svc.from('dentists').delete().like('email', 'qa-cap-%@qa.test')
 
 const dent = await svc.from('dentists').select('id, full_name, email, active')
 if (dent.error) { console.error('FAIL cannot read dentists: ' + dent.error.message); process.exit(1) }
 const byEmail = Object.fromEntries(dent.data.map((d) => [d.email, d]))
-const A = byEmail['owner@dentalvibe.ph'].id
 const B = byEmail['dr.diaz@email.com'].id
 const C = byEmail['doctor@dentalvibe.ph'].id // Dr. Miguel Ramos — the UI-smoke doctor
 const activeIds = dent.data.filter((d) => d.active).map((d) => d.id)
 
 const pats = await svc.from('patients').select('id, full_name')
 const byName = Object.fromEntries(pats.data.map((p) => [p.full_name, p.id]))
-const maria = byName['Maria Santos'], juan = byName['Juan Dela Cruz'], andrea = byName['Andrea Reyes']
+const P = { maria: byName['Maria Santos'], juan: byName['Juan Dela Cruz'], andrea: byName['Andrea Reyes'] }
 
 const svcRow = (await svc.from('services').select('id, price').eq('name', 'Consultation').single()).data
 
-// one deactivated dentist (none exists in seed data) — created here, removed at cleanup
-const off = await svc.from('dentists')
-  .insert({ full_name: 'QA Deactivated DDS', email: 'qa-off@dentalvibe.qa', role: 'doctor', active: false })
-  .select('id').single()
-if (off.error) { console.error('FAIL cannot create deactivated dentist: ' + off.error.message); process.exit(1) }
-const OFF = off.data.id
+// patient clients (case c0 documents why bookings themselves are staff-side)
+const authed = async (email) => {
+  const c = anon()
+  const { error } = await c.auth.signInWithPassword({ email, password: 'password123' })
+  if (error) throw new Error(email + ' login failed: ' + error.message)
+  return c
+}
+const mariaC = await authed('maria@dentalvibe.ph')
+const juanC = await authed('juan@dentalvibe.ph')
 
 const created = [] // appointment ids to remove at cleanup
-const book = async (patient, dateISO, hhmm, { mins = 30, dentist = null, payment = 'pending' } = {}) => {
+const madeDentists = [] // throwaway dentist ids (schedules/ready cascade away with them)
+const madeSchedules = [] // schedule ids created for REAL dentists (case 14) — removed explicitly
+
+// throwaway dentist (created here, removed at cleanup)
+const mkDentist = async (tag, active = true) => {
+  const r = await svc.from('dentists')
+    .insert({ full_name: `QA Cap ${tag}`, email: `qa-cap-${tag}-${Date.now()}@qa.test`, role: 'doctor', active })
+    .select('id').single()
+  if (r.error) throw new Error('cannot create dentist: ' + r.error.message)
+  madeDentists.push(r.data.id)
+  return r.data.id
+}
+// schedule row: the ONLY thing that makes a dentist a resource on that weekday
+const addSched = async (id, dow = 0, open = '10:00', close = '17:00', real = false) => {
+  const r = await svc.from('dentist_work_schedules')
+    .insert({ dentist_id: id, day_of_week: dow, open_time: open, close_time: close })
+    .select('id').single()
+  if (r.error) throw new Error('cannot create schedule: ' + r.error.message)
+  if (real) madeSchedules.push(r.data.id)
+  return r.data
+}
+
+// book a RESERVATION (payment_status pending = counted by the guard). Patient
+// inserts can only be unpaid non-reservations (fn_appointment_guard), so booking
+// state is written staff-side via the service client — see check c0.
+const book = async (patient, dateISO, hhmm, { mins = 30, dentist = null } = {}) => {
   const r = await svc.from('appointments').insert({
     patient_id: patient, service_id: svcRow.id, service_ids: [svcRow.id], requested_date: dateISO,
     scheduled_at: at(dateISO, hhmm), duration_minutes: mins, price: svcRow.price,
-    status: 'pending', payment_status: payment, notes: 'capacity_qa', ...(dentist ? { dentist_id: dentist } : {}),
+    status: 'pending', payment_status: 'pending', notes: 'capacity_qa', ...(dentist ? { dentist_id: dentist } : {}),
   }).select('id, dentist_id')
   if (!r.error && r.data?.[0]?.id) created.push(r.data[0].id)
   return r
 }
+const noAvail = (r) => !!r.error && /no dentist available/.test(r.error.message)
+// retire throwaway schedules at the end of each case — every test date is a
+// Sunday (dow 0), so leftover schedule rows would leak capacity into later cases
+const cleanScheds = () => svc.from('dentist_work_schedules').delete().in('dentist_id', madeDentists)
 
-// ready state for a date: ready=false on EVERY active dentist except the readyIds (ready=true)
-const setAvail = async (dateISO, readyIds) => {
-  const rows = activeIds.map((id) => ({
-    dentist_id: id, clinic_date: dateISO, ready: readyIds.includes(id),
-    ready_at: readyIds.includes(id) ? new Date().toISOString() : null, updated_at: new Date().toISOString(),
-  }))
-  const { error } = await svc.from('dentist_ready').upsert(rows, { onConflict: 'dentist_id,clinic_date' })
-  if (error) throw error
-}
-
-// start clean: nobody else's rows on the test dates
+// ── z: test dates start empty and un-scheduled (Sunday assumption) ────────────
 {
-  const preR = await svc.from('dentist_ready').select('id').in('clinic_date', TEST_DATES)
   const preA = await svc.from('appointments').select('id').in('requested_date', TEST_DATES)
-  check('z1 test dates start empty', !preR.error && !preA.error && !preR.data.length && !preA.data.length,
-    `ready=${preR.data?.length} appts=${preA.data?.length}`)
+  const preR = await svc.from('dentist_ready').select('id').in('clinic_date', TEST_DATES)
+  check('z1 test dates start empty', !preA.error && !preR.error && !preA.data.length && !preR.data.length,
+    `appts=${preA.data?.length} ready=${preR.data?.length}`)
+  let scheduled = 0
+  for (const d of TEST_DATES) {
+    const { data } = await svc.rpc('fn_day_schedule', { p_date: d })
+    scheduled += (data ?? []).length
+  }
+  check('z2 nobody is scheduled on the Sunday test dates (seed is Mon–Sat)', scheduled === 0, `scheduled=${scheduled}`)
 }
 
-// ── (a) zero ready ⇒ booking fails ────────────────────────────────────────────
-await setAvail(D_A, [])
+// ── (0) patient surface: patients cannot mint reservations directly ──────────
 {
-  const r = await book(maria, D_A, '10:00')
-  check('a1 zero ready ⇒ booking rejected with no dentist available',
-    !!r.error && /no dentist available/.test(r.error.message), r.error?.message ?? 'insert succeeded')
+  const r1 = await mariaC.from('appointments').insert({
+    patient_id: P.maria, service_id: svcRow.id, service_ids: [svcRow.id], requested_date: D1,
+    scheduled_at: at(D1, '11:00'), duration_minutes: 30, price: svcRow.price,
+    status: 'pending', payment_status: 'pending', notes: 'capacity_qa',
+  }).select('id')
+  const r2 = await juanC.from('appointments').insert({
+    patient_id: P.juan, service_id: svcRow.id, service_ids: [svcRow.id], requested_date: D1,
+    scheduled_at: at(D1, '11:00'), duration_minutes: 30, price: svcRow.price,
+    status: 'pending', payment_status: 'pending', notes: 'capacity_qa',
+  }).select('id')
+  // patient bookings start pending+UNPAID (fn_appointment_guard) and unpaid rows
+  // are not reservations — so every capacity case below books staff-side. The
+  // rejection surfaces whichever guard fires first (alphabetical trigger order).
+  check('c0 patient clients cannot create reservations (patient bookings start unpaid)',
+    !!r1.error && !!r2.error,
+    [r1.error?.message, r2.error?.message].filter(Boolean).join(' / '))
 }
 
-// ── (b) one ready ⇒ first booking ok, second same-time fails ──────────────────
-await setAvail(D_B, [A])
+// ── (1) zero SCHEDULED dentists ⇒ booking fails ───────────────────────────────
 {
-  const b1 = await book(maria, D_B, '10:00')
-  check('b1 first booking ok, auto-assigned', !b1.error && b1.data?.[0]?.dentist_id === A, b1.error?.message)
-  const b2 = await book(juan, D_B, '10:00')
-  check('b2 second same-time booking rejected', !!b2.error && /no dentist available/.test(b2.error.message), b2.error?.message ?? 'insert succeeded')
+  const r = await book(P.maria, D1, '10:00')
+  check('c1 zero scheduled dentists ⇒ booking rejected, no dentist available',
+    noAvail(r), r.error?.message ?? 'insert succeeded')
 }
 
-// ── (c) two ready ⇒ same time twice, different dentists ───────────────────────
-await setAvail(D_C, [A, B])
+// ── (2) one scheduled ⇒ first booking ok, second same-time fails ──────────────
 {
-  const c1 = await book(maria, D_C, '10:00')
-  const c2 = await book(juan, D_C, '10:00')
+  const T1 = await mkDentist('one')
+  await addSched(T1)
+  const b1 = await book(P.maria, D2, '10:00')
+  check('c2a one scheduled dentist ⇒ first booking ok, auto-assigned', !b1.error && b1.data?.[0]?.dentist_id === T1, b1.error?.message)
+  const b2 = await book(P.juan, D2, '10:00')
+  check('c2b second same-time booking rejected (one dentist = one slot)', noAvail(b2), b2.error?.message ?? 'insert succeeded')
+  await cleanScheds()
+}
+
+// ── (3) two scheduled ⇒ same time twice, different dentists ───────────────────
+{
+  const T2 = await mkDentist('two-a')
+  const T3 = await mkDentist('two-b')
+  await addSched(T2); await addSched(T3)
+  const c1 = await book(P.maria, D3, '10:00')
+  const c2 = await book(P.juan, D3, '10:00')
   const ok = !c1.error && !c2.error
-  check('c1 two same-time bookings both succeed', ok, c1.error?.message || c2.error?.message)
-  check('c2 assigned to different dentists', ok && c1.data[0].dentist_id !== c2.data[0].dentist_id,
+  check('c3a two scheduled ⇒ same-time bookings both succeed', ok, c1.error?.message || c2.error?.message)
+  check('c3b assigned to different dentists', ok && c1.data[0].dentist_id !== c2.data[0].dentist_id,
     ok ? `${c1.data[0].dentist_id} vs ${c2.data[0].dentist_id}` : '')
+  await cleanScheds()
 }
 
-// ── (d) three ready ⇒ three parallel same-time bookings all succeed ───────────
-await setAvail(D_D, [A, B, C])
+// ── (4) three scheduled ⇒ three parallel same-time bookings all succeed ───────
 {
-  const rs = await Promise.all([book(maria, D_D, '10:00'), book(juan, D_D, '10:00'), book(andrea, D_D, '10:00')])
+  const ids = [await mkDentist('three-a'), await mkDentist('three-b'), await mkDentist('three-c')]
+  for (const id of ids) await addSched(id)
+  const rs = await Promise.all([
+    book(P.maria, D4, '10:00'), book(P.juan, D4, '10:00'), book(P.andrea, D4, '10:00'),
+  ])
   const oks = rs.filter((r) => !r.error)
-  check('d1 three parallel same-time bookings all succeed', oks.length === 3,
+  check('c4a three parallel same-time bookings all succeed', oks.length === 3,
     rs.map((r) => r.error?.message ?? 'ok').join(' / '))
-  check('d2 three distinct dentists', oks.length === 3 && new Set(oks.map((r) => r.data[0].dentist_id)).size === 3)
+  check('c4b three distinct dentists (3 scheduled = 3 resources)',
+    oks.length === 3 && new Set(oks.map((r) => r.data[0].dentist_id)).size === 3)
+  await cleanScheds()
 }
 
-// ── (e) 90m visit blocks an overlapping 30m on the SAME dentist, not another ──
-await setAvail(D_E, [A, B])
+// ── (5) future booking works with ZERO ready rows (ready=false for everyone) ──
 {
-  const e1 = await book(maria, D_E, '10:00', { mins: 90, dentist: A }) // 10:00–11:30 on A
-  check('e1 90m booking on dentist A ok', !e1.error, e1.error?.message)
-  const e2 = await book(juan, D_E, '10:30', { mins: 30, dentist: A })
-  check('e2 overlapping 30m on same dentist rejected', !!e2.error && /overlaps/.test(e2.error.message), e2.error?.message ?? 'insert succeeded')
-  const e3 = await book(andrea, D_E, '10:30', { mins: 30, dentist: B })
-  check('e3 same 30m allowed on the other ready dentist', !e3.error && e3.data?.[0]?.dentist_id === B, e3.error?.message)
+  const T5 = await mkDentist('zero-ready')
+  await addSched(T5)
+  const rows = [...new Set([...activeIds, T5])].map((id) => ({ dentist_id: id, clinic_date: D5, ready: false, updated_at: new Date().toISOString() }))
+  const up = await svc.from('dentist_ready').upsert(rows, { onConflict: 'dentist_id,clinic_date' })
+  const readyRows = (await svc.from('dentist_ready').select('id').eq('clinic_date', D5).eq('ready', false)).data ?? []
+  check('c5a ready=false rows exist for every dentist on the date', !up.error && readyRows.length === rows.length,
+    up.error?.message ?? `ready_false=${readyRows.length}/${rows.length}`)
+  const r = await book(P.maria, D5, '10:00')
+  check('c5b booking succeeds with zero ready rows (Ready never gates booking)',
+    !r.error && r.data?.[0]?.dentist_id === T5, r.error?.message ?? 'insert succeeded')
+  await cleanScheds()
 }
 
-// ── (f) two concurrent inserts, one ready dentist ⇒ exactly one wins ──────────
-await setAvail(D_F, [A])
+// ── (6) Ready does not affect capacity: ready=false dentist stays bookable ────
 {
-  const rs = await Promise.all([book(maria, D_F, '10:00'), book(juan, D_F, '10:00')])
-  const oks = rs.filter((r) => !r.error)
-  check('f1 exactly one of two concurrent inserts wins', oks.length === 1,
-    rs.map((r) => r.error?.message ?? 'ok').join(' / '))
-}
-
-// ── (g) deactivated dentist: cannot become ready, cannot receive an appointment ─
-{
-  const g1 = await svc.from('dentist_ready').upsert(
-    { dentist_id: OFF, clinic_date: D_G, ready: true, ready_at: new Date().toISOString() },
+  const T6 = await mkDentist('not-ready-a')
+  const T6b = await mkDentist('not-ready-b')
+  await addSched(T6); await addSched(T6b)
+  await svc.from('dentist_ready').upsert(
+    { dentist_id: T6, clinic_date: D6, ready: false, updated_at: new Date().toISOString() },
     { onConflict: 'dentist_id,clinic_date' })
-  check('g1 deactivated dentist cannot become ready', !!g1.error && /deactivated dentist cannot become ready/.test(g1.error.message), g1.error?.message ?? 'upsert succeeded')
-  await setAvail(D_G, []) // every active dentist Not Ready
-  const g2 = await book(maria, D_G, '10:00')
-  check('g2 no appointment auto-assigned when only a deactivated dentist is left', !!g2.error && /no dentist available/.test(g2.error.message), g2.error?.message ?? 'insert succeeded')
-  const g3 = await book(juan, D_G, '10:00', { dentist: OFF })
-  check('g3 explicit assignment to deactivated dentist rejected', !!g3.error && /no dentist available/.test(g3.error.message), g3.error?.message ?? 'insert succeeded')
+  const c1 = await book(P.maria, D6, '10:00', { dentist: T6 })
+  check('c6a ready=false dentist slot still bookable (explicit)', !c1.error && c1.data?.[0]?.dentist_id === T6, c1.error?.message)
+  const c2 = await book(P.juan, D6, '10:00')
+  check('c6b auto-assign ignores Ready (second same-time booking still lands)',
+    !c2.error && c2.data?.[0]?.dentist_id === T6b, c2.error?.message ?? JSON.stringify(c2.data))
+  await cleanScheds()
 }
 
-// ── (h) removing Ready blocks future bookings; historical appointments remain ─
-await setAvail(D_H, [A])
+// ── (7) 90m visit blocks a 30m overlap on the SAME dentist, not the other ─────
 {
-  const h1 = await book(maria, D_H, '10:00')
-  check('h1 booking while ready ok', !h1.error, h1.error?.message)
-  await setAvail(D_H, []) // Ready removed (ready=false row) — including A
-  const h2 = await book(juan, D_H, '10:00')
-  check('h2 same-time booking blocked after Ready removed', !!h2.error && /no dentist available/.test(h2.error.message), h2.error?.message ?? 'insert succeeded')
-  const hist = await svc.from('appointments').select('id').eq('requested_date', D_H).neq('status', 'cancelled')
-  check('h3 historical appointment remains', !hist.error && hist.data.length === 1 && hist.data[0].id === h1.data?.[0]?.id,
-    `count=${hist.data?.length}`)
+  const T7 = await mkDentist('dur-a')
+  const T7b = await mkDentist('dur-b')
+  await addSched(T7); await addSched(T7b)
+  const e1 = await book(P.maria, D7, '10:00', { mins: 90, dentist: T7 }) // 10:00–11:30 on T7
+  check('c7a 90m booking on dentist T ok', !e1.error, e1.error?.message)
+  const e2 = await book(P.juan, D7, '10:30', { mins: 30, dentist: T7 })
+  check('c7b overlapping 30m on the same dentist rejected', !!e2.error && /overlaps/.test(e2.error.message), e2.error?.message ?? 'insert succeeded')
+  const e3 = await book(P.andrea, D7, '10:30', { mins: 30 })
+  check('c7c the other scheduled dentist takes the 30m overlap', !e3.error && e3.data?.[0]?.dentist_id === T7b, e3.error?.message)
+  await cleanScheds()
 }
 
-// ── (i) patient cannot forge dentist assignment ───────────────────────────────
+// ── (8) simultaneous race: two concurrent inserts, one slot, one dentist ──────
 {
-  const patient = anon()
-  const login = await patient.auth.signInWithPassword({ email: 'maria@dentalvibe.ph', password: 'password123' })
-  check('i0 patient session in', !login.error, login.error?.message)
-  await setAvail(D_I, []) // nobody available
-  const i1 = await patient.from('appointments').insert({
-    patient_id: maria, service_id: svcRow.id, service_ids: [svcRow.id], requested_date: D_I,
-    scheduled_at: at(D_I, '10:00'), duration_minutes: 30, price: svcRow.price, status: 'pending',
-    notes: 'capacity_qa', dentist_id: B, // forged: B is Not Ready
-  })
-  check('i1 patient insert with forged dentist_id rejected', !!i1.error && /no dentist available/.test(i1.error.message), i1.error?.message ?? 'insert succeeded')
-  await setAvail(D_I, [A]) // control: same insert, no dentist_id, one ready dentist
-  const i2 = await patient.from('appointments').insert({
-    patient_id: maria, service_id: svcRow.id, service_ids: [svcRow.id], requested_date: D_I,
-    scheduled_at: at(D_I, '11:00'), duration_minutes: 30, price: svcRow.price, status: 'pending',
-    notes: 'capacity_qa',
-  }).select('id, dentist_id')
-  if (!i2.error && i2.data?.[0]?.id) created.push(i2.data[0].id)
-  check('i2 control: patient booking without dentist_id auto-assigns', !i2.error && i2.data?.[0]?.dentist_id === A, i2.error?.message)
+  const T8 = await mkDentist('race')
+  await addSched(T8)
+  const rs = await Promise.all([
+    book(P.maria, D8, '10:00', { dentist: T8 }),
+    book(P.juan, D8, '10:00', { dentist: T8 }),
+  ])
+  const oks = rs.filter((r) => !r.error)
+  check('c8a exactly one of two concurrent same-slot inserts wins', oks.length === 1,
+    rs.map((r) => r.error?.message ?? 'ok').join(' / '))
+  check('c8b the loser is rejected with the overlap error',
+    oks.length === 1 && rs.some((r) => r.error && /overlaps/.test(r.error.message)))
+  await cleanScheds()
 }
 
-// ── (j) owner can read all assignments ────────────────────────────────────────
+// ── (9) deactivated dentist: no assignment, no Ready, no explicit assignment ──
 {
-  const owner = anon()
-  const login = await owner.auth.signInWithPassword({ email: 'owner@dentalvibe.ph', password: 'password123' })
-  check('j0 owner session in', !login.error, login.error?.message)
-  const { data, error } = await owner.from('appointments')
-    .select('id, dentist_id, dentists(full_name)').in('id', created)
-  check('j1 owner reads every assignment with dentist names',
-    !error && data?.length === created.length && data.every((r) => r.dentists?.full_name),
-    error?.message ?? `got ${data?.length}/${created.length}`)
+  const T9 = await mkDentist('off', false) // deactivated WITH a schedule — deactivation wins
+  await addSched(T9)
+  const g1 = await book(P.maria, D9, '10:00')
+  check('c9a deactivated dentist excluded from auto-assignment (schedule row alone is not enough)',
+    noAvail(g1), g1.error?.message ?? 'insert succeeded')
+  const g2 = await svc.from('dentist_ready').upsert(
+    { dentist_id: T9, clinic_date: D9, ready: true, ready_at: new Date().toISOString() },
+    { onConflict: 'dentist_id,clinic_date' })
+  check('c9b deactivated dentist cannot become Ready (guard raises)',
+    !!g2.error && /deactivated dentist cannot become ready/.test(g2.error.message), g2.error?.message ?? 'upsert succeeded')
+  const g3 = await book(P.juan, D9, '10:00', { dentist: T9 })
+  check('c9c explicit assignment to deactivated dentist rejected', noAvail(g3), g3.error?.message ?? 'insert succeeded')
+  await cleanScheds()
 }
 
-// ── (k) UI smoke: doctor sees only own + TBA rows, Ready toggle works; owner sees all ──
-const preReadyToday = (await svc.from('dentist_ready').select('id').eq('dentist_id', C).eq('clinic_date', manilaToday())).data ?? []
+// ── (10) NEW dentist expands capacity exactly when a schedule row exists ──────
 {
-  await setAvail(D_UI, [C, B])
-  const u1 = await book(maria, D_UI, '10:00', { dentist: C })
-  const u2 = await book(juan, D_UI, '11:00', { dentist: B })
+  const T10 = await mkDentist('new')
+  const f1 = await book(P.maria, D10, '10:00')
+  check('c10a new dentist without a schedule row ⇒ booking blocked', noAvail(f1), f1.error?.message ?? 'insert succeeded')
+  await addSched(T10)
+  const f2 = await book(P.juan, D10, '11:00')
+  check('c10b one schedule row added ⇒ date becomes bookable', !f2.error && f2.data?.[0]?.dentist_id === T10, f2.error?.message)
+  await cleanScheds()
+}
+
+// ── (11) historical appointments survive schedule removal + deactivation ─────
+{
+  const T11 = await mkDentist('hist')
+  const sched = await addSched(T11)
+  const h1 = await book(P.maria, D11, '10:00')
+  check('c11a booking auto-assigned before removal', !h1.error && h1.data?.[0]?.dentist_id === T11, h1.error?.message)
+  await svc.from('dentist_work_schedules').delete().eq('id', sched.id) // schedule removed
+  await svc.from('dentists').update({ active: false }).eq('id', T11) // dentist deactivated
+  const hist = await svc.from('appointments').select('id, dentist_id, status, payment_status, scheduled_at')
+    .eq('id', h1.data?.[0]?.id).single()
+  check('c11b historical appointment intact after schedule removal + deactivation',
+    !hist.error && hist.data.dentist_id === T11 && hist.data.status === 'pending' && hist.data.payment_status === 'pending'
+      && new Date(hist.data.scheduled_at).getTime() === new Date(at(D11, '10:00')).getTime(),
+    hist.error?.message ?? JSON.stringify(hist.data))
+  await cleanScheds()
+}
+
+// ── (12) forged dentist_id for an unscheduled dentist rejected ────────────────
+{
+  const T12 = await mkDentist('forged')
+  await addSched(T12)
+  const i1 = await book(P.maria, D12, '10:00', { dentist: B }) // B has no Sunday schedule
+  check('c12a forged dentist_id for an unscheduled dentist rejected', noAvail(i1), i1.error?.message ?? 'insert succeeded')
+  const i2 = await book(P.juan, D12, '10:00')
+  check('c12b control: same booking without dentist_id auto-assigns to the scheduled dentist',
+    !i2.error && i2.data?.[0]?.dentist_id === T12, i2.error?.message)
+  await cleanScheds()
+}
+
+// ── (13) per-dentist working hours respected ──────────────────────────────────
+{
+  const AM = await mkDentist('am') // 09:00–12:00
+  const PM = await mkDentist('pm') // 13:00–16:00
+  await addSched(AM, 0, '09:00', '12:00')
+  await addSched(PM, 0, '13:00', '16:00')
+  const h1 = await book(P.maria, D13, '13:30', { dentist: AM })
+  check('c13a outside a dentist’s working hours rejected even though the day is covered', noAvail(h1), h1.error?.message ?? 'insert succeeded')
+  const h2 = await book(P.juan, D13, '13:30', { dentist: PM })
+  check('c13b accepted for the dentist whose hours cover it', !h2.error && h2.data?.[0]?.dentist_id === PM, h2.error?.message)
+  const h3 = await book(P.andrea, D13, '10:00')
+  check('c13c auto-assign only considers the dentist whose hours cover the slot',
+    !h3.error && h3.data?.[0]?.dentist_id === AM, h3.error?.message ?? JSON.stringify(h3.data))
+  await cleanScheds()
+}
+
+// ── (14)+(15) doctor isolation + owner visibility (calendar view smoke) ───────
+{
+  await addSched(C, 0, '10:00', '17:00', true) // real dentists, temporary Sunday rows
+  await addSched(B, 0, '10:00', '17:00', true)
+  const u1 = await book(P.maria, D14, '10:00', { dentist: C })
+  const u2 = await book(P.juan, D14, '11:00', { dentist: B })
   const u3 = await svc.from('appointments').insert({
-    patient_id: andrea, service_id: svcRow.id, service_ids: [svcRow.id], requested_date: D_UI,
-    status: 'pending', notes: 'capacity_qa',
-  }).select('id') // unscheduled, no dentist → visible as TBA
+    patient_id: P.andrea, service_id: svcRow.id, service_ids: [svcRow.id], requested_date: D14,
+    status: 'pending', notes: 'capacity_qa', // unscheduled TBA row (unpaid → not a reservation)
+  }).select('id')
   if (!u3.error && u3.data?.[0]?.id) created.push(u3.data[0].id)
-  check('k0 smoke rows in', !u1.error && !u2.error && !u3.error, [u1.error, u2.error, u3.error].filter(Boolean).map((e) => e.message).join(' / '))
+  check('k0 smoke rows in (two assigned + one TBA)', !u1.error && !u2.error && !u3.error,
+    [u1.error, u2.error, u3.error].filter(Boolean).map((e) => e.message).join(' / '))
 
   const b = await chromium.launch()
   const pg = await b.newPage()
@@ -239,39 +352,46 @@ const preReadyToday = (await svc.from('dentist_ready').select('id').eq('dentist_
 
   await login('doctor@dentalvibe.ph')
   await pg.goto(BASE + '/doctor/calendar', { waitUntil: 'networkidle' }); await pg.waitForTimeout(1500)
-  await pg.fill('input[type="date"]', D_UI); await pg.waitForTimeout(800)
+  await pg.fill('input[type="date"]', D14); await pg.waitForTimeout(800)
   const body = await pg.locator('body').innerText()
   check('k1 doctor sees own assignment and TBA row', body.includes('Maria Santos') && body.includes('Andrea Reyes'))
-  check('k2 doctor does not see another dentist assignment', !body.includes('Juan Dela Cruz'))
-  const tog = pg.locator('[data-testid="ready-toggle"]')
-  check('k3 ready toggle present', await tog.count() === 1)
-  const before = (await tog.innerText()).trim()
-  await tog.click(); await pg.waitForTimeout(1200)
-  const after = (await tog.innerText()).trim()
-  check('k4 ready toggle flips state', before !== after, `${before} → ${after}`)
-  await tog.click(); await pg.waitForTimeout(1200) // restore
-  check('k5 ready toggle flips back', (await tog.innerText()).trim() === before)
+  check('k2 doctor does not see another dentist’s assignment', !body.includes('Juan Dela Cruz'))
 
   await login('owner@dentalvibe.ph')
   await pg.goto(BASE + '/owner/calendar', { waitUntil: 'networkidle' }); await pg.waitForTimeout(1500)
-  await pg.fill('input[type="date"]', D_UI); await pg.waitForTimeout(800)
+  await pg.fill('input[type="date"]', D14); await pg.waitForTimeout(800)
   const obody = await pg.locator('body').innerText()
   check('k6 owner sees all assignments', obody.includes('Maria Santos') && obody.includes('Juan Dela Cruz'))
   await b.close()
 }
 
+// ── (15) owner API visibility: every assignment readable with dentist names ───
+{
+  const owner = anon()
+  const login = await owner.auth.signInWithPassword({ email: 'owner@dentalvibe.ph', password: 'password123' })
+  check('j0 owner session in', !login.error, login.error?.message)
+  const { data, error } = await owner.from('appointments')
+    .select('id, dentist_id, dentists(full_name)').in('id', created)
+  check('j1 owner API reads every assignment with dentist names',
+    !error && data?.length === created.length && data.every((r) => !r.dentist_id || r.dentists?.full_name),
+    error?.message ?? `got ${data?.length}/${created.length}`)
+}
+
 // ── cleanup: every row this script created ────────────────────────────────────
 {
   if (created.length) await svc.from('appointments').delete().in('id', created)
-  await svc.from('dentist_ready').delete().in('clinic_date', [...TEST_DATES, D_UI])
-  await svc.from('dentist_ready').delete().eq('dentist_id', C).eq('clinic_date', manilaToday())
-    .not('id', 'in', preReadyToday.length ? `(${preReadyToday.map((r) => r.id).join(',')})` : '(00000000-0000-0000-0000-000000000000)')
-  await svc.from('dentist_ready').delete().eq('dentist_id', OFF) // trigger blocks upserts, but clear any
-  await svc.from('dentists').delete().eq('id', OFF)
-  const leftR = await svc.from('dentist_ready').select('id').in('clinic_date', [...TEST_DATES, D_UI])
+  await svc.from('dentist_ready').delete().in('clinic_date', TEST_DATES)
+  if (madeSchedules.length) await svc.from('dentist_work_schedules').delete().in('id', madeSchedules)
+  await svc.from('dentists').delete().in('id', madeDentists) // cascades schedule + ready rows
+  await svc.from('dentists').delete().like('email', 'qa-cap-%@qa.test')
   const leftA = await svc.from('appointments').select('id').in('id', created)
-  check('z2 all created rows cleaned up', !leftR.error && !leftA.error && !leftR.data.length && !leftA.data.length,
-    `ready_left=${leftR.data?.length} appts_left=${leftA.data?.length}`)
+  const leftR = await svc.from('dentist_ready').select('id').in('clinic_date', TEST_DATES)
+  const leftD = await svc.from('dentists').select('id').like('email', 'qa-cap-%@qa.test')
+  const leftS = await svc.from('dentist_work_schedules').select('id').in('id', madeSchedules)
+  check('z3 all created rows cleaned up',
+    !leftA.error && !leftR.error && !leftD.error && !leftS.error
+      && !leftA.data.length && !leftR.data.length && !leftD.data.length && !leftS.data.length,
+    `appts=${leftA.data?.length} ready=${leftR.data?.length} dentists=${leftD.data?.length} scheds=${leftS.data?.length}`)
 }
 
 console.log(`\n${pass} passed, ${fail} failed`)
