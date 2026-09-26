@@ -35,6 +35,7 @@ check('patient row', !!meRow, JSON.stringify(meRow))
 // random day ahead: ux_appt_patient_date = one booking per patient per day
 const when = new Date(Date.now() + (2 + Math.floor(Math.random() * 200)) * 24 * 3600 * 1000)
 when.setUTCHours(2, 0, 0, 0) // 10:00 PH
+while (when.getUTCDay() === 0) when.setUTCDate(when.getUTCDate() + 1) // clinic closed Sundays
 const book = await fetch(`${URL}/rest/v1/appointments`, {
   method: 'POST',
   headers: { apikey: ANON, Authorization: `Bearer ${jwt}`, 'Content-Type': 'application/json', Prefer: 'return=representation' },
