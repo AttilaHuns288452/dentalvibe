@@ -1,6 +1,6 @@
 # CHECKPOINT — DentalVibe final hardening (multi-dentist capacity session)
 
-**State: PAUSED mid-task. Resume from here.** Written 2026-09-26.
+**State: COMPLETE (2026-09-26).** Final gate 365 local + 55 prod checks green; see REPORT_FINAL.md. Kept for history.
 
 ## What is DONE and verified (committed `96d9665` + earlier `e10d5ea`)
 
