@@ -56,7 +56,7 @@ export default function ResetPassword() {
       <div className="mt-8 bg-white border border-gray-200 rounded-lg p-3.5 text-xs text-gray-600 space-y-1">
         <div className="font-semibold text-gray-900">Still need help?</div>
         <div>Clinic email · {clinic?.clinic_email ?? ''}</div>
-        <div>Hours · {fmtDays(clinic?.open_days)} · {clinic ? fmtTime12(clinic.open_time) + ' – ' + fmtTime12(clinic.close_time) : '10 AM – 5 PM'}</div>
+        <div>Hours · {fmtDays(clinic?.open_days)} · {clinic ? fmtTime12(clinic.open_time) + ' – ' + fmtTime12(clinic.close_time) : 'Clinic hours unavailable'}</div>
       </div>
       <a href="/" className="block text-center text-xs font-semibold text-primary-700 mt-4">Back to Sign In</a>
     </div>

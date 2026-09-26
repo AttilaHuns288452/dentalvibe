@@ -2,7 +2,8 @@ import useEscape from '../../lib/useEscape'
 import { useSubmit , useRevalidateOnVisible } from '../../lib/hooks'
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { supabase, peso } from '../../lib/api'
+import { supabase, peso, clinicName } from '../../lib/api'
+import { correctTransaction, voidTransaction, listTransactions, listAudit } from '../../lib/finance'
 import { printReport } from '../../lib/format'
 // ponytail: transactions ledger = walk-in/counter entries only; appointment income
 // derives from paid appointments at query time (no FK by design — double-entry only if
@@ -22,21 +23,30 @@ export default function IncomeHub() {
   const [from, setFrom] = useState(''), [to, setTo] = useState('')
   const [txns, setTxns] = useState(null)
   const [appts, setAppts] = useState([])
+  const [corrections, setCorrections] = useState({}) // tx id -> pre-correction amount (audit before_data)
+  const [correcting, setCorrecting] = useState(null)
+  const [voiding, setVoiding] = useState(null)
   const [adding, setAdding] = useState(false)
   const [err, setErr] = useState('')
 
   const load = () => {
-    supabase.from('transactions').select('*').order('entry_date', { ascending: false })
-      .then(({ data, error }) => (error ? setErr(error.message) : setTxns(data ?? [])))
+    listTransactions().then(setTxns).catch((e) => setErr(e.message))
+    listAudit({ action: 'CORRECT' }).then((rows) => {
+      const m = {}
+      rows.forEach((r) => { m[r.entity_id] = r.before_data?.amount ?? m[r.entity_id] })
+      setCorrections(m)
+    }).catch(() => {})
     supabase.from('appointments').select('id, status, price, scheduled_at, services(name), patients(full_name)').eq('payment_status', 'paid').neq('status', 'cancelled')
       .then(({ data }) => setAppts(data ?? []))
   }
   useEffect(load, [])
 
   // income derives from `transactions` alone — settled payments auto-create ledger
-  // rows (fn_apply_payment_result), so summing appointments too would double-count
-  const income = useMemo(() => (txns ?? []).filter((t) => t.type === 'income').reduce((s, t) => s + Number(t.amount), 0), [txns])
-  const expenses = useMemo(() => (txns ?? []).filter((t) => t.type === 'expense').reduce((s, t) => s + Number(t.amount), 0), [txns])
+  // rows (fn_apply_payment_result), so summing appointments too would double-count.
+  // Voided rows stay listed (struck) but never count toward totals.
+  const live = (t) => !t.voided_at
+  const income = useMemo(() => (txns ?? []).filter((t) => t.type === 'income' && live(t)).reduce((s, t) => s + Number(t.amount), 0), [txns])
+  const expenses = useMemo(() => (txns ?? []).filter((t) => t.type === 'expense' && live(t)).reduce((s, t) => s + Number(t.amount), 0), [txns])
 
   const inPeriod = (iso) => {
     const d = new Date(iso)
@@ -50,8 +60,8 @@ export default function IncomeHub() {
     if (period === 'Yearly') return d.getFullYear() === now.getFullYear()
     return true
   }
-  const pIncome = useMemo(() => (txns ?? []).filter((t) => t.type === 'income' && inPeriod(t.entry_date)).reduce((s, t) => s + Number(t.amount), 0), [txns, period])
-  const pExpenses = useMemo(() => (txns ?? []).filter((t) => t.type === 'expense' && inPeriod(t.entry_date)).reduce((s, t) => s + Number(t.amount), 0), [txns, period])
+  const pIncome = useMemo(() => (txns ?? []).filter((t) => t.type === 'income' && live(t) && inPeriod(t.entry_date)).reduce((s, t) => s + Number(t.amount), 0), [txns, period])
+  const pExpenses = useMemo(() => (txns ?? []).filter((t) => t.type === 'expense' && live(t) && inPeriod(t.entry_date)).reduce((s, t) => s + Number(t.amount), 0), [txns, period])
   const net = pIncome - pExpenses
 
   const byProc = useMemo(() => {
@@ -65,7 +75,7 @@ export default function IncomeHub() {
 
   const byExpCat = useMemo(() => {
     const counts = {}
-    ;(txns ?? []).filter((t) => t.type === 'expense' && inPeriod(t.entry_date)).forEach((t) => {
+    ;(txns ?? []).filter((t) => t.type === 'expense' && live(t) && inPeriod(t.entry_date)).forEach((t) => {
       counts[t.category] = (counts[t.category] ?? 0) + Number(t.amount)
     })
     const tot = Object.values(counts).reduce((s, v) => s + v, 0) || 1
@@ -114,6 +124,8 @@ export default function IncomeHub() {
       </div>
 
       {adding && <AddTransaction onDone={() => { setAdding(false); load() }} />}
+      {correcting && <CorrectModal tx={correcting} onClose={() => setCorrecting(null)} onDone={() => { setCorrecting(null); load() }} />}
+      {voiding && <VoidModal tx={voiding} onClose={() => setVoiding(null)} onDone={() => { setVoiding(null); load() }} />}
 
       {err && <p className="text-xs text-red-500">{err}</p>}
 
@@ -198,13 +210,31 @@ export default function IncomeHub() {
           <div className="bg-white border border-gray-200 rounded-lg divide-y divide-gray-100">
             {(txns ?? []).length === 0 && <div className="px-3.5 py-4 text-sm text-gray-500">No transactions recorded.</div>}
             {(txns ?? []).map((t) => (
-              <div key={t.id} className="flex justify-between items-center px-3.5 py-2.5">
-                <div className="min-w-0">
-                  <div className="text-sm font-semibold text-gray-900">{t.category}</div>
-                  <div className="text-xs text-gray-500">{short(new Date(t.entry_date))}{t.patient_name ? ` · ${t.patient_name}` : ''}{t.description ? ` · ${t.description}` : ''}</div>
+              <div key={t.id} data-testid="tx-row" data-tx={t.id} className={'px-3.5 py-2.5 ' + (t.voided_at ? 'opacity-60' : '')}>
+                <div className="flex justify-between items-center">
+                  <div className="min-w-0">
+                    <div className={'text-sm font-semibold text-gray-900 ' + (t.voided_at ? 'line-through' : '')}>{t.category}</div>
+                    <div className="text-xs text-gray-500">{short(new Date(t.entry_date))}{t.patient_name ? ` · ${t.patient_name}` : ''}{t.description ? ` · ${t.description}` : ''}</div>
+                  </div>
+                  <div className={'text-sm font-bold ' + (t.voided_at ? 'text-gray-400 line-through' : t.type === 'income' ? 'text-green-600' : 'text-red-500')}>
+                    {t.type === 'income' ? '+' : '−'}{peso(t.amount)}
+                  </div>
                 </div>
-                <div className={'text-sm font-bold ' + (t.type === 'income' ? 'text-green-600' : 'text-red-500')}>
-                  {t.type === 'income' ? '+' : '−'}{peso(t.amount)}
+                {(t.correction_reason || t.payment_id) && (
+                  <div className="mt-1 text-[11px] text-gray-500">
+                    {t.voided_at
+                      ? <>Voided — {t.correction_reason}</>
+                      : t.correction_reason
+                        ? <>Corrected from {corrections[t.id] != null ? peso(corrections[t.id]) : 'previous amount'}, {t.correction_reason}</>
+                        : null}
+                    {t.payment_id && <span className="ml-2 italic">linked to payment</span>}
+                  </div>
+                )}
+                <div className="mt-1.5 flex gap-2">
+                  <button aria-label="Correct transaction" onClick={() => setCorrecting(t)}
+                          className="h-8 px-2.5 rounded-lg border border-gray-200 text-[11px] font-semibold text-gray-600">Correct</button>
+                  <button aria-label="Void transaction" onClick={() => setVoiding(t)}
+                          className="h-8 px-2.5 rounded-lg border border-red-100 text-[11px] font-semibold text-red-500">Void</button>
                 </div>
               </div>
             ))}
@@ -311,5 +341,94 @@ function AddTransaction({ onDone }) {
         <button disabled={busy} className="flex-1 h-10 rounded-lg bg-primary-600 text-white text-xs font-semibold disabled:opacity-60">{busy ? 'Saving…' : 'Save'}</button>
       </div>
     </form>
+  )
+}
+
+// ---- Correct / Void (owner-only RPCs, migration 0024) ----
+
+function Modal({ title, onClose, children }) {
+  useEscape(onClose)
+  return (
+    <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" onClick={onClose}>
+      <div role="dialog" aria-label={title} onClick={(e) => e.stopPropagation()}
+           className="bg-white rounded-lg p-4 w-full max-w-sm space-y-3">
+        <div className="text-sm font-bold text-gray-900">{title}</div>
+        {children}
+      </div>
+    </div>
+  )
+}
+
+function CorrectModal({ tx, onClose, onDone }) {
+  const [amount, setAmount] = useState(String(tx.amount))
+  const [reason, setReason] = useState('')
+  const [err, setErr] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  const submit = async (e) => {
+    e.preventDefault()
+    const amt = Number(amount)
+    if (!(amt > 0)) return setErr('Enter a valid amount.')
+    if (reason.trim().length < 3) return setErr('Reason is required (at least 3 characters).')
+    setErr(''); setBusy(true)
+    try {
+      await correctTransaction(tx.id, amt, reason.trim())
+      onDone()
+    } catch (ex) {
+      setErr(ex.message) // surfaces 'invalid amount', 'transaction is voided', 'not authorized'…
+      setBusy(false)
+    }
+  }
+
+  return (
+    <Modal title="Correct transaction" onClose={onClose}>
+      <form onSubmit={submit} className="space-y-3">
+        <p className="text-xs text-gray-500">Current amount {peso(tx.amount)}. The change is recorded in the audit log.</p>
+        <input type="number" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} aria-label="New amount"
+               className="w-full h-11 border border-gray-200 rounded-lg px-3 text-sm bg-white" />
+        <input value={reason} onChange={(e) => setReason(e.target.value)} aria-label="Reason" placeholder="Reason (required)"
+               className="w-full h-11 border border-gray-200 rounded-lg px-3 text-sm bg-white" />
+        {tx.payment_id && <p className="text-[11px] text-gray-500 italic">Linked to a payment — correcting keeps this same ledger row.</p>}
+        {err && <p role="alert" className="text-xs text-red-500">{err}</p>}
+        <div className="flex gap-2.5">
+          <button type="button" onClick={onClose} className="flex-1 h-10 rounded-lg border border-gray-200 text-gray-700 text-xs font-semibold bg-white">Cancel</button>
+          <button disabled={busy} className="flex-1 h-10 rounded-lg bg-primary-600 text-white text-xs font-semibold disabled:opacity-60">{busy ? 'Saving…' : 'Save correction'}</button>
+        </div>
+      </form>
+    </Modal>
+  )
+}
+
+function VoidModal({ tx, onClose, onDone }) {
+  const [reason, setReason] = useState('')
+  const [err, setErr] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  const submit = async (e) => {
+    e.preventDefault()
+    if (reason.trim().length < 3) return setErr('Reason is required (at least 3 characters).')
+    setErr(''); setBusy(true)
+    try {
+      await voidTransaction(tx.id, reason.trim())
+      onDone()
+    } catch (ex) {
+      setErr(ex.message)
+      setBusy(false)
+    }
+  }
+
+  return (
+    <Modal title="Void transaction" onClose={onClose}>
+      <form onSubmit={submit} className="space-y-3">
+        <p className="text-xs text-gray-500">Void {peso(tx.amount)} ({tx.category}). The row stays listed, struck out, and leaves the totals.</p>
+        <input value={reason} onChange={(e) => setReason(e.target.value)} aria-label="Reason" placeholder="Reason (required)"
+               className="w-full h-11 border border-gray-200 rounded-lg px-3 text-sm bg-white" />
+        {err && <p role="alert" className="text-xs text-red-500">{err}</p>}
+        <div className="flex gap-2.5">
+          <button type="button" onClick={onClose} className="flex-1 h-10 rounded-lg border border-gray-200 text-gray-700 text-xs font-semibold bg-white">Cancel</button>
+          <button disabled={busy} className="flex-1 h-10 rounded-lg bg-red-600 text-white text-xs font-semibold disabled:opacity-60">{busy ? 'Voiding…' : 'Confirm void'}</button>
+        </div>
+      </form>
+    </Modal>
   )
 }

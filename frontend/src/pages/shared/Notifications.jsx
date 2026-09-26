@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import Skel from '../../components/Skel'
 import { supabase } from '../../lib/api'
 import { useAuth } from '../../context/RoleContext'
@@ -29,6 +30,7 @@ const ago = (iso) => {
 
 export default function Notifications({ roleBase = '' }) {
   const { refresh } = useAuth() // bell badge lives in context — invalidate it here (#45)
+  const navigate = useNavigate()
   const [items, setItems] = useState(null)
   const [err, setErr] = useState('')
 
@@ -56,8 +58,15 @@ export default function Notifications({ roleBase = '' }) {
   const earlier = (items ?? []).filter((n) => new Date(n.created_at).toDateString() !== new Date().toDateString())
   const unread = (items ?? []).filter((n) => !n.read).length
 
+  // row click = mark read + follow the stored route when it has one; stale or
+  // unknown routes are normalized by the router (Placeholder / role redirect), so
+  // navigating blind is safe. Rows without a route just mark read.
+  const onRowClick = (n) => {
+    markRead(n.id)
+    if (n.route) navigate(n.route)
+  }
   const Row = ({ n }) => (
-    <button type="button" onClick={() => markRead(n.id)}
+    <button type="button" onClick={() => onRowClick(n)}
             className="w-full text-left flex gap-3 px-3.5 py-3 border-b border-gray-100 last:border-0">
       <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-none ${ICON_BG[n.icon] ?? ICON_BG.bell}`}>
         <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d={ICON_PATHS[n.icon] ?? ICON_PATHS.bell} /></svg>

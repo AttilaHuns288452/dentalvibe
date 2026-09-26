@@ -143,7 +143,7 @@ export default function MyAppointments() {
         <div className="bg-white border border-gray-200 rounded-lg p-4 mt-4">
           <div className="text-[11px] font-bold uppercase tracking-wide text-gray-500 mb-2">Clinic information</div>
           <div className="flex justify-between text-sm py-1.5 border-t border-gray-100">
-            <span className="text-gray-500">Hours</span><span className="font-semibold text-gray-900">{fmtDays(clinic?.open_days)} · {clinic ? fmtTime12(clinic.open_time) + ' – ' + fmtTime12(clinic.close_time) : '10 AM – 5 PM'}</span>
+            <span className="text-gray-500">Hours</span><span className="font-semibold text-gray-900">{fmtDays(clinic?.open_days)} · {clinic ? fmtTime12(clinic.open_time) + ' – ' + fmtTime12(clinic.close_time) : 'Clinic hours unavailable'}</span>
           </div>
           <div className="flex justify-between text-sm py-1.5 border-t border-gray-100">
             <span className="text-gray-500">Contact</span><span className="font-semibold text-primary-700">{clinic?.clinic_email ?? ''}</span>

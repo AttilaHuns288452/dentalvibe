@@ -1,9 +1,11 @@
 import Skel from '../../components/Skel'
 import { useRevalidateOnVisible } from '../../lib/hooks'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { useAuth } from '../../context/RoleContext'
 import { listAppointments, setAppointmentStatus, getClinicSettings } from '../../lib/api'
 import { fmtTime12 } from '../../lib/format'
 import { slotStartsFor, manilaDayKey, manilaHM, addDaysISO, TZ } from '../../lib/availability'
+import { myDentist, readyStateForDate, setMyReady } from '../../lib/scheduling'
 
 // Calendar Day view — Figma frame 29: Day/Week/Month seg control, formatted date
 // heading, hour rows with color-coded appointment blocks (time · name · service).
@@ -26,8 +28,12 @@ const slotOf = (a) => {
 }
 
 export default function DoctorCalendar() {
+  const { profile, deactivated } = useAuth()
+  const isOwner = profile?.role === 'owner'
   const [appts, setAppts] = useState(null)
   const [settings, setSettings] = useState(null)
+  const [me, setMe] = useState(null) // my dentists row (email → dentists.id)
+  const [ready, setReady] = useState(null) // dentist_ready for Manila today: true | false | null (no row)
   const [view, setView] = useState('Day')
   const [day, setDay] = useState(() => manilaDayKey(new Date())) // Manila "today", not UTC
   // default to a day that has appointments (demo-friendly); fallback to today
@@ -36,17 +42,26 @@ export default function DoctorCalendar() {
   const load = async () => {
     listAppointments().then(setAppts).catch((e) => setErr(e.message))
     getClinicSettings().then(setSettings).catch((e) => setErr(e.message))
+    Promise.all([myDentist(), readyStateForDate(manilaDayKey(new Date()))])
+      .then(([d, state]) => { setMe(d); setReady(state.find((r) => r.id === d?.id)?.ready ?? null) })
+      .catch((e) => setErr(e.message))
   }
   useEffect(() => { load() }, [])
-  useEffect(() => {
-    if (!appts?.length) return
-    const today = manilaDayKey(new Date())
-    const keys = (appts || []).map(apptDay).filter(Boolean).sort()
-    setDay(keys.find((d) => d >= today) || keys[0] || today)
-  }, [appts])
   useRevalidateOnVisible(load)
 
-  const dayAppts = (appts ?? [])
+  // doctors see their own assigned visits (+ unassigned unscheduled rows as TBA); owner sees all
+  const visible = useMemo(() => (appts ?? []).filter(
+    (a) => isOwner || a.dentist_id === me?.id || (!a.dentist_id && !a.scheduled_at),
+  ), [appts, me?.id, isOwner])
+
+  useEffect(() => {
+    if (!visible.length) return
+    const today = manilaDayKey(new Date())
+    const keys = visible.map(apptDay).filter(Boolean).sort()
+    setDay(keys.find((d) => d >= today) || keys[0] || today)
+  }, [visible])
+
+  const dayAppts = visible
     .filter((a) => apptDay(a) === day && a.status !== 'cancelled')
     .sort((a, b) => (a.scheduled_at || '').localeCompare(b.scheduled_at || ''))
 
@@ -61,6 +76,21 @@ export default function DoctorCalendar() {
         <h1 className="text-xl font-bold text-gray-900">Calendar</h1>
         <p className="text-xs text-gray-500">Color-coded by appointment status</p>
       </div>
+
+      {/* Ready-for-today presence toggle (dentist_ready per Manila clinic date) */}
+      {me && (
+        <button type="button" data-testid="ready-toggle" disabled={deactivated}
+                onClick={async () => {
+                  try { const next = ready === false; await setMyReady(next); setReady(next) }
+                  catch (e) { alert(e.message) }
+                }}
+                className={'w-full h-12 rounded-lg text-sm font-bold border ' +
+                  (deactivated ? 'bg-gray-100 text-gray-400 border-gray-200'
+                    : ready === false ? 'bg-red-50 text-red-600 border-red-200'
+                    : 'bg-green-600 text-white border-green-600')}>
+          {deactivated ? 'Account deactivated' : ready === false ? 'Not Ready' : 'Ready for Today'}
+        </button>
+      )}
 
       {/* legend chips (Figma p42) */}
       <div className="flex gap-2">
@@ -106,7 +136,7 @@ export default function DoctorCalendar() {
                   <span className={'text-[10px] font-bold px-1.5 py-0.5 rounded capitalize ' + (STATUS_PILL[a.status] || '')}>{a.status}</span>
                 </div>
                 <div className="text-sm font-semibold text-gray-900">{a.patients?.full_name}</div>
-                <div className="text-xs text-gray-500">{a.services?.name}</div>
+                <div className="text-xs text-gray-500">{a.services?.name}{a.dentists?.full_name ? ' · ' + a.dentists.full_name : ''}</div>
               </div>
             </div>
           ))}
@@ -123,7 +153,7 @@ export default function DoctorCalendar() {
                     </div>
                     <div className="text-sm font-semibold text-gray-900">{block.patients?.full_name}</div>
                     <div className="text-xs text-gray-500 flex items-center justify-between">
-                      <span>{block.services?.name} · {block.duration_minutes || 30} min</span>
+                      <span>{block.services?.name} · {block.duration_minutes || 30} min{block.dentists?.full_name ? ' · ' + block.dentists.full_name : ''}</span>
                       {block.status === 'approved' && (
                         <button onClick={async () => {
                           try {
@@ -147,7 +177,7 @@ export default function DoctorCalendar() {
         <div className="space-y-2">
           {[0, 1, 2, 3, 4, 5, 6].map((o) => {
             const ds = addDaysISO(day, o)
-            const items = (appts ?? []).filter((a) => apptDay(a) === ds && a.status !== 'cancelled')
+            const items = visible.filter((a) => apptDay(a) === ds && a.status !== 'cancelled')
             return (
               <div key={ds} className="bg-white border border-gray-200 rounded-lg px-3.5 py-2.5">
                 <div className="text-xs font-bold text-gray-900">{new Date(ds + 'T12:00:00Z').toLocaleDateString([], { timeZone: TZ, weekday: 'short', month: 'short', day: 'numeric' })} <span className="text-gray-500 font-medium">· {items.length} booked</span></div>
@@ -178,7 +208,7 @@ export default function DoctorCalendar() {
               {cells.map((dnum, i) => {
                 if (!dnum) return <div key={'e' + i} />
                 const ds = firstKey.slice(0, 8) + String(dnum).padStart(2, '0')
-                const items = (appts ?? []).filter((a) => apptDay(a) === ds && a.status !== 'cancelled')
+                const items = visible.filter((a) => apptDay(a) === ds && a.status !== 'cancelled')
                 const isToday = ds === todayKey
                 return (
                   <button key={ds} onClick={() => { setDay(ds); setView('Day') }} className={'min-h-14 rounded-lg border p-1 text-left ' + (isToday ? 'border-blue-400 bg-blue-50' : 'border-gray-200 bg-white')}>
@@ -197,13 +227,13 @@ export default function DoctorCalendar() {
       <div className="bg-gray-50 border border-gray-200 rounded-lg p-3.5 divide-y divide-gray-200 text-sm">
         <div className="flex justify-between py-1">
           <span className="text-gray-600">Today</span>
-          <span className="font-semibold text-gray-900">{appts?.filter((a) => apptDay(a) === manilaDayKey(new Date()) && a.status !== 'cancelled').length ?? 0} booked</span>
+          <span className="font-semibold text-gray-900">{visible.filter((a) => apptDay(a) === manilaDayKey(new Date()) && a.status !== 'cancelled').length} booked</span>
         </div>
         <div className="flex justify-between py-1">
           <span className="text-gray-600">This week</span>
           <span className="font-semibold text-gray-900">{(() => {
             const t0 = manilaDayKey(new Date()); const t7 = addDaysISO(t0, 7)
-            return appts?.filter((a) => { const d = apptDay(a); return a.status !== 'cancelled' && d >= t0 && d < t7 }).length ?? 0
+            return visible.filter((a) => { const d = apptDay(a); return a.status !== 'cancelled' && d >= t0 && d < t7 }).length
           })()} booked</span>
         </div>
       </div>

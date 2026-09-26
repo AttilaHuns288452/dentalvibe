@@ -55,9 +55,12 @@ check('2. UI reports enabled only after subscribe+register', settingsTxt.include
 const sub = await pg.evaluate(async () => {
   const reg = await navigator.serviceWorker.ready
   const s = await reg.pushManager.getSubscription()
-  return s ? { endpoint: s.endpoint.slice(0, 40), hasKeys: !!s.toJSON().keys.p256dh } : null
+  return s ? { endpoint: s.endpoint.slice(0, 40), ep: s.endpoint, hasKeys: !!s.toJSON().keys.p256dh } : null
 })
-check('3. real PushManager subscription exists', !!sub && sub.hasKeys, JSON.stringify(sub))
+check('3. real PushManager subscription exists', !!sub && sub.hasKeys, JSON.stringify({ endpoint: sub?.endpoint, hasKeys: sub?.hasKeys }))
+// every subscription row THIS run creates goes in here — final cleanup deletes
+// exactly these endpoints and nothing else (never delete-by-user)
+const runEndpoints = new Set(sub?.ep ? [sub.ep] : [])
 
 // ── 2. it is stored server-side, owned by the session user ──
 const { data: me } = await svc.from('patients').select('id, user_id').eq('email', 'maria@dentalvibe.ph').maybeSingle()
@@ -110,10 +113,12 @@ check('12b. victim subscription still present after the attack', (survivor ?? []
 
 // forged user_id in the register body must be ignored (server derives identity)
 const { data: { session } } = await other.auth.getSession()
+const forgeEp = 'https://fcm.googleapis.com/fcm/send/forge-' + Date.now()
+runEndpoints.add(forgeEp) // forge row binds to the SESSION user (juan) — clean it up by endpoint, not by user
 const forge = await fetch(SB + '/functions/v1/push-register', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + session.access_token },
-  body: JSON.stringify({ endpoint: 'https://fcm.googleapis.com/fcm/send/forge-' + Date.now(), keys: { p256dh: 'x', auth: 'y' }, user_id: me.user_id }),
+  body: JSON.stringify({ endpoint: forgeEp, keys: { p256dh: 'x', auth: 'y' }, user_id: me.user_id }),
 })
 const { data: forgeRows } = await svc.from('push_subscriptions').select('user_id').like('endpoint', '%forge-%')
 check('13. forged user_id ignored — subscription binds to the SESSION user', forge.ok && (forgeRows ?? []).every((r) => r.user_id !== me.user_id), 'forge=' + forge.status)
@@ -166,9 +171,16 @@ await pgB.locator('form button:has-text("Sign In")').last().click()
 await pgB.waitForTimeout(2500)
 await pgB.goto(BASE + '/settings', { waitUntil: 'networkidle' })
 await pgB.locator('button:has-text("Enable phone notifications")').click()
-await pgB.waitForTimeout(5000)
-const { data: mariaSubs } = await svc.from('push_subscriptions').select('endpoint').eq('user_id', me.user_id).is('revoked_at', null)
-check('18. two devices = two active subscriptions (no overwrite)', (mariaSubs ?? []).length >= 2, 'subs=' + (mariaSubs ?? []).length)
+// ponytail: fresh-profile FCM registration can take well over 5s — settle on the
+// real signal (the server row landing) instead of a blind timer
+let mariaSubs = []
+for (let i = 0; i < 20 && mariaSubs.length < 2; i++) {
+  await pgB.waitForTimeout(1500)
+  mariaSubs = (await svc.from('push_subscriptions').select('endpoint').eq('user_id', me.user_id).is('revoked_at', null)).data ?? []
+}
+const epB = await pgB.evaluate(async () => { const r = await navigator.serviceWorker.ready; const s = await r.pushManager.getSubscription(); return s ? s.endpoint : null })
+if (epB) runEndpoints.add(epB) // device B's row — same endpoint-scoped cleanup set
+check('18. two devices = two active subscriptions (no overwrite)', mariaSubs.length >= 2, 'subs=' + mariaSubs.length)
 // clear both devices' notifications, fire ONE event, both must show it
 await pg.evaluate(async () => { const r = await navigator.serviceWorker.ready; (await r.getNotifications()).forEach((n) => n.close()) })
 await pgB.evaluate(async () => { const r = await navigator.serviceWorker.ready; (await r.getNotifications()).forEach((n) => n.close()) })
@@ -203,7 +215,8 @@ const { data: payNotif2 } = await svc.from('notifications').select('id').eq('ded
 check('21. duplicate payment events = one notification', (payNotif2 ?? []).length === 1, 'rows=' + (payNotif2 ?? []).length)
 // the pushed payload carries the same route (dispatch reads the row)
 await pg.evaluate(async () => { const r = await navigator.serviceWorker.ready; (await r.getNotifications()).forEach((n) => n.close()) })
-await svc.from('notifications').insert({ user_id: me.user_id, title: 'Payment confirmed', body: 'Your payment was received.', route: '/appointments?appt=' + appt.id, dedupe_key: 'dlink:' + Date.now() })
+const dlinkKey = 'dlink:' + Date.now()
+await svc.from('notifications').insert({ user_id: me.user_id, title: 'Payment confirmed', body: 'Your payment was received.', route: '/appointments?appt=' + appt.id, dedupe_key: dlinkKey })
 let pushedRoute = null
 for (let i = 0; i < 15 && !pushedRoute; i++) {
   await pg.waitForTimeout(1500)
@@ -238,6 +251,30 @@ const juanName = (await svc.from('patients').select('full_name').eq('email', 'ju
 check('26. foreign appointment id renders NO private data (RLS)', !txt.includes(juanName) && (await pg.locator('#appt-' + juanAppt.id).count()) === 0, '')
 check('27. page still works with an unknown id (graceful)', txt.includes('Appointment') || txt.includes('appointment'))
 
+// ── 7c. in-app row click follows the notification's stored route ──
+const { data: clickNotif } = await svc.from('notifications').insert({
+  user_id: me.user_id, title: 'Row click probe', body: 'tap to open the appointment', route: '/appointments?appt=' + appt.id, dedupe_key: 'rowclick:' + Date.now(),
+}).select().maybeSingle()
+await pg.goto(BASE + '/notifications', { waitUntil: 'networkidle' })
+await pg.waitForTimeout(1200)
+await pg.locator('button:has-text("Row click probe")').first().click()
+await pg.waitForTimeout(1500)
+check('28. in-app row click navigates to its stored route', pg.url().includes('/appointments?appt=' + appt.id), pg.url())
+check('28b. scoped appointment card visible after row click', await pg.locator('#appt-' + appt.id).isVisible().catch(() => false))
+
+// ── 7d. stale route (random uuid): safe render, zero private data ──
+const staleId = crypto.randomUUID()
+const { data: staleNotif } = await svc.from('notifications').insert({
+  user_id: me.user_id, title: 'Stale route probe', body: 'route no longer resolves', route: '/appointments?appt=' + staleId, dedupe_key: 'stale:' + Date.now(),
+}).select().maybeSingle()
+await pg.goto(BASE + '/notifications', { waitUntil: 'networkidle' })
+await pg.waitForTimeout(1200)
+await pg.locator('button:has-text("Stale route probe")').first().click()
+await pg.waitForTimeout(1500)
+const staleTxt = await pg.locator('main').textContent()
+check('29. stale route (random uuid) renders safely — no crash, no card', (await pg.locator('#appt-' + staleId).count()) === 0 && (staleTxt.includes('Appointment') || staleTxt.includes('appointment')), pg.url())
+check('29b. stale route leaks no private data', !staleTxt.includes(juanName), '')
+
 // cleanup additions
 await svc.from('appointments').delete().eq('id', juanAppt.id)
 await svc.from('notifications').delete().eq('dedupe_key', 'payment:' + payRow.id + ':paid')
@@ -254,9 +291,12 @@ check('16. logout revokes this device subscription', !!afterLogout?.revoked_at |
 
 // cleanup (rows owned by this run)
 await svc.from('notifications').delete().eq('dedupe_key', nrow?.dedupe_key ?? 'probe:none')
+await svc.from('notifications').delete().in('id', [clickNotif?.id, staleNotif?.id].filter(Boolean))
+await svc.from('notifications').delete().in('dedupe_key', [dlinkKey, 'appt:' + appt.id + ':booked:patient'])
 await svc.from('push_subscriptions').delete().in('id', [dead.id, malformed.id])
-await svc.from('push_subscriptions').delete().like('endpoint', '%forge-%')
-await svc.from('push_subscriptions').delete().eq('user_id', me.user_id) // QA owns this demo account's rows
+// endpoint-scoped: delete ONLY the rows this run created (device A + device B +
+// forge) — never delete-by-user, that would sweep unrelated demo-account rows
+await svc.from('push_subscriptions').delete().in('endpoint', [...runEndpoints])
 await svc.from('transactions').delete().eq('appointment_id', appt.id)
 await svc.from('payments').delete().eq('appointment_id', appt.id)
 await svc.from('appointments').delete().eq('id', appt.id)

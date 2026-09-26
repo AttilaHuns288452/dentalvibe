@@ -72,3 +72,15 @@ export function slotStartsFor({ open_time, close_time, open_days }, dateISO, dur
   }
   return out
 }
+
+// Capacity-aware variant (multi-dentist): perDentistBusy is one busyRanges list per
+// available dentist. A start is offered when AT LEAST ONE dentist is free for the
+// whole visit — parallel chairs may overlap each other, never themselves.
+// Empty perDentistBusy (zero available dentists) ⇒ no slots.
+export function slotStartsForDentists(settings, dateISO, durationMinutes = 30, perDentistBusy = []) {
+  const ok = new Set()
+  for (const busy of perDentistBusy) {
+    for (const t of slotStartsFor(settings, dateISO, durationMinutes, busy)) ok.add(t)
+  }
+  return [...ok].sort()
+}

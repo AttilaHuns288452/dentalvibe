@@ -113,6 +113,10 @@ export default function OwnerManage() {
       </section>
 
       {err && <p className="text-xs text-red-500">{err}</p>}
+      <button onClick={() => navigate('/owner/audit')}
+              className="w-full flex items-center justify-between bg-white border border-gray-200 rounded-lg px-4 py-3 text-sm font-semibold text-gray-700">
+        Audit Log <span className="text-gray-400">→</span>
+      </button>
       <button disabled={saveBusy} onClick={save} className="w-full h-12 rounded-lg bg-primary-600 text-white font-semibold">
         {saved ? 'Saved ✓' : 'Save Changes'}
       </button>

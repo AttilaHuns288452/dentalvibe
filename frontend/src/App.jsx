@@ -17,6 +17,7 @@ import ResetPassword, { ResetConfirm } from './pages/shared/ResetPassword'
 import Placeholder from './pages/Placeholder'
 import DoctorPatients from './pages/doctor/DoctorPatients'
 import OwnerPatients from './pages/owner/OwnerPatients'
+import OwnerAudit from './pages/owner/OwnerAudit'
 import { BrowserRouter, Navigate, useLocation } from 'react-router-dom'
 
 const PatientShell = lazy(() => import('./pages/patient/shells'))
@@ -116,6 +117,8 @@ function Routes() {
       return <OwnerShell name="OwnerServicePrices" />
     case '/owner/income':
       return <OwnerShell name="IncomeHub" />
+    case '/owner/audit':
+      return <OwnerAudit />
     case '/owner/income/legacy':
       return <OwnerShell name="OwnerIncome" />
     case '/owner/staff':
