@@ -1,6 +1,21 @@
 import { cleanTestFuture } from './pretest_clean.mjs'
 import { settleAppointment } from './qa_settle.mjs'
-import('./qa_playwright.mjs').then(async ({ chromium }) => {
+import('./qa_playwright.mjs').then(async ({ chromium, createClient }) => {
+  // multi-dentist: the booking lands on the least-loaded dentist, not necessarily
+  // the journey doctor — assert calendar visibility CONSISTENT with the assignment
+  const { readFileSync } = await import('fs')
+  const envf = Object.fromEntries(readFileSync(new URL('./.env.local', import.meta.url), 'utf8').trim().split('\n').map((l) => l.split('=')))
+  const svc = createClient(envf.VITE_SUPABASE_URL, process.env.SB_SECRET ?? envf.SB_SECRET ?? '')
+  async function assignedDentistFor(patientName) {
+    const { data: pat } = await svc.from('patients').select('id').eq('full_name', patientName).maybeSingle()
+    if (!pat) return null
+    const { data: appt } = await svc.from('appointments').select('dentist_id').eq('patient_id', pat.id).order('created_at', { ascending: false }).limit(1).maybeSingle()
+    return appt?.dentist_id ?? null
+  }
+  async function dentistIdForEmail(email) {
+    const { data: d } = await svc.from('dentists').select('id').eq('email', email).maybeSingle()
+    return d?.id ?? null
+  }
 const pickDate = async (pg, daysAhead) => {
   const target = new Date(Date.now() + daysAhead * 864e5)
   while (target.getDay() === 0) target.setDate(target.getDate() + 1) // clinic closed Sundays
@@ -143,7 +158,9 @@ await pg.locator('form section:has-text("Available time") button:not([disabled])
   await pg.locator('input[type="date"]').fill(BDATE); await pg.waitForTimeout(900)  // a doctor jumps to the booked date
   const cal = await pg.locator('main').textContent()
   check('D2. calendar legend', cal.includes('Completed') && cal.includes('Pending') && cal.includes('Cancelled'))
-  check('D3. calendar has the booked slot (patient visible)', cal.includes('Journey Tester'))
+  const assigned = await assignedDentistFor('Journey Tester')
+  const miguel = await dentistIdForEmail('doctor@dentalvibe.ph')
+  check('D3. calendar visibility matches the auto-assignment (multi-dentist)', cal.includes('Journey Tester') === (assigned === miguel), `assigned=${assigned?.slice(0, 8)} miguel=${miguel?.slice(0, 8)}`)
   check('D4. calendar summary rows', cal.includes('Today') && cal.includes('This week'))
   await shot('09-calendar')
 
