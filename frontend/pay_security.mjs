@@ -19,6 +19,7 @@ await maria.auth.signInWithPassword({ email: 'maria@dentalvibe.ph', password: 'p
 const svcRow = (await svc.from('services').select('id, price').order('price', { ascending: false }).limit(1)).data?.[0]
 const DAY = 30 + Math.floor(Math.random() * 300)
 const when = new Date(Date.now() + DAY * 864e5); when.setUTCHours(2, 0, 0, 0)
+while (when.getUTCDay() === 0) when.setUTCDate(when.getUTCDate() + 1) // clinic closed Sundays
 const me = (await maria.from('patients').select('id').eq('user_id', (await maria.auth.getUser()).data.user.id).maybeSingle()).data
 if (!me) { console.log('FAIL no patient row for maria'); process.exit(1) }
 

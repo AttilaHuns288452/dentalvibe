@@ -76,9 +76,17 @@ const AMT = Math.round(Number(payRow.amount) * 100)
 const t1 = Math.floor(Date.now() / 1000)
 const ev1Id = 'evt_WQA1_' + Date.now()
 const ev1 = mkEvent(ev1Id, 'payment.paid', false, INTENT, AMT)
-const r1 = await post(ev1, `t=${t1},te=${sign(ev1, t1, SECRET)}`)
-const r1body = await r1.text()
-check('W1. valid test event processes', r1.status === 200 && r1body.includes('"received"') && !r1body.includes('duplicate'), `s=${r1.status} ${r1body.slice(0, 40)}`)
+// provider test-API settle latency is variable — a transient 500 ('provider not
+// settled yet') is the DESIGNED retryable outcome; re-post the same event id
+// exactly like the provider's own retry until it processes
+let r1 = await post(ev1, `t=${t1},te=${sign(ev1, t1, SECRET)}`)
+let r1body = await r1.text()
+for (let i = 0; i < 12 && r1.status !== 200; i++) {
+  await new Promise((r) => setTimeout(r, 2000))
+  r1 = await post(ev1, `t=${t1},te=${sign(ev1, t1, SECRET)}`)
+  r1body = await r1.text()
+}
+check('W1. valid test event processes (via retry when provider lags)', r1.status === 200 && r1body.includes('"received"') && !r1body.includes('duplicate'), `s=${r1.status} ${r1body.slice(0, 40)}`)
 let w1 = { status: 'pending' }
 for (let i = 0; i < 12 && w1.status !== 'paid'; i++) {
   await new Promise((r) => setTimeout(r, 1500))

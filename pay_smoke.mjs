@@ -6,6 +6,22 @@ const ANON = process.env.SB_ANON
 if (!ANON) { console.error('SB_ANON required'); process.exit(2) }
 
 const results = []
+
+// provider test-API settle latency is variable — poll the production status
+// path until the REAL signed webhook/reconcile settles the payment
+const waitForPaid = async (paymentId, tries = 25) => {
+  for (let i = 0; i < tries; i++) {
+    const r = await fetch(`${URL}/functions/v1/paymongo-check`, {
+      method: 'POST',
+      headers: { apikey: ANON, Authorization: `Bearer ${jwt}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ payment_id: paymentId }),
+    }).then((x) => x.json())
+    if (r.status === 'paid' || r.error) return r
+    await new Promise((res) => setTimeout(res, 1500))
+  }
+  return { status: 'timeout' }
+}
+
 const check = (name, ok, detail = '') => { results.push({ name, ok, detail }); console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${detail ? ' — ' + detail : ''}`) }
 
 // 1. sign in as patient Maria
@@ -88,7 +104,8 @@ const s1 = await fetch(`${URL}/functions/v1/paymongo-check`, {
   body: JSON.stringify({ payment_id: created.payment_id, simulate: 'paid' }),
 })
 const paid1 = await s1.json()
-check('simulate paid', paid1.status === 'paid', JSON.stringify(paid1))
+const settled1 = paid1.status === 'paid' ? paid1 : await waitForPaid(created.payment_id)
+check('simulate paid', settled1.status === 'paid', JSON.stringify(settled1))
 
 // 7. replay: simulate again must NOT create a second transaction
 const s2 = await fetch(`${URL}/functions/v1/paymongo-check`, {
@@ -97,7 +114,8 @@ const s2 = await fetch(`${URL}/functions/v1/paymongo-check`, {
   body: JSON.stringify({ payment_id: created.payment_id, simulate: 'paid' }),
 })
 const paid2 = await s2.json()
-check('replay idempotent', paid2.status === 'paid', JSON.stringify(paid2))
+const settled2 = paid2.status === 'paid' ? paid2 : await waitForPaid(created.payment_id)
+check('replay idempotent', settled2.status === 'paid', JSON.stringify(settled2))
 
 // 8. appointment confirmed exactly once
 const st2 = await fetch(`${URL}/rest/v1/appointments?id=eq.${appt.id}&select=payment_status,status`, {
