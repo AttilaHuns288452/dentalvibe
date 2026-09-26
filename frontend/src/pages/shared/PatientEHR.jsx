@@ -100,8 +100,13 @@ export default function PatientEHR() {
   
   const viewAtt = async (x) => {
     if (!x.path) return
-    const { data } = await supabase.storage.from('ehr-files').createSignedUrl(x.path, 60)
-    if (data?.signedUrl) window.open(data.signedUrl, '_blank')
+    const { data, error } = await supabase.storage.from('ehr-files').createSignedUrl(x.path, 60)
+    if (data?.signedUrl) {
+      window.open(data.signedUrl, '_blank')
+    } else {
+      // recoverable: reopening re-signs the same record (never creates a new one)
+      setErr("Couldn't open this file" + (error ? ' — ' + error.message : '') + '. Tap View again to retry.')
+    }
   }
   
   const exportEHR = async () => {
@@ -319,6 +324,10 @@ function AddAttachment({ patient, onClose, onSaved }) {
     if (!f) return
     if (f.size > 10 * 1024 * 1024) return setErr('Max file size is 10 MB.')
     if (!/\.(png|jpe?g|pdf|webp)$/i.test(f.name)) return setErr('Supported: JPG, PNG, WEBP, PDF.')
+    // declared MIME must match the allowlist too (extension alone is not a
+    // file-type check; the bucket enforces size+MIME server-side as well)
+    const OK_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'application/pdf']
+    if (f.type && !OK_TYPES.includes(f.type)) return setErr('Supported: JPG, PNG, WEBP, PDF.')
     setErr('')
     setFile(f)
   }
@@ -331,7 +340,7 @@ function AddAttachment({ patient, onClose, onSaved }) {
     try {
       // real file → private bucket (staff-only RLS on storage.objects)
       const path = `${patient.id}/${Date.now()}-${file.name.replace(/[^\w.\-]/g, '_')}`
-      const { error: upErr } = await supabase.storage.from('ehr-files').upload(path, file, { upsert: false })
+      const { error: upErr } = await supabase.storage.from('ehr-files').upload(path, file, { upsert: false, cacheControl: 'no-store' })
       if (upErr) throw upErr
       const { error } = await supabase.from('ehr_attachments').insert({
         patient_id: patient.id, category: cat.name, category_id: cat.id, filename: file.name, path,
@@ -376,8 +385,8 @@ function AddAttachment({ patient, onClose, onSaved }) {
 
         <label className="block border-2 border-dashed border-gray-200 rounded-lg bg-white py-6 text-center cursor-pointer">
           <div className="text-sm font-semibold text-gray-800">{file ? file.name : 'Tap to choose file'}</div>
-          <div className="text-[11px] text-gray-500">PNG · JPG · PDF · max 10 MB</div>
-          <input type="file" accept=".png,.jpg,.jpeg,.pdf" onChange={pick} className="hidden" />
+          <div className="text-[11px] text-gray-500">PNG · JPG · WEBP · PDF · max 10 MB</div>
+          <input type="file" accept=".png,.jpg,.jpeg,.webp,.pdf,image/png,image/jpeg,image/webp,application/pdf" onChange={pick} className="hidden" />
         </label>
 
         <label className="block"><span className="text-xs font-medium text-gray-500">Optional note</span>
