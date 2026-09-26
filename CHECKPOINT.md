@@ -22,24 +22,22 @@
 - `pay_lifecycle_qa.mjs` **7/7** (updated to per-dentist semantics: 1b = explicit same-dentist insert rejected; 3a/3c = same-dentist resurrection blocked; 3 forces rebooking onto apptA's dentist).
 - `pay_smoke.mjs` 13/13.
 
-## What LANDED but is NOT YET VERIFIED (working tree, uncommitted)
-Three parallel workstreams wrote these files (their completion reports arrived after pause — treat claims as unverified):
-- **Capacity UI:** `frontend/src/lib/scheduling.js`, `availability.js`, `Book.jsx`, `DoctorCalendar.jsx`, `capacity_qa.mjs`
-- **Finance + Audit UI:** `frontend/src/lib/finance.js`, `IncomeHub.jsx`, `OwnerAudit.jsx`, `App.jsx` (route), `finance_qa.mjs`, `audit_qa.mjs`
-- **Notifications + copy:** `Notifications.jsx`, `MyAppointments.jsx`, `ResetPassword.jsx`, `push_qa.mjs`, `notification_qa.mjs`; `OwnerManage.jsx` (likely the Audit entry link)
+## What LANDED + WORKER-REPORTED GREEN (self-reports, orchestrator spot-verify on resume) — commit `2a3e4cc`
+- **Capacity UI:** `scheduling.js`, `availability.js` (slotStartsForDentists), `Book.jsx`, `DoctorCalendar.jsx` (own-appointments + Ready toggle), `capacity_qa.mjs` **33/33** (cases a–j + UI smoke; incl. concurrency case f: two simultaneous inserts, exactly one wins).
+- **Finance + Audit UI:** `finance.js`, `IncomeHub.jsx` (Correct/Void modals, reason required, voided struck+excluded from totals), `OwnerAudit.jsx` + `/owner/audit` route + Manage entry link, `finance_qa.mjs` **26/26**, `audit_qa.mjs` **18/18**. Also fixed `exportReport` missing `clinicName` import.
+- **Notifications + copy:** `Notifications.jsx` (row click → read + navigate route), `MyAppointments.jsx`/`ResetPassword.jsx` ("Clinic hours unavailable" fallbacks; zero receipt-upload leftovers found), `push_qa.mjs` **33/33** (endpoint-scoped cleanup + new deep-link checks 28/28b/29/29b), `notification_qa.mjs` **12/12** (NEW).
+
+## DB captures applied after the workers (migration `0027_rls_fixes.sql`)
+- (1) `dentist_ready` ready-own-write/update policies now use `lower(auth.jwt() ->> 'email')` (worker found the 0021 `auth.users` reference broke every doctor self-write; fixed live + captured).
+- (2) `audit_log` insert policy tightened to `with check (false)` (was `true` — bare return=minimal POSTs could forge rows; trigger writes are SECURITY DEFINER and unaffected). RE-RUN `audit_qa.mjs` on resume to confirm the tighten doesn't break its asserts.
 
 ## RESUME STEPS (in order)
-1. `cd ~/Documents/Projects/dentalvibe/frontend && npm run build` — fix any breakage in the unverified files first.
-2. Re-read each workstream diff (`git diff` + new files) against its brief before trusting it:
-   - capacity: Ready toggle on DoctorCalendar (own-appointments filter, deactivated-disabled), capacity-aware Book slots, no client-sent dentist_id on booking.
-   - finance: Correct/Void modals with required reason, voided excluded from totals, OwnerAudit screen + filters + owner-only.
-   - notifications: row click → mark read + navigate(route); fallbacks say "Clinic hours unavailable"; push_qa cleanup is endpoint-scoped (NOT delete-by-user).
-3. Run: `capacity_qa.mjs`, `finance_qa.mjs`, `audit_qa.mjs`, `notification_qa.mjs`, `push_qa.mjs` (QA_CHROME=/home/attila/tools/google-chrome/opt/google/chrome/chrome), then the full matrix (qa, qa:e2e, qa:security, qa:cross-role, qa:ehr, qa:scheduling, qa:payment incl. pay_webhook_qa) — journey_qa P12 and appointment flows may need re-pinning to per-dentist behavior.
-4. ALSO RUN the leftover task-1 QA cases not yet covered anywhere: concurrency case (two simultaneous bookings, one dentist → exactly one wins) is in capacity_qa (f) — verify it actually asserts that.
-5. §6 legacy-copy repo sweep: grep 'receipt', '8 AM', '10 AM – 5 PM', 'Attach receipt' repo-wide once more.
-6. Data hygiene: QA suites create dentists/transactions — scan `dentists` for `QA %` rows and test transactions before finishing.
-7. Commit, push (Vercel auto-deploys), run push_qa + cross_role against https://dentalvibe.vercel.app, then write the §10 final report (12 sections).
-8. Physical Android/iPhone = NOT VERIFIED (no devices) — keep that distinction explicit.
+1. Spot-verify the three workstreams (workers' reports claim green — confirm, don't re-derive): `cd frontend && npm run build`, then run `capacity_qa.mjs`, `finance_qa.mjs`, `audit_qa.mjs` (especially after 0027), `notification_qa.mjs`, `push_qa.mjs` (QA_CHROME=/home/attila/tools/google-chrome/opt/google/chrome/chrome, headed).
+2. Full regression matrix (qa, qa:e2e, qa:security, qa:cross-role, qa:ehr, qa:scheduling, qa:payment incl. pay_webhook_qa) — journey_qa P12 and appointment flows may need re-pinning to per-dentist behavior.
+3. §6 legacy-copy repo sweep: grep 'receipt', '8 AM', '10 AM – 5 PM', 'Attach receipt' repo-wide once more.
+4. Data hygiene: scan `dentists` for `QA %` rows and test transactions (worker incidents: one deactivation test used the owner's dentist row then restored it — verify owner dentist is active).
+5. Commit, push (Vercel auto-deploys), run push_qa + cross_role against https://dentalvibe.vercel.app, then write the §10 final report (12 sections).
+6. Physical Android/iPhone = NOT VERIFIED (no devices) — keep that distinction explicit.
 
 ## Key facts for the resumed session
 - Preview server: `cd frontend && npx vite preview --port 4176` (may need restart).
