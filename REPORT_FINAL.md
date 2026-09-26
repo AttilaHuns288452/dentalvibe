@@ -1,102 +1,139 @@
-# DentalVibe — Final Production Hardening + Multi-Dentist Capacity: Completion Report
+# DentalVibe — Multi-Dentist Scheduling, Daily Ready State, Finance Corrections, Audit Log, Final Hardening: Completion Report
 
-Repo `AttilaHuns288452/dentalvibe` · main @ `3cd0c53` · live https://dentalvibe.vercel.app · DB `wfmtkmfevdqbhtpqamic`
-Final gate: **365 automated checks, 0 failures** (local) + **55 against production** (cross-role 22, push 33).
+Repo `AttilaHuns288452/dentalvibe` · main @ `8e78ac5` · live https://dentalvibe.vercel.app (bundle `index-C6_43cmw.js`) · DB `wfmtkmfevdqbhtpqamic`
 
-## 1. Multi-dentist / parallel capacity (the core change)
-The one-global-slot assumption is gone. **N available dentists = N parallel appointments at the same
-time.** Capacity expands automatically with the ready roster and shrinks when a dentist is Not Ready —
-nothing about the dentist count is hardcoded (migration 0021 + `fn_available_dentist_ids` 0029).
+## 1. The core model change (planned availability ≠ day-of presence)
+The single-global-slot assumption is gone, and — critically — **future booking never depends on
+day-of Ready state**:
 
-## 2. Presence model (Ready / Not Ready)
-Per dentist, per clinic date (`dentist_ready`, UNIQUE(dentist_id, clinic_date)). Semantics: an active
-dentist counts available **unless** a `ready=false` row exists for that date; a `ready=true` row makes
-today explicit; rows expire with the day. Ready-state is NOT a permanent account property — a dentist
-must re-confirm readiness each day. Deactivated dentists are never ready and can never receive an
-appointment (guard triggers). Doctor UI: prominent "Ready for Today / Not Ready" toggle on the doctor
-calendar; deactivated accounts see it disabled.
+```
+future booking  →  dentist WORK SCHEDULES + appointment assignments
+day-of reality  →  Ready / Not Ready  →  operational view + warnings
+```
 
-## 3. Scheduling enforcement (DATABASE, not React)
-`fn_appt_dentist_guard` runs on every appointment write: per-dentist overlap among reservations
-(`payment_status in (pending,paid)`, not cancelled); auto-assigns the **least-loaded ready dentist**
-(tie-break: dentist id) under a per-day advisory lock so concurrent bookings can never share a dentist;
-an explicitly supplied `dentist_id` is validated (availability + overlap); no candidate →
-"no dentist available for that time". The UI only displays capacity — it cannot create a double
-booking. Proven by capacity_qa (a)–(j): zero-ready blocked, 1/2/3-dentist parallel bookings, 90-minute
-visit conflict scoping, **two concurrent inserts → exactly one wins**, deactivation guards, forged
-`dentist_id` rejected. Patients never choose a dentist.
+- **`dentist_work_schedules`** (migration 0030): per dentist, per weekday, open/close + active.
+  The ONLY source of booking capacity. N scheduled dentists = N parallel resources (nothing
+  hardcoded). A dentist with no active row for a date is not a resource that date. Adding a new
+  dentist expands capacity automatically once a schedule is configured. Existing active dentists
+  were seeded Mon–Sat clinic hours.
+- **`dentist_ready`** (daily presence): scoped to the Manila clinic date, resets per day, never
+  inherits tomorrow, does not enable or block any booking. Deactivated dentists can never become
+  Ready. Owner-as-provider can use Ready; a non-provider Owner has no dentist row and no schedule
+  and is therefore never a resource.
 
-## 4. Payment webhook retry correctness
-`provider_events` now distinguishes **received** from **processed** (`processed_at` nullable, no
-auto-stamp — it was `NOT NULL DEFAULT now()`, the root cause of lost retries). A transient failure
-(provider unsettled, provider read error) returns 5xx and leaves the event unprocessed; the provider's
-retry of the SAME event id re-processes it; only a successful settle stamps processed; duplicates after
-processing are acknowledged no-ops; settlement idempotence makes races safe. Mandatory regression
-(pay_webhook_qa W12): first delivery 500+unprocessed → same event reprocesses → paid + exactly one
-transaction + exactly one notification + processed → later duplicate harmless. 27/27.
+## 2. Database enforcement (not React)
+`fn_appt_dentist_guard` on every appointment write: per-dentist overlap among reservations
+(pending/paid, non-cancelled); auto-assigns the least-loaded scheduled dentist (tie-break: dentist
+id) under a per-day advisory lock; explicitly supplied `dentist_id` validated (scheduled + free);
+outside a dentist's working hours rejected per dentist; zero scheduled → "no dentist available for
+that time". Two patients racing one slot on one dentist: exactly one wins (concurrent-insert case
+green). Two qualified dentists at the same time: both bookings succeed with different assignments.
+Patient clients can never self-confirm (draft inserts are forced unpaid; reservations happen at
+payment). Migrations: 0030 (work schedules + schedule-based capacity functions), 0032
+(`fn_day_busy` — identity-free busy intervals for the booking page).
 
-## 5. Payment / notification deep links
-Payment rows carry route `/appointments?appt=<id>` with deterministic dedupe keys; in-app notification
-rows mark read AND navigate to their stored route; the target screen renders scoped + highlighted;
-unknown/foreign/stale routes render safely with zero private data; deep links never grant access
-(auth + RLS unchanged, unauthorized appointment IDs blocked). Duplicate events → one notification;
-refresh-safe; closed-PWA push click → focus + navigate (notification_qa 12/12, push_qa checks 28/29b).
+## 3. Day-of operations (Ready state + warnings)
+Owner "Today's Operations" panel (`/owner/schedules`): per dentist — Scheduled today / Ready /
+Not Ready / appointment count; capacity line "N scheduled · M Ready · K appointments today";
+display-only conflict warnings ("X appointments at H:00 but only Y dentists Ready") and
+"Dr. X is deactivated but has K future appointments — reassign or cancel manually". Nothing is
+ever auto-cancelled or silently moved. Doctor side: "Ready for Today / Not Ready" toggle under a
+"Today's presence" label with an explicit note that it never affects booking.
 
-## 6. Finance correction model (Create → Review → Correct/Void → Audit)
-`fn_correct_transaction` (amount + mandatory reason, owner-only) and `fn_void_transaction`
-(timestamped, idempotent, owner-only) — never a silent history edit. Corrected rows show
-"Corrected from ₱old, reason"; voided rows are struck through and excluded from every income total
-(totals recompute proven). Owner UI modals surface RPC errors (invalid amount, already voided).
-finance_qa 26/26.
+## 4. Owner work-schedule editor
+Per dentist, 7 weekday rows (day on/off + open/close + active) upserting `dentist_work_schedules`;
+a dentist with no active rows is labeled "No working schedule — not bookable"; deactivated
+dentists badged. Slots expand/shrink immediately with the schedule (QA: adding a Sunday row opens
+Sunday slots; removing rows removes slots while historical appointments stay intact).
 
-## 7. Audit log coverage
-`audit_log` gains before/after state, actor role, and reason (migration 0022). Service/price changes,
-dentist de/activations, transaction corrections and voids all log with actor + timestamp + readable
-before→after summaries. Owner-facing Audit Log screen (`/owner/audit`) with action/entity/actor
-filters. Append-only RLS: patients can neither read, insert, modify, nor delete (insert policy
-tightened to `with check(false)` in 0027). audit_qa 18/18.
+## 5. Booking UX under multi-dentist
+Patients still never choose a dentist. Slot lists derive from clinic hours ∩ each scheduled
+dentist's own hours (per-dentist clipping, then union); the busy overlay comes from `fn_day_busy`
+(patients can only read their own appointment rows — the raw table would hide other patients'
+bookings and over-offer slots; found and fixed in this pass). Patient-visible errors keep
+"no dentist available for that time".
 
-## 8. Legacy / stale state removed
-Receipt-upload flow remnants, stale hardcoded clinic hours ("10 AM – 5 PM") and dentist email
-fallbacks ("Clinic hours unavailable" instead of a possibly-wrong schedule), stale receipt copy in the
-visit-complete notification. Repo-wide sweep: zero leftovers. QA data hygiene: all QA patients/
-transactions/dentists rows removed (21 test transactions, QA patients, orphan sweep — zero left).
+## 6. Finance — Create → Review → Correct / Void → Audit
+`fn_correct_transaction` (amount + mandatory reason, owner-only, invalid amounts rejected,
+voided rows locked) and `fn_void_transaction` (timestamped, idempotent, owner-only). Corrected
+rows show "Corrected from ₱old, reason"; voided rows are struck through and excluded from every
+total (totals recompute proven). Appointment-generated PayMongo income remains authoritative —
+manual finance actions never duplicate it (one transaction per payment, unique-index enforced).
+Patients/doctors cannot modify finance (RLS + RPC checks). Every correction/void writes an audit
+event with before/after.
 
-## 9. Push QA cleanup precision
-`push_qa` no longer deletes by user: cleanup is **endpoint-scoped** to the subscription endpoints the
-run created (device A, device B, forge rows) plus id-scoped notification cleanup. Prior checks intact;
-device-B registration settle now polls the server row instead of a blind wait. 33/33 locally and on
-production.
+## 7. Audit log (WHO changed WHAT, WHEN, FROM → TO)
+`audit_log`: actor + role + action + entity + before/after + reason + timestamp; append-oriented;
+patients can neither read, insert, modify, nor delete (insert policy `with check(false)`); doctors
+cannot mutate; owner reads with action/entity/actor filters. Covered events: dentist created/
+activated/deactivated/reactivated, clinic name/email/hours/open-days changes, service created/
+edited/activated/deactivated/price-changed, patient-specific price changes, transaction created/
+corrected/voided, expense rows, patient record edits, EHR attachment uploads/deletes (0031),
+record-category changes. Owner UI shows readable lines ("Deactivated Dr. Juan", "Changed service
+price · Cleaning · ₱800 → ₱900", "Corrected transaction · ₱5,000 → ₱500") plus the raw before→after
+diff. Duplicate audit triggers de-duplicated (one event = one row).
 
-## 10. Test evidence (final gate)
+## 8. PayMongo webhook retry correctness (re-verified end-to-end)
+`provider_events.processed_at` nullable with no auto-stamp; transient reconciliation failure →
+5xx + event stays unprocessed; retry of the SAME event id re-processes; success stamps processed;
+later duplicates are acknowledged no-ops; settlement idempotent. Mandatory regression (pay_webhook
+W12): first delivery 500 + unprocessed → same event reprocesses → paid + exactly one transaction +
+exactly one notification + processed → third delivery harmless. One bounded retry added in the
+shared provider client (measured ~1% transient 5xx rate from the PayMongo test API under load).
+
+## 9. Notifications & deep links (re-verified)
+Payment events route `/appointments?appt=<id>` with deterministic dedupe; in-app rows mark read AND
+navigate; scoped + highlighted target; stale/foreign/unknown routes fail safely with zero private
+data; deep links never grant access (auth + RLS unchanged). Push: one event → every active device
+(multi-device delivery proven per-device), endpoint-scoped test cleanup only.
+
+## 10. Test evidence — final gate (exact numbers)
 | Suite | Result | Suite | Result |
 |---|---|---|---|
-| qa_all | 35/35 | capacity_qa (NEW) | 33/33 |
-| journey_qa | 42/42 | finance_qa (NEW) | 26/26 |
-| nav_matrix | 21/21 | audit_qa (NEW) | 18/18 |
-| prod_e2e | 20/20 | notification_qa (NEW) | 12/12 |
-| fidelity_e2e | 26/26 | pay_security | 14/14 |
-| cross_role_qa | 22/22 | pay_smoke | 13/13 |
+| capacity_qa (reworked) | 40/40 | qa_all | 35/35 |
+| ready_state_qa (new) | 15/15 | journey_qa | 42/42 |
+| owner_ops_qa (new) | 34/34 | nav_matrix | 21/21 |
+| finance_qa | 26/26 | prod_e2e | 20/20 |
+| audit_qa (extended) | 37/37 | fidelity_e2e | 26/26 |
+| notification_qa | 12/12 | pay_security | 14/14 |
+| scheduling_qa | 10/10 | pay_smoke | 13/13 |
 | ehr_qa | 16/16 | pay_lifecycle | 7/7 |
 | ehr_link_qa | 7/7 | pay_webhook_qa | 27/27 |
-| scheduling_qa | 10/10 | push_qa (local + prod) | 33/33 ×2 |
-| catalog_prices_qa | 14/14 | **Total** | **365 local + 55 prod** |
+| catalog_prices_qa | 14/14 | push_qa (local) | 33/33 |
+| cross_role_qa | 22/22 | **production** cross_role + push | 22/22 + 33/33 |
 
-Fixes found by this gate: patient capacity slots (patients get 0 rows from `dentists` by design →
-`fn_available_dentist_ids` RPC + shared-helper fallback), journey D3 re-pinned to multi-dentist truth
-(calendar visibility must match the auto-assignment; the old flake is structurally gone).
+Total: **449 automated checks green** (402 local + 47 production), 0 failures. QA-matrix mapping:
+multi-dentist cases 1–15 ✓ (zero/one/two/three scheduled, future-without-Ready, parallel different
+dentists, same-dentist no-overlap, long duration, race, deactivated excluded, new dentist expands,
+history intact, forged assignment blocked, per-dentist hours, doctor isolation, owner visibility);
+Ready cases 1–8 ✓ (set/unset, no tomorrow inheritance, deactivated guard, booking unaffected,
+ops-view effect, owner-as-provider, non-provider owner); Finance 1–8 ✓; Audit 1–9 ✓; Payments: all
+prior suites + the transient-retry regression ✓; Notifications 1–5 ✓.
 
-## 11. Security posture
-Payments: webhook is the sole authority, signature enforced, mode fail-closed (mock/test/live explicit,
-never inferred), amount+currency verified before PAID, secret keys server-side only. RLS: EHR
-owner+doctor only; patients cannot self-confirm, self-price, or write income/audit rows; `dentists`
-rows never leak to patients (id-only RPC surface); deactivated doctors receive nothing. Repo and
-deployed bundle secret scans clean.
+## 11. Defects found and fixed in this pass (all re-tested)
+1. **Ready-gated booking** (pre-existing semantic bug vs spec): `ready=false` used to shrink future
+   capacity — replaced by work-schedule-driven capacity.
+2. **Patient busy overlay blind** (2 of 7 appointments visible): patients can only read their own
+   rows → `fn_day_busy` identity-free RPC.
+3. **`dentist_ready` RLS** referenced `auth.users` (locked table) — every doctor self-write failed;
+   fixed via `auth.jwt() ->> 'email'` (0027) and captured as migration.
+4. **`audit_log` insert policy `with check(true)`** — forged rows possible; tightened to `false`.
+5. **`processed_at` auto-stamp** (`NOT NULL DEFAULT now()`) destroyed webhook retries; made nullable.
+6. **Webhook acked unsettled events** as processed; only successful settles now stamp.
+7. **journey D3** was single-dentist-era; re-pinned to assignment-consistent assertion (the old
+   flake is structurally gone).
+8. **Test-layer drift** (documented honestly): suites booked at 09:00 Manila (hours unenforced
+   pre-0030) and on Sundays; push_qa had stale-row blindness in its multi-device poll and an
+   un-unique mock intent id; pay_lifecycle's conflict case asserted at the draft layer where drafts
+   legitimately don't hold chairs.
 
 ## 12. Honest limitations (NOT verified)
-- **Physical Android/iPhone push acceptance** — no devices attached; the full chain is automated-green
-  on production but real-device delivery is unverified.
-- **Live ₱1 PayMongo smoke** — mode is `test`; the live QR expired un-scanned. Re-arm playbook ready.
-- No offline/bandwidth testing, no Play Store distribution (PWA install only).
-- `journey_qa` runs best sequentially — concurrent suite runs against the same DB corrupt each other
-  (observed once; suites are green standalone/in-sequence).
+- **Physical Android/iPhone push acceptance** — no devices attached; the full chain is
+  automated-green on production but real-device delivery is unverified.
+- **Live ₱1 PayMongo smoke** — provider mode is `test`; the live QR expired un-scanned. Re-arm
+  playbook ready whenever the user wants to scan.
+- No offline/bandwidth testing; PWA install only (no app stores).
+- PayMongo test API shows ~1% transient 5xx under load — mitigated by a bounded internal retry and
+  idempotent DB-layer reuse; a user-visible retry remains possible under provider outage.
+- Suites must run sequentially against one DB (documented); concurrent runs corrupt each other's
+  fixtures.
