@@ -17,6 +17,13 @@ export async function readyStateForDate(dateISO) {
   ])
   if (e1) throw e1
   if (e2) throw e2
+  // Patients cannot read dentists rows (RLS is doctor/owner/self by design) —
+  // fall back to the id-only RPC so capacity-aware slots still compute.
+  if (!(dentists ?? []).length) {
+    const { data: ids, error: e3 } = await supabase.rpc('fn_available_dentist_ids', { p_date: dateISO })
+    if (e3) throw e3
+    return (ids ?? []).map((id) => ({ id, ready: null, ready_at: null }))
+  }
   const byId = Object.fromEntries((rows ?? []).map((r) => [r.dentist_id, r]))
   return (dentists ?? []).map((d) => ({ ...d, ready: byId[d.id]?.ready ?? null, ready_at: byId[d.id]?.ready_at ?? null }))
 }
